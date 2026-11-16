@@ -1,4 +1,6 @@
 export type DriveSide = 'left' | 'right';
+/** Time of day the city is dressed for: the winter afternoon, or the night kit the base game shipped with. */
+export type SkyStyle = 'winterDay' | 'night';
 
 /**
  * What a city is, without its generator: `config.ts` reads this at load to set the seed and the drive side,
@@ -13,6 +15,7 @@ export interface MapInfo {
   /** Feeds the dressings (buildings, props, parked cars); the street layout is fixed in `maps/montreal/layout.ts`. */
   seed: number;
   driveSide: DriveSide;
+  sky: SkyStyle;
 }
 
 /** Montreal Driver ships one city. */
@@ -25,6 +28,7 @@ export const MAPS: Record<MapId, MapInfo> = {
     sub: '2 décembre. Les pneus d’hiver, c’est hier.',
     seed: 20261202,
     driveSide: 'right',
+    sky: 'winterDay',
   },
 };
 

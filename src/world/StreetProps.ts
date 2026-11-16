@@ -5,6 +5,7 @@ import type { AABB, Facing, Vec2 } from '../types';
 import { AVIATION, buildingBase } from './BuildingDetails';
 import { inDriveway as curbCut } from './Features';
 import type { CityModel } from './RoadGraph';
+import { LOOK } from '../render/Look';
 
 type M = THREE.Matrix4;
 const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number): M =>
@@ -109,11 +110,10 @@ export function buildStreetProps(city: CityModel, scene: THREE.Scene): AABB[] {
                 new THREE.Vector3(cs * 1.15, cs * 0.85, cs * 1.15),
               ),
             );
-            leafCol.push(
-              sakura
-                ? new THREE.Color().setHSL(rng.range(0.9, 0.97), rng.range(0.45, 0.7), rng.range(0.55, 0.75))
-                : new THREE.Color().setHSL(rng.range(0.25, 0.36), rng.range(0.35, 0.5), rng.range(0.12, 0.2)),
-            );
+            const leaf = sakura
+              ? new THREE.Color().setHSL(rng.range(0.9, 0.97), rng.range(0.45, 0.7), rng.range(0.55, 0.75))
+              : new THREE.Color().setHSL(rng.range(0.25, 0.36), rng.range(0.35, 0.5), rng.range(0.12, 0.2));
+            leafCol.push(LOOK.day ? winterCrown(sakura, leaf) : leaf);
           }
           if (drop) {
             trunks.length = mark[0];
@@ -145,6 +145,15 @@ export function buildStreetProps(city: CityModel, scene: THREE.Scene): AABB[] {
 }
 
 /** Foliage glows faintly in its own (instance) color, like trees lit from below by the street. */
+/**
+ * December: the crowns are bare twigs under a dusting of snow. Same random rolls as the summer colors (the
+ * rest of the street keeps its sequence); the lightness picks how much snow a clump caught.
+ */
+export function winterCrown(frosted: boolean, leaf: THREE.Color): THREE.Color {
+  const l = leaf.getHSL({ h: 0, s: 0, l: 0 }).l;
+  return frosted ? new THREE.Color().setHSL(0.6, 0.06, 0.35 + 0.4 * (l - 0.55)) : new THREE.Color().setHSL(0.07, 0.12, 0.05 + 0.3 * (l - 0.12));
+}
+
 function leafMaterial(): THREE.MeshStandardMaterial {
   const m = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.85, flatShading: true });
   m.onBeforeCompile = (sh) => {

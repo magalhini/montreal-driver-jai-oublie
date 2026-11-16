@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { clamp } from '../core/math';
 import type { ViewSystem } from '../types';
 import { GlowQuads } from '../render/GlowQuads';
+import { LOOK } from '../render/Look';
 import { sharedGlow } from '../world/textures';
 import type { Car } from './Car';
 import { buildCarParts, carMaterial } from './CarModel';
@@ -29,10 +30,12 @@ const MAT = {
     map: sharedGlow(),
     color: new THREE.Color(0.55, 0.5, 0.42),
     transparent: true,
+    opacity: LOOK.pool,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   }),
-  sirenGlow: new THREE.MeshBasicMaterial({ map: sharedGlow(), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }),
+  // The siren wash on the asphalt still has to read by day: it is how a chase is spotted from a block away
+  sirenGlow: new THREE.MeshBasicMaterial({ map: sharedGlow(), transparent: true, opacity: Math.min(1, LOOK.pool * 4), blending: THREE.AdditiveBlending, depthWrite: false }),
 };
 
 /** Blob shadows with a per-instance opacity (they fade and spread while the car is in the air). */
@@ -58,7 +61,7 @@ const shadowMaterial = () =>
   });
 
 /** Player headlight beam (candela-ish, physically based lights). */
-const SPOT_INTENSITY = 220;
+const SPOT_INTENSITY = 220 * LOOK.headSpot;
 
 /** Halo color and size (m) per lamp state. Headlight halos stay soft so oncoming traffic is not glaring. */
 const GLOW = {

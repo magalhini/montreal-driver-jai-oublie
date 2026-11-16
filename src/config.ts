@@ -1,6 +1,6 @@
-import { DEFAULT_MAP, MAPS, type DriveSide } from "./maps/catalog";
+import { DEFAULT_MAP, MAPS, type DriveSide, type SkyStyle } from "./maps/catalog";
 
-export type { DriveSide };
+export type { DriveSide, SkyStyle };
 
 /** The one city (`maps/catalog.ts`). */
 const MAP = DEFAULT_MAP;
@@ -9,6 +9,8 @@ export const CONFIG = {
   MAP,
   SEED: MAPS[MAP].seed,
   DRIVE_SIDE: MAPS[MAP].driveSide,
+  /** Daylight and snow, or the night kit (`render/Look.ts`). */
+  SKY: MAPS[MAP].sky,
 
   // Street dimensions (meters). The grid, and each edge's lanes and parking, are `maps/montreal/layout.ts`.
   SIDEWALK: 4,

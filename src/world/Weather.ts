@@ -18,6 +18,8 @@ export const WEATHER_TUNING = {
   dry: 0.0055,
   /** Tire grip multiplier on a fully wet road (1 = rain does not affect handling). */
   wetGrip: 0.88,
+  /** Winter map (PRD 4.4): slush keeps the road this wet all session; no rain spells. */
+  winterWetness: 0.45,
 };
 
 /**
@@ -32,6 +34,8 @@ export class Weather implements SimSystem {
   wetness = 0;
   /** When off the current state holds (no new spells). */
   auto = true;
+  /** Road wetness never dries below this (slush on the winter map); null lets it dry out. */
+  wetFloor: number | null = null;
   private rng: Rng;
   private timer: number;
   private segmentsLeft = 0;
@@ -39,6 +43,17 @@ export class Weather implements SimSystem {
   constructor(seed: number) {
     this.rng = new Rng(seed);
     this.timer = this.rng.range(WEATHER_TUNING.dryMin, WEATHER_TUNING.dryMax) * 0.5;
+  }
+
+  /**
+   * Winter map: no rain cycle, the road stays damp with slush. The debug toggle can still start a shower.
+   */
+  holdWinter(): void {
+    this.auto = false;
+    this.stopRain();
+    this.rain = 0;
+    this.wetFloor = WEATHER_TUNING.winterWetness;
+    this.wetness = this.wetFloor;
   }
 
   /** Tire grip multiplier from road wetness. */
@@ -74,7 +89,7 @@ export class Weather implements SimSystem {
     const step = t.fade * dt;
     this.rain = this.rain < this.target ? Math.min(this.target, this.rain + step) : Math.max(this.target, this.rain - step);
     const wetTarget = this.rain > 0.05 ? 1 : 0;
-    this.wetness = clamp(this.wetness + (wetTarget ? t.soak * this.rain : -t.dry) * dt, 0, 1);
+    this.wetness = clamp(this.wetness + (wetTarget ? t.soak * this.rain : -t.dry) * dt, this.wetFloor ?? 0, 1);
   }
 
   private startRain(heavyFirst: boolean): void {

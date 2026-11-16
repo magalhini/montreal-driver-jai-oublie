@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { sharedGlow } from '../world/textures';
+import { LOOK } from './Look';
 
 /**
  * One draw call of additive glow halos, refilled every frame. Quads face local +Z and are one-sided,
@@ -17,6 +18,7 @@ export class GlowQuads {
       depthWrite: false,
       toneMapped: false,
       fog,
+      opacity: LOOK.glow, // halos are a night trick: faint against a daylight street
     });
     this.mesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(1, 1), mat, max);
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

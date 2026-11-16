@@ -7,6 +7,7 @@ import type { CityGround } from './Ground';
 import type { CityModel } from './RoadGraph';
 import { inDriveway } from './StreetProps';
 import { sharedGlow } from './textures';
+import { LOOK } from '../render/Look';
 
 /** One street lamp: pole on the curb, arm over the lane, glowing head and a pool on the asphalt. */
 interface LampPost {
@@ -108,11 +109,13 @@ export class StreetLamps implements SimSystem, ViewSystem {
   private boxGeo = new THREE.BoxGeometry(1, 1, 1);
   private poolGeo = new THREE.PlaneGeometry(13, 13);
   private poleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, roughness: 0.6, metalness: 0.5 });
-  private headMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(3.2, 2.2, 1.2) });
+  /** On in the grey afternoon at a low warm glow (PRD 4.4), full strength at night. */
+  private headMat = new THREE.MeshBasicMaterial({ color: LOOK.day ? new THREE.Color(1.3, 1.05, 0.75) : new THREE.Color(3.2, 2.2, 1.2) });
   private poolMat = new THREE.MeshBasicMaterial({
     map: sharedGlow(),
     color: new THREE.Color(0.55, 0.38, 0.22),
     transparent: true,
+    opacity: LOOK.pool,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
   });

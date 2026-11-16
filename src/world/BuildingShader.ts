@@ -2,10 +2,16 @@
  * Facade shader chunks for the building instances (`BuildingFactory`). Windows, shopfronts and doors come
  * from object-space coordinates (`position`, `objectNormal`, instance scale), so they follow a rotated
  * instance (T39); only the roof grime reads world xz.
+ *
+ * `uDay` (0 night, 1 the winter afternoon) turns most windows into dark glass that reflects the sky, drops
+ * the Japanese shop dressing (glyph sign bands, noren), and `uWindows` scales everything the facades emit.
+ * `aMat` lays brick (1) or dressed stone (2) coursing over the wall color.
  */
 export const VERT_HEAD = /* glsl */ `
 attribute vec4 aParams;
 attribute vec2 aExtra;
+attribute float aMat;
+varying float vMat;
 varying vec3 vWP;
 varying vec3 vObjN;
 varying vec3 vFac;
@@ -28,6 +34,7 @@ export const VERT_BODY = /* glsl */ `
   // Facade coordinates: u along the facade (m), v up from the ground floor (m), facade length
   vFac = vec3(sideX ? (position.z + 0.5) * sc.z : (position.x + 0.5) * sc.x, position.y * sc.y - aExtra.x, sideX ? sc.z : sc.x);
   vParams = aParams;
+  vMat = aMat;
   // Street-facing facade? (bit mask N=1 S=2 E=4 W=8)
   float bit = sideX ? (objectNormal.x > 0.0 ? 4.0 : 8.0) : (objectNormal.z > 0.0 ? 2.0 : 1.0);
   vFront = mod(floor(aExtra.y / bit), 2.0);
@@ -39,7 +46,10 @@ varying vec3 vObjN;
 varying vec3 vFac;
 varying vec4 vParams;
 varying float vFront;
+varying float vMat;
 uniform float uTime;
+uniform float uDay;
+uniform float uWindows;
 float bh(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 // Living windows: about one in eight flips on / off now and then, each on its own slow clock
 float alive(float on, vec2 cell, float seed) {
@@ -57,6 +67,29 @@ float vnoise(vec2 p) {
 float cellBox(vec2 f, vec2 lo, vec2 hi, vec2 fw) {
   vec2 a = smoothstep(lo - fw, lo + fw, f) * (1.0 - smoothstep(hi - fw, hi + fw, f));
   return a.x * a.y;
+}
+// By day most rooms are dark behind the glass: keep about one window in six lit
+float dayOn(float on, vec2 cell, float seed) {
+  return mix(on, on * step(0.83, bh(cell * 0.71 + seed * 1.9)), uDay);
+}
+// Brick (vMat 1, half-bond, ~24 x 7.7 cm) or dressed stone (vMat 2, ashlar courses) over the wall color.
+// Joints fade to the average tone where they would shimmer.
+vec3 masonry(vec3 col, float u, float v, float seed) {
+  if (vMat < 0.5) return col;
+  bool brick = vMat < 1.5;
+  vec2 size = brick ? vec2(0.24, 0.077) : vec2(1.15, 0.56);
+  float row = v / size.y;
+  float rid = floor(row);
+  float x = u / size.x + 0.5 * mod(rid, 2.0);
+  vec2 g = vec2(x, row);
+  vec2 fw = fwidth(g);
+  float far = smoothstep(0.22, 0.55, max(fw.x, fw.y));
+  vec2 j = brick ? vec2(0.045, 0.13) : vec2(0.012, 0.025);
+  float joint = 1.0 - cellBox(fract(g), j, 1.0 - j, fw);
+  float unit = bh(vec2(floor(x), rid) + seed);
+  vec3 face = col * (brick ? 0.8 + 0.4 * unit : 0.93 + 0.14 * unit);
+  vec3 mortar = brick ? vec3(0.2, 0.19, 0.175) : col * 0.7;
+  return mix(mix(face, mortar, joint), mix(col, mortar, brick ? 0.15 : 0.04), far);
 }
 vec3 homeLight(float h) {
   if (h < 0.55) return vec3(1.0, 0.66, 0.36);
@@ -90,6 +123,7 @@ export const FRAG_BODY = /* glsl */ `
     // Weathered concrete / panels, darker toward the street
     float grime = 0.8 + 0.3 * vnoise(vec2(u * 0.3 + seed, v * 0.09)) + 0.08 * vnoise(vec2(u * 2.1, v * 1.7));
     diffuseColor.rgb *= grime * mix(0.7, 1.0, smoothstep(0.0, 7.0, v));
+    diffuseColor.rgb = masonry(diffuseColor.rgb, u, v, seed);
     vec3 dark = vec3(0.012, 0.016, 0.026);
 
     if (style < 0.5) {
@@ -143,7 +177,7 @@ export const FRAG_BODY = /* glsl */ `
         float floorOn = step(1.0 - litP * 0.6, fl);
         float h = bh(cell + seed);
         float on = floorOn > 0.5 ? step(0.15, h) : step(1.0 - litP * 0.25, h);
-        on = mix(alive(on, cell, seed), litP * 0.6, far);
+        on = mix(dayOn(alive(on, cell, seed), cell, seed), litP * mix(0.6, 0.1, uDay), far);
         float hue = bh(vec2(cell.y * 3.1, seed));
         vec3 lc = hue < 0.45 ? vec3(0.62, 0.78, 1.0) : hue < 0.8 ? vec3(1.0, 0.8, 0.55) : vec3(0.7, 1.0, 0.8);
         // Ceiling-lit rooms: bright top, desks and partitions darken the lower part
@@ -176,7 +210,7 @@ export const FRAG_BODY = /* glsl */ `
             float frame = (1.0 - step(0.012, abs(abs(f.x - doorX) - 0.13))) * step(f.y, 0.8);
             float inner = (0.5 + 0.5 * f.y) * mix(1.0, shelves * goods, 1.0 - door);
             // Noren over some doors: dyed cloth in strips, glowing from the shop light behind
-            float hasNoren = step(0.62, bh(vec2(floor(g.x), seed + 4.0)));
+            float hasNoren = step(0.62, bh(vec2(floor(g.x), seed + 4.0))) * (1.0 - uDay);
             float noren = hasNoren * door * step(0.52, f.y) * step(f.y, 0.83) * step(fract((f.x - doorX) * sw / 0.32 + 0.5), 0.9);
             vec3 cloth = bh(vec2(floor(g.x), seed + 6.0)) < 0.5 ? vec3(0.08, 0.12, 0.45) : vec3(0.6, 0.06, 0.06);
             emit += front * sc * 0.22 * inner * (1.0 - frame * 0.8) * (1.0 - noren);
@@ -189,8 +223,9 @@ export const FRAG_BODY = /* glsl */ `
             float gc = f.x * sw / 0.4;
             float glyph = step(0.3, bh(vec2(floor(gc), floor(g.x) + seed))) * cellBox(vec2(fract(gc), (f.y - 0.865) / 0.12), vec2(0.14, 0.2), vec2(0.86, 0.82), vec2(fwidth(gc), fw.y / 0.12));
             float text = step(0.22, f.x) * step(f.x, 0.78);
-            emit += band * (kc * 0.22 + glyph * text * mix(vec3(1.0), kc, 0.3) * 0.55);
-            diffuseColor.rgb = mix(diffuseColor.rgb, kc * 0.2, band);
+            // By day the band is a painted fascia: no lit glyphs
+            emit += band * (kc * 0.22 + glyph * text * mix(vec3(1.0), kc, 0.3) * 0.55 * (1.0 - uDay));
+            diffuseColor.rgb = mix(diffuseColor.rgb, kc * mix(0.2, 0.32, uDay), band);
           } else {
             float rib = 0.75 + 0.25 * sin(v * 52.0);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.23, 0.25) * rib, front);
@@ -209,7 +244,7 @@ export const FRAG_BODY = /* glsl */ `
         vec2 f = fract(g);
         float w = vFront > 0.5 ? cellBox(f, vec2(0.14, 0.3), vec2(0.86, 0.85), fw) : cellBox(f, vec2(0.32, 0.4), vec2(0.68, 0.8), fw);
         float h = bh(cell + seed);
-        float on = alive(step(1.0 - litP, h), cell, seed);
+        float on = dayOn(alive(step(1.0 - litP, h), cell, seed), cell, seed);
         float mull = (1.0 - step(0.015, abs(f.x - 0.5))) + (1.0 - step(0.015, abs(f.y - 0.68)));
         vec3 lc = mix(shopLight(bh(cell.yx * 1.3 + seed)), vec3(1.0, 0.75, 0.5), 0.5);
         emit += w * on * lc * (0.16 + 0.2 * f.y) * (1.0 - min(1.0, mull));
@@ -218,7 +253,7 @@ export const FRAG_BODY = /* glsl */ `
       }
     } else if (style < 2.5) {
       // Harbor warehouse: corrugated walls, roller doors, high sodium-lit strip windows
-      float rib = sin(u * 6.2832 / 0.42);
+      float rib = vMat > 0.5 ? 0.0 : sin(u * 6.2832 / 0.42);
       diffuseColor.rgb *= 0.86 + 0.14 * rib;
       roughnessFactor = mix(roughnessFactor, 0.5, 0.5 + 0.5 * rib);
       float dw = L / max(1.0, floor(L / 13.0 + 0.5));
@@ -268,7 +303,7 @@ export const FRAG_BODY = /* glsl */ `
           roughnessFactor = mix(roughnessFactor, 0.45, sh);
         } else {
           float win = cellBox(fm, vec2(c - 0.8, 1.25), vec2(c + 0.8, 2.25), fwm);
-          float on = step(0.45, bh(vec2(cid, seed + 8.0)));
+          float on = dayOn(step(0.45, bh(vec2(cid, seed + 8.0))), vec2(cid, 1.0), seed);
           float bars = vFront * (1.0 - step(0.03, abs(fract((fm.x - c) / 0.2) - 0.5) - 0.44));
           emit += win * on * homeLight(bh(vec2(cid, seed))) * 0.09 * (1.0 - bars * 0.7);
           diffuseColor.rgb = mix(diffuseColor.rgb, dark, win * (1.0 - on));
@@ -283,7 +318,7 @@ export const FRAG_BODY = /* glsl */ `
         float w = vFront > 0.5 ? cellBox(f, vec2(0.1, 0.06), vec2(0.9, 0.86), fw) : cellBox(f, vec2(0.34, 0.42), vec2(0.66, 0.82), fw);
         w = mix(w, vFront > 0.5 ? 0.55 : 0.12, far);
         float h = bh(cell + seed);
-        float on = mix(alive(step(1.0 - litP, h), cell, seed), litP * 0.5, far);
+        float on = mix(dayOn(alive(step(1.0 - litP, h), cell, seed), cell, seed), litP * mix(0.5, 0.08, uDay), far);
         vec3 lc = homeLight(bh(cell.yx * 1.7 + seed * 0.37));
         // Curtains (most windows): folds, tinted fabric, sometimes half open
         float cv = bh(cell + seed * 3.1);
@@ -339,7 +374,7 @@ export const FRAG_BODY = /* glsl */ `
         float far = smoothstep(0.22, 0.6, max(fw.x, fw.y));
         float win = mix(cellBox(f, vec2(0.12, 0.16), vec2(0.88, 0.86), fw), 0.45, far) * (1.0 - isBand);
         float hh = bh(cell + seed);
-        float on = mix(alive(step(0.18, hh), cell, seed), 0.7, far);
+        float on = mix(dayOn(alive(step(0.18, hh), cell, seed), cell, seed), mix(0.7, 0.12, uDay), far);
         emit += win * on * vec3(0.62, 0.8, 1.0) * (0.18 + 0.28 * f.y);
         diffuseColor.rgb = mix(diffuseColor.rgb * 0.55, dark, max(win * (1.0 - on), band));
         glass = max(win * (1.0 - on * 0.45), band * 0.25);
@@ -349,8 +384,9 @@ export const FRAG_BODY = /* glsl */ `
     // Roofs: gravel / tar with stains
     diffuseColor.rgb *= 0.55 + 0.25 * vnoise(vWP.xz * 0.35) + 0.1 * vnoise(vWP.xz * 3.0);
   }
-  totalEmissiveRadiance += emit;
-  roughnessFactor = mix(roughnessFactor, 0.2, glass);
-  metalnessFactor = mix(metalnessFactor, 0.12, glass);
+  totalEmissiveRadiance += emit * uWindows;
+  // Glass: by day it is mostly sky reflection
+  roughnessFactor = mix(roughnessFactor, mix(0.2, 0.1, uDay), glass);
+  metalnessFactor = mix(metalnessFactor, mix(0.12, 0.6, uDay), glass);
 }
 `;

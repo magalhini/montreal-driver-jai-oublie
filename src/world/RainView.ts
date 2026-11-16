@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { Debug } from "../core/Debug";
 import { damp } from "../core/math";
+import { LOOK } from "../render/Look";
 import type { AABB, ViewSystem } from "../types";
 import type { EnvironmentParts } from "./Environment";
 import type { RoadMaterials } from "./RoadMesh";
@@ -144,8 +145,9 @@ export class RainView implements ViewSystem {
     asphalt: THREE.Color;
     rough: [number, number, number, number];
   };
-  private readonly rainFog = new THREE.Color(0x2c2238);
-  private readonly rainBg = new THREE.Color(0x1d1428);
+  /** Rain closes the sky in: purple city glow at night, flat grey by day. */
+  private readonly rainFog = LOOK.day ? new THREE.Color(0.42, 0.44, 0.48) : new THREE.Color(0x2c2238);
+  private readonly rainBg = LOOK.day ? new THREE.Color(0.42, 0.44, 0.48) : new THREE.Color(0x1d1428);
 
   constructor(
     private readonly weather: Weather,
@@ -283,7 +285,7 @@ export class RainView implements ViewSystem {
     this.env.fog.color.copy(b.fog).lerp(this.rainFog, rain * 0.75);
     this.env.background.copy(b.bg).lerp(this.rainBg, rain * 0.75);
     (this.env.sky.uniforms.uRain as THREE.IUniform<number>).value = rain;
-    this.env.moon.visible = rain < 0.15;
+    if (this.env.moon) this.env.moon.visible = rain < 0.15;
     this.scene.environmentIntensity = b.env * (1 + 0.3 * wet);
     this.roads.asphalt.roughness = b.rough[0] * (1 - 0.45 * wet);
     this.roads.lots.roughness = b.rough[1] * (1 - 0.45 * wet);

@@ -7,6 +7,8 @@ import { subtractRect } from './Interiors';
 import type { MarkingStyle } from '../maps/MapDef';
 import { buildMarkings } from './RoadMarkings';
 import type { CityModel } from './RoadGraph';
+import { LOOK } from '../render/Look';
+import { snowMaterial } from './SnowCover';
 import { offset } from './Polyline';
 import { polygonArea } from './RoadIndex';
 import { SurfaceBuilder } from './SurfaceBuilder';
@@ -114,7 +116,8 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   const puddles = puddleTexture();
   puddles.repeat.set(1 / 30, 1 / 30);
   const asphalt = new THREE.MeshStandardMaterial({
-    color: 0x6a6a7a,
+    // Night: blue-grey under the neon. Day: plain worn grey (the weather view darkens it with the slush)
+    color: LOOK.day ? 0x66666a : 0x6a6a7a,
     map: tex.map,
     normalMap: tex.normalMap,
     normalScale: new THREE.Vector2(0.55, 0.55),
@@ -149,7 +152,11 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   if (grass.vertexCount > 0) {
     const lawn = grassTexture();
     lawn.repeat.set(1 / 6, 1 / 6);
-    scene.add(grass.mesh(new THREE.MeshStandardMaterial({ color: 0x8a9a80, map: lawn, roughness: 0.95, metalness: 0 })));
+    // December lawns are snow, the turf texture showing through a little
+    const lawnMat = LOOK.day
+      ? snowMaterial()
+      : new THREE.MeshStandardMaterial({ color: 0x8a9a80, map: lawn, roughness: 0.95, metalness: 0 });
+    scene.add(grass.mesh(lawnMat));
   }
 
   scene.add(buildMarkings(city, markings));

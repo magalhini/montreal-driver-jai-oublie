@@ -32,6 +32,7 @@ import {
 import { BustSystem } from "./gameplay/Bust";
 import { Economy } from "./gameplay/Economy";
 import { Gps } from "./gameplay/Gps";
+import { Tires } from "./gameplay/Tires";
 import { Recovery } from "./gameplay/Recovery";
 import { Wreck, wreckDetail } from "./gameplay/Wreck";
 import { WreckView } from "./gameplay/WreckView";
@@ -79,6 +80,8 @@ import { buildParks } from "./world/ParkView";
 import { solidParts } from "./world/Interiors";
 import { buildEnvironment } from "./world/Environment";
 import { RainView } from "./world/RainView";
+import { buildSnowBerms } from "./world/SnowCover";
+import { SNOW_TUNING, SnowView } from "./world/SnowView";
 import { Weather } from "./world/Weather";
 import { buildDepot } from "./world/DepotView";
 import { buildPoliceStation } from "./world/PoliceStationView";
@@ -119,6 +122,8 @@ buildAlleys(city, r.scene);
 // IMPROVEMENTS #20: garages (pit stops)
 buildPitStops(city, r.scene);
 buildParks(city, r.scene);
+// Winter (PRD 4.4): plowed snow along the curbs (roof caps come with the buildings)
+if (CONFIG.SKY === "winterDay") buildSnowBerms(city, r.scene);
 // Cut the whole-city meshes into tiles so they can be frustum / distance culled
 const tiles = new StaticTiles();
 tiles.split(r.scene.children.slice(staticStart));
@@ -208,8 +213,15 @@ const game = new Game(() => {
 });
 game.addSim({ update: () => world.cars.forEach((c) => c.savePrev()) });
 const weather = new Weather(CONFIG.SEED + 11);
+const winter = CONFIG.SKY === "winterDay";
+// Winter map: slush, no rain cycle, and grip comes from the tires (PRD 4.4), not from the wet road
+if (winter) weather.holdWinter();
 game.addSim(weather);
-game.addSim({ update: () => (VehiclePhysics.surfaceGrip = weather.grip) });
+const tires = new Tires();
+game.addSim({
+  update: () =>
+    (VehiclePhysics.surfaceGrip = winter ? tires.grip : weather.grip),
+});
 game.addSim(lights);
 const limiter = new SpeedLimiter(world);
 game.addSim(new PlayerController(world, input, limiter));
@@ -531,6 +543,7 @@ adoptSpec = addDebugPanels({
   tiles,
   pitStops,
   builds,
+  tires,
   openPitShop: (s) => shop.open(s),
 }).adoptSpec;
 const routeView = new RouteDebugView(
@@ -559,6 +572,13 @@ game.addView(
     roofs,
   ),
 );
+if (CONFIG.SKY === "winterDay") {
+  game.addView(new SnowView(r.scene, r.camera));
+  const snowFolder = Debug.addFolder("Snow");
+  snowFolder.add(SNOW_TUNING, "fall", 0.2, 4, 0.05).name("fall m/s");
+  snowFolder.add(SNOW_TUNING, "size", 0.01, 0.15, 0.005).name("flake size m");
+  snowFolder.add(SNOW_TUNING, "opacity", 0, 1, 0.05);
+}
 // T34: synthesized audio, ears on the camera (after the camera update)
 const audio: AudioSystem = new AudioSystem({
   world,
@@ -678,6 +698,7 @@ function viewHeading(cam: THREE.Camera): number {
   riderView,
   dogs,
   weather,
+  tires,
   signals,
   effects,
   gps,

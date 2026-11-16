@@ -4,6 +4,8 @@ import type { Vec2 } from '../types';
 import type { CityModel } from './RoadGraph';
 import { SurfaceBuilder } from './SurfaceBuilder';
 import { sharedGlow } from './textures';
+import { LOOK } from '../render/Look';
+import { winterCrown } from './StreetProps';
 
 /**
  * Gardens (`maps/montreal/Parks.ts`): gravel path, cherry trees and pines, lamp posts, stone lanterns and
@@ -54,7 +56,8 @@ export function buildParks(city: CityModel, scene: THREE.Scene): void {
         for (let b = 0; b < 3; b++) {
           const r = rng.range(1.4, 2.1) * (tr.r / 3);
           blossom.push(box(r, r * 0.75, r, tr.pos.x + rng.range(-1, 1), y + rng.range(3.1, 4.2), tr.pos.z + rng.range(-1, 1)));
-          blossomCol.push(rng.pick(pinks));
+          const pink = rng.pick(pinks);
+          blossomCol.push(LOOK.day ? winterCrown(true, pink) : pink);
         }
       } else {
         for (const [oy, s] of [
@@ -84,7 +87,7 @@ export function buildParks(city: CityModel, scene: THREE.Scene): void {
 
   const unit = new THREE.BoxGeometry(1, 1, 1);
   add(scene, unit, new THREE.MeshStandardMaterial({ color: 0x3a2a22, roughness: 0.9 }), trunks);
-  add(scene, new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, emissive: 0x2a0c18 }), blossom, blossomCol);
+  add(scene, new THREE.IcosahedronGeometry(1, 1), new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.8, emissive: LOOK.day ? 0x000000 : 0x2a0c18 }), blossom, blossomCol);
   add(scene, new THREE.ConeGeometry(1, 1, 7), new THREE.MeshStandardMaterial({ color: 0x24402c, roughness: 0.85 }), pines);
   add(scene, unit, new THREE.MeshStandardMaterial({ color: 0x24242c, roughness: 0.5, metalness: 0.6 }), posts);
   add(scene, new THREE.SphereGeometry(0.5, 14, 10), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 2.1, 1.4), toneMapped: false }), globes);

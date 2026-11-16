@@ -16,6 +16,7 @@ import { BUST_TUNING, type BustSystem } from './gameplay/Bust';
 import type { Wreck } from './gameplay/Wreck';
 import type { Economy } from './gameplay/Economy';
 import type { Gps } from './gameplay/Gps';
+import { TIRE_TUNING, type Tires } from './gameplay/Tires';
 import { PIT_TUNING, type PitStopSystem } from './gameplay/PitStop';
 import type { CameraRig } from './render/CameraRig';
 import { GRAPHICS, GRAPHICS_OPTIONS, POSTFX, setGraphic, type GraphicsKey } from './render/PostFX';
@@ -52,6 +53,7 @@ export interface DebugSystems {
   tiles: StaticTiles;
   pitStops: PitStopSystem;
   builds: Builds;
+  tires: Tires;
   openPitShop: (stop: PitStop) => void;
 }
 
@@ -73,6 +75,12 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
     });
   cheats.add({ go: () => wreck.debugBoom() }, 'go').name('explode the car');
   cheats.add({ fix: () => repair(player) }, 'fix').name('repair car');
+  // Phase 3 stand-in for the winter-tire mission: which set is on the car, and how much grip each gives
+  const tires = Debug.addFolder('Tires');
+  tires.add(sys.tires, 'set', ['summer', 'winter']).name('tires on the car').listen();
+  tires.add(TIRE_TUNING, 'summerGrip', 0.6, 1, 0.01).name('summer grip x');
+  tires.add(TIRE_TUNING, 'winterGrip', 0.6, 1.1, 0.01).name('winter grip x');
+  Debug.watch('tires', () => `${sys.tires.set}  grip x${sys.tires.grip.toFixed(2)}`);
   Debug.watch('cars', () => {
     const trucks = [...traffic.drivers.values()].filter((d) => d.car.look.style === 'truck' || d.car.look.style === 'keitruck').length;
     const moods = { yield: 0, evade: 0, ped: 0 };

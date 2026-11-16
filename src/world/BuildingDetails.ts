@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config';
+import { LOOK } from '../render/Look';
 import { Rng, hash01 } from '../core/Rng';
 import type { AABB, Building, Facing } from '../types';
 import type { Layout } from './BuildingFrame';
@@ -384,7 +385,9 @@ export function buildBuildingDetails(buildings: Building[], scene: THREE.Scene):
   scene.add(rails.mesh(unit, new THREE.MeshStandardMaterial({ color: 0x5a6068, roughness: 0.35, metalness: 0.3 })));
   scene.add(awnings.mesh(center, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, emissive: 0x220a08 })));
   scene.add(machines.mesh(unit, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.7, metalness: 0.35 })));
-  scene.add(glow.mesh(unit, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false })));
+  // By day the billboards and crown lights are unlit painted panels
+  const glowMat = LOOK.day ? new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.5, metalness: 0.2 }) : new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
+  scene.add(glow.mesh(unit, glowMat));
   const cyl = new THREE.CylinderGeometry(1, 1, 1, 14);
   cyl.translate(0, 0.5, 0);
   scene.add(tanks.mesh(cyl, new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.4 })));

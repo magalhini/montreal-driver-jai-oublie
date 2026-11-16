@@ -3,13 +3,15 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { LOOK } from './Look';
 
 /** Live-tunable amounts (Debug "Post FX" folder). Graphics toggles gate these; 0 skips that look. */
 export const POSTFX = {
   enabled: true,
-  bloom: 0.5,
+  // By day only lamps and lit signals clear the threshold: the sky and snow must not haze, brake lights not halo
+  bloom: LOOK.day ? 0.22 : 0.5,
   bloomRadius: 0.25,
-  bloomThreshold: 0.9,
+  bloomThreshold: LOOK.day ? 1.4 : 0.9,
   vignette: 0.38,
   grain: 0.035,
   aberration: 0.0006,
