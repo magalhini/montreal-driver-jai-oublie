@@ -72,7 +72,7 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   const world = new World(city, events, rng, statics, lights);
   world.mode = 'free';
 
-  const startLane = city.nearestLanePoint(city.depotPos);
+  const startLane = city.nearestLanePoint(city.startPos);
   const starter = FLEET[PLAYER_CAR];
   const player = new Car('player', starter.spec, { ...starter.look }, startLane.pos, Math.atan2(startLane.lane.dir.x, startLane.lane.dir.z));
   world.player = player;

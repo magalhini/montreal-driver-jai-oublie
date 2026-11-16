@@ -63,7 +63,8 @@ function rayExit(poly: Vec2[], o: Vec2, d: Vec2): number {
 
 /**
  * Signal heads, one per approach (T43), facing its traffic along the lanes' `endDir`. `overhead` (Tokyo):
- * horizontal heads hung from an arm on a pole beyond the junction, on the far side of the approach.
+ * horizontal heads hung from an arm on a pole beyond the junction, on the far side of the approach. `mast`
+ * (North America, Montreal): the same far-side pole and arm, with a vertical head hanging under the arm.
  * `pole` (European): vertical heads on a pole at the stop line, on the drive-side curb.
  */
 export class TrafficLightView implements ViewSystem {
@@ -89,6 +90,9 @@ export class TrafficLightView implements ViewSystem {
     const lampM: Record<Lamp, THREE.Matrix4[]> = { green: [], yellow: [], red: [] };
     const side = CONFIG.DRIVE_SIDE === 'left' ? 1 : -1;
     const H = 5.6;
+    const armed = style !== 'pole';
+    /** Three lamps stacked, red on top (`mast`, `pole`), or side by side (`overhead`). */
+    const vertical = style !== 'overhead';
 
     for (const n of city.nodes) {
       if (!n.signalized) continue;
@@ -106,7 +110,7 @@ export class TrafficLightView implements ViewSystem {
         let pole: Vec2;
         let head: Vec2;
         let top: number;
-        if (style === 'overhead') {
+        if (armed) {
           // Beyond the junction, on the driver's side of the incoming road, the head hung over its lanes
           const far = rayExit(n.poly, n.pos, d);
           const at = { x: n.pos.x + d.x * (far + 1.6), z: n.pos.z + d.z * (far + 1.6) };
@@ -114,8 +118,14 @@ export class TrafficLightView implements ViewSystem {
           head = { x: at.x + lv.x * side * (hw * 0.45), z: at.z + lv.z * side * (hw * 0.45) };
           top = H + city.terrain.heightAt(n.pos.x, n.pos.z);
           const armLen = Math.hypot(pole.x - head.x, pole.z - head.z) + 0.3;
-          arms.push(new THREE.Matrix4().makeScale(armLen, 0.12, 0.12).premultiply(rot).setPosition((pole.x + head.x) / 2, top + 0.35, (pole.z + head.z) / 2));
-          housings.push(new THREE.Matrix4().makeScale(1.35, 0.46, 0.32).premultiply(rot).setPosition(head.x, top, head.z));
+          // A vertical head hangs under the arm (its top at the arm), a horizontal one is bolted along it
+          const armY = vertical ? top + 0.62 : top + 0.35;
+          arms.push(new THREE.Matrix4().makeScale(armLen, 0.12, 0.12).premultiply(rot).setPosition((pole.x + head.x) / 2, armY, (pole.z + head.z) / 2));
+          if (vertical) {
+            housings.push(new THREE.Matrix4().makeScale(0.4, 1.16, 0.32).premultiply(rot).setPosition(head.x, top, head.z));
+            // Bracket from the arm down to the housing
+            housings.push(new THREE.Matrix4().makeScale(0.08, 0.1, 0.08).premultiply(rot).setPosition(head.x, top + 0.6, head.z));
+          } else housings.push(new THREE.Matrix4().makeScale(1.35, 0.46, 0.32).premultiply(rot).setPosition(head.x, top, head.z));
         } else {
           // At the stop line, just behind the drive-side curb
           const cum = cumulative(e.pts);
@@ -127,14 +137,15 @@ export class TrafficLightView implements ViewSystem {
           housings.push(new THREE.Matrix4().makeScale(0.36, 1.08, 0.3).premultiply(rot).setPosition(head.x, top, head.z));
         }
         const poleY = city.terrain.surfaceY(pole.x, pole.z);
-        const thick = style === 'pole' ? 0.16 : 0.24;
+        const thick = style === 'pole' ? 0.16 : style === 'mast' ? 0.26 : 0.24;
         poles.push(new THREE.Matrix4().makeScale(thick, top + 0.4 - poleY, thick).setPosition(pole.x, poleY, pole.z));
         const front = 0.17;
-        // Lamp positions: across the head (overhead: green on the left) or stacked (pole: red on top)
+        // Lamp positions: across the head with red nearest the road's center (overhead: red on the right in Tokyo,
+        // on the left in Montreal) or stacked (pole: red on top)
         const at = (k: number, ahead: number) =>
-          style === 'overhead'
-            ? new THREE.Vector3(head.x - d.x * ahead + lv.x * 0.42 * k, top, head.z - d.z * ahead + lv.z * 0.42 * k)
-            : new THREE.Vector3(head.x - d.x * ahead, top - 0.34 * k, head.z - d.z * ahead);
+          vertical
+            ? new THREE.Vector3(head.x - d.x * ahead, top - 0.34 * k, head.z - d.z * ahead)
+            : new THREE.Vector3(head.x - d.x * ahead + lv.x * 0.42 * k * side, top, head.z - d.z * ahead + lv.z * 0.42 * k * side);
         const place = (k: number) => new THREE.Matrix4().copy(rot).setPosition(at(k, front));
         lampM.green.push(place(1));
         lampM.yellow.push(place(0));
@@ -150,10 +161,10 @@ export class TrafficLightView implements ViewSystem {
     }
 
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    // Pole heads (Montreal): slim dark round posts and black housings; overhead arms keep the grey box kit
-    const poleStyle = style === 'pole';
-    const baseBox = (poleStyle ? new THREE.CylinderGeometry(0.5, 0.5, 1, 10) : boxGeo.clone()).translate(0, 0.5, 0);
-    const metal = new THREE.MeshStandardMaterial({ color: poleStyle ? 0x2a2c30 : 0x55565e, metalness: 0.6, roughness: 0.4 });
+    // Montreal (stop-line poles or mast arms): dark round posts and black housings; Tokyo's arms keep the grey box kit
+    const dark = style !== 'overhead';
+    const baseBox = (dark ? new THREE.CylinderGeometry(0.5, 0.5, 1, 10) : boxGeo.clone()).translate(0, 0.5, 0);
+    const metal = new THREE.MeshStandardMaterial({ color: dark ? 0x2a2c30 : 0x55565e, metalness: 0.6, roughness: 0.4 });
     const mk = (geo: THREE.BufferGeometry, mat: THREE.Material, ms: THREE.Matrix4[]) => {
       const im = new THREE.InstancedMesh(geo, mat, ms.length);
       ms.forEach((m, i) => im.setMatrixAt(i, m));
@@ -162,7 +173,7 @@ export class TrafficLightView implements ViewSystem {
     };
     mk(baseBox, metal, poles);
     mk(boxGeo, metal, arms);
-    mk(boxGeo, new THREE.MeshStandardMaterial({ color: poleStyle ? 0x18191c : 0x8a8c94, metalness: 0.5, roughness: 0.45 }), housings);
+    mk(boxGeo, new THREE.MeshStandardMaterial({ color: dark ? 0x18191c : 0x8a8c94, metalness: 0.5, roughness: 0.45 }), housings);
     const disc = new THREE.CircleGeometry(0.18, 16);
     const lampMat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
     this.lamps = {

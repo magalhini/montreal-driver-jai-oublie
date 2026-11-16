@@ -40,7 +40,7 @@ export const RAISED: Record<SurfaceKind, boolean> = {
 
 /** Road-level surface of a block's interior (inside the sidewalk ring), or null for a raised slab with buildings. */
 export function blockFloor(f: CityFeatures, b: Block): 'lot' | null {
-  return f.kinds[b.id] === 'lot' || b.district === 'depot' ? 'lot' : null;
+  return f.kinds[b.id] === 'lot' ? 'lot' : null;
 }
 
 export function surfaceAt(city: CityModel, p: Vec2): SurfaceKind {
@@ -50,7 +50,12 @@ export function surfaceAt(city: CityModel, p: Vec2): SurfaceKind {
   const b = city.blockAt(p);
   if (!b) {
     const o = city.bounds;
-    return p.x > o.minX && p.x < o.maxX && p.z < city.waterZ ? 'sidewalk' : 'outside';
+    if (!(p.x > o.minX && p.x < o.maxX && p.z < city.waterZ)) return 'outside';
+    // The Old Port's parking lot and its curb cuts; the rest of the promenade is raised pavement
+    const port = f.port;
+    if (port && inBox(p, port.lot)) return 'lot';
+    if (port) for (const m of port.mouths) if (inBox(p, m)) return 'driveway';
+    return 'sidewalk';
   }
   const floor = blockFloor(f, b);
   if (floor && inBox(p, inner(b))) return floor;

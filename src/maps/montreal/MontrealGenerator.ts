@@ -7,23 +7,24 @@ import { generateBuildings } from '../../world/Districts';
 import { settleBuildings } from '../../world/Settle';
 import { planCurbParking } from '../../world/CurbParking';
 import { emptyFeatures } from '../../world/Features';
-import { planDepot } from '../../world/Depot';
 import { planPitStops } from '../../world/PitStops';
 import { planPoliceStation } from '../../world/PoliceStation';
 import { CityModel, laneOffset } from '../../world/RoadGraph';
 import { dressSkyline } from '../../world/Skyline';
 import { Terrain } from '../../world/Terrain';
-import { layHarbor, openHarbor } from './Harbor';
-import { fitHeights, openCourtyards, placeArena, placeClock, placeSilos } from './Massing';
+import { layPort, portWaterZ } from './Harbor';
+import { fitHeights, openCourtyards, placeArena, placeBasilica, placeSilos } from './Massing';
 import { layParks } from './Parks';
-import { ARENA, CANAL_ROW, CLOCK, SILOS, STREET_CLASSES, X_RAW, Z_RAW, classWidth, colClass, colName, districtAt, heightOf, isPark, junctionControl, rowClass, rowName } from './layout';
+import { laySquares } from './Squares';
+import { ARENA, BASILICA, CANAL_ROW, SILOS, START, STREET_CLASSES, X_RAW, Z_RAW, classWidth, colClass, colName, districtAt, heightOf, isPark, isSquare, junctionControl, rowClass, rowName } from './layout';
 
 const OUTER = 28;
 
 /**
  * Downtown Montreal, Guy to Saint-Hubert, Sherbrooke to the river: real block spacing, gardens instead of
- * whole-block lawns, the Lachine Canal as the east-west water, a paved lane along the quay, and roof heights
- * taken from the blocks. Lanes follow `CONFIG.DRIVE_SIDE` (right-hand traffic).
+ * whole-block lawns, pedestrian squares, the Lachine Canal as the east-west water, the Old Port's promenade
+ * along the river, the basilica on Notre-Dame, and roof heights taken from the blocks. Lanes follow
+ * `CONFIG.DRIVE_SIDE` (right-hand traffic).
  *
  * Every edge carries its street class (`layout.ts`: boulevard, street or cobble) and the widths that go with
  * it. A row can change class part way (Sainte-Catherine, Saint-Paul), so a junction box is as wide as the
@@ -167,7 +168,6 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
         rect: true,
       };
       city.blocks.push(block);
-      if (block.district === 'depot') city.depotBlock = block;
     }
   }
   city.finishLayout();
@@ -192,17 +192,16 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
     x1: city.xs[GX] + city.hwX[GX] + sw + 400,
   };
   for (const block of city.blocks) {
-    // Held back from cafés, alleys and the yard planners. Buildings still fill them, then the landmarks replace them.
-    if ((block.gi === ARENA.i && block.gj === ARENA.j) || (block.gi === SILOS.i && block.gj === SILOS.j) || (block.gi === CLOCK.i && block.gj === CLOCK.j)) {
-      f.kinds[block.id] = 'bridge';
-    }
+    // Held back from garages, alleys and the precinct. Buildings still fill them, then the landmarks replace them.
+    const at = (p: { i: number; j: number }) => block.gi === p.i && block.gj === p.j;
+    if (at(ARENA) || at(SILOS) || at(BASILICA)) f.kinds[block.id] = 'bridge';
     if (isPark(block.gi, block.gj)) f.kinds[block.id] = 'park';
+    if (isSquare(block.gi, block.gj)) f.kinds[block.id] = 'square';
   }
   city.features = f;
-  layHarbor(city);
-  f.depot = planDepot(city.depotBlock);
-  f.driveways.push(...f.depot.gates.map((g) => g.mouth));
-  city.depotPos = f.depot.ring;
+  // On the street along the square's north side (William), where the old yard's start was
+  const startBlock = city.blocks[START.j * GX + START.i];
+  city.startPos = { x: startBlock.center.x, z: startBlock.min.z + 30 };
   f.pitStops = planPitStops(city, f.kinds, () => true, new Rng(seed + 20), CANAL_ROW);
   for (const p of f.pitStops) f.driveways.push(...p.driveways);
 
@@ -216,7 +215,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   }
   openCourtyards(city);
   layParks(city, seed);
-  openHarbor(city);
+  laySquares(city);
 
   const x0 = city.xs[0] - city.hwX[0];
   const x1 = city.xs[GX] + city.hwX[GX];
@@ -226,7 +225,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   const canal = f.canal;
   city.buildings = city.buildings.filter((b) => b.faces.length > 0 || b.maxZ < canal.z0 - 3 || b.minZ > canal.z1 + 3);
 
-  city.waterZ = z1 + sw + 6;
+  city.waterZ = portWaterZ(z1);
   city.walls.push(
     { minX: x0 - 60, maxX: x1 + 60, minZ: city.waterZ, maxZ: city.waterZ + 4 },
     { minX: x0 - sw - 2, maxX: x0 - sw, minZ: z0 - 60, maxZ: city.waterZ + 4 },
@@ -235,6 +234,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   );
   city.bounds = { minX: x0 - sw, minZ: z0 - sw, maxX: x1 + sw, maxZ: city.waterZ };
   canalWalls(city);
+  layPort(city);
   city.terrain = new Terrain(city, f);
   settleBuildings(city);
   planAlleys(city, seed + 19);
@@ -243,7 +243,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   fitHeights(city);
   placeArena(city);
   placeSilos(city);
-  placeClock(city);
+  placeBasilica(city);
   settleBuildings(city);
   // Last: the bays keep clear of every curb cut the planners above made
   f.curb = planCurbParking(city);

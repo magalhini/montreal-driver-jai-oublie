@@ -25,6 +25,7 @@ const C = {
   passage: '#2c2f4c',
   passageEdge: 'rgba(160, 168, 220, 0.55)',
   park: '#14321e',
+  plaza: '#3a3848',
   gravel: '#5e5a54',
   pitStop: '#2a2633',
   canopy: '#e8e6f0',
@@ -108,8 +109,36 @@ export function buildMapImage(city: CityModel): MapImage {
   }
 
   // Buildings: taller reads brighter
+  // Pedestrian squares (paving, the fountain) and the Old Port (lawns, the walk, the lot and its curb cuts)
+  for (const sq of f.squares ?? []) {
+    ctx.fillStyle = C.plaza;
+    rect(sq.plaza.minX, sq.plaza.minZ, sq.plaza.maxX, sq.plaza.maxZ);
+    ctx.fillStyle = C.park;
+    for (const l of sq.lawns) rect(l.minX, l.minZ, l.maxX, l.maxZ);
+    ctx.fillStyle = C.water;
+    ctx.beginPath();
+    ctx.arc(sq.fountain.pos.x, sq.fountain.pos.z, sq.fountain.r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  const port = f.port;
+  if (port) {
+    ctx.fillStyle = C.plaza;
+    rect(port.walk.minX, port.walk.minZ, port.walk.maxX, port.walk.maxZ);
+    ctx.fillStyle = C.park;
+    for (const l of port.lawns) rect(l.minX, l.minZ, l.maxX, l.maxZ);
+    ctx.fillStyle = C.lot;
+    rect(port.lot.minX, port.lot.minZ, port.lot.maxX, port.lot.maxZ);
+    for (const m of port.mouths) rect(m.minX, m.minZ, m.maxX, m.maxZ);
+  }
+
   for (const bd of city.buildings) {
     const inset = 0.6;
+    if (bd.custom) {
+      // Stone landmarks read pale on the map
+      ctx.fillStyle = 'rgb(176, 166, 150)';
+      rect(bd.minX + 0.3, bd.minZ + 0.3, bd.maxX - 0.3, bd.maxZ - 0.3);
+      continue;
+    }
     if (bd.scramble) {
       ctx.fillStyle = 'rgb(168, 206, 255)';
       rect(bd.minX + inset, bd.minZ + inset, bd.maxX - inset, bd.maxZ - inset);
@@ -124,6 +153,10 @@ export function buildMapImage(city: CityModel): MapImage {
     const k = 0.5 + Math.min(1, bd.height / 90) * 0.55;
     ctx.fillStyle = `rgb(${Math.round(r * k)}, ${Math.round(g * k)}, ${Math.round(bl * k)})`;
     rect(bd.minX + inset, bd.minZ + inset, bd.maxX - inset, bd.maxZ - inset);
+  }
+  for (const d of [...(f.squares ?? []), ...(port ? [port] : [])]) {
+    ctx.fillStyle = 'rgba(160, 170, 180, 0.75)';
+    for (const t of d.trees) rect(t.x - 1.3, t.z - 1.3, t.x + 1.3, t.z + 1.3);
   }
   for (const park of f.parks ?? []) {
     for (const t of park.trees) {
@@ -198,19 +231,6 @@ export function buildMapImage(city: CityModel): MapImage {
     const sb = station.building;
     ctx.fillStyle = '#2a4a88';
     rect(sb.minX, sb.minZ, sb.maxX, sb.maxZ);
-  }
-  // The yard: its drive lanes, the planter wall (amber) and the gates cut through the sidewalk
-  const depot = f.depot;
-  if (depot) {
-    ctx.fillStyle = 'rgba(255, 180, 62, 0.16)';
-    for (const g of depot.gates) {
-      const w = 4.5;
-      rect(Math.min(g.edge.x, g.lane.x) - (g.side === 'S' ? w : 0), Math.min(g.edge.z, g.lane.z) - (g.side === 'S' ? 0 : w), Math.max(g.edge.x, g.lane.x) + (g.side === 'S' ? w : 0), Math.max(g.edge.z, g.lane.z) + (g.side === 'S' ? 0 : w));
-    }
-    ctx.fillStyle = '#ffb43e';
-    for (const p of depot.planters) rect(p.minX, p.minZ, p.maxX, p.maxZ);
-    ctx.fillStyle = C.lot;
-    for (const g of depot.gates) rect(g.mouth.minX, g.mouth.minZ, g.mouth.maxX, g.mouth.maxZ);
   }
   // Pit stop canopies
   ctx.fillStyle = C.canopy;
@@ -323,7 +343,7 @@ export function mapLabels(city: CityModel): MapLabel[] {
   const gz = city.nz - 1;
   const seen = new Set<number>();
   for (const start of city.blocks) {
-    if (seen.has(start.id) || start.district === 'depot') continue;
+    if (seen.has(start.id)) continue;
     const group: Block[] = [];
     const stack = [start];
     seen.add(start.id);
@@ -364,6 +384,16 @@ export function mapLabels(city: CityModel): MapLabel[] {
     if (k === 'lot') out.push({ text: 'PARKING', pos: center(city.blocks[id]), kind: 'landmark' });
   });
   for (const s of f.pitStops) out.push({ text: 'GARAGE', pos: { x: (s.box.minX + s.box.maxX) / 2, z: (s.box.minZ + s.box.maxZ) / 2 }, kind: 'landmark' });
+  // The basilica and the square in front of it are one label (they are a block apart: two would collide)
+  const nd = f.basilica;
+  const armes = f.squares?.find((q) => q.name);
+  if (nd) out.push({ text: 'BASILIQUE NOTRE-DAME', sub: armes?.name, pos: { x: (nd.minX + nd.maxX) / 2, z: nd.minZ }, kind: 'landmark' });
+  if (f.port) {
+    const w = f.port.walk;
+    out.push({ text: 'PROMENADE DU VIEUX-PORT', sub: 'piétons seulement', pos: { x: (w.minX + w.maxX) / 2 - 300, z: (w.minZ + w.maxZ) / 2 }, kind: 'landmark' });
+  }
+  // The lot sits right beside the clock tower: one label for both
+  if (f.clock) out.push({ text: "TOUR DE L'HORLOGE", sub: f.port ? 'parking' : undefined, pos: { ...f.clock.pos }, kind: 'landmark' });
   if (f.canal) {
     const i = Math.floor(gx * 0.75);
     out.push({ text: f.canal.label ?? 'CANAL DE LACHINE', sub: f.canal.labelSub, pos: { x: (city.xs[i] + city.xs[i + 1]) / 2, z: f.canal.zc }, kind: 'landmark' });

@@ -52,8 +52,8 @@ export class CityModel {
   /** Extra static colliders (boundary walls etc.). */
   walls: AABB[] = [];
   bounds: AABB = { minX: 0, minZ: 0, maxX: 0, maxZ: 0 };
-  depotBlock!: Block;
-  depotPos: Vec2 = { x: 0, z: 0 };
+  /** Where the session starts (the car is put in the nearest lane). */
+  startPos: Vec2 = { x: 0, z: 0 };
   waterZ = 0;
   /** Junctions stay at height 0. Tokyo leaves this off and keeps its hills. */
   flatGround = false;

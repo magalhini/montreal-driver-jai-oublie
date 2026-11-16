@@ -101,9 +101,11 @@ const DAY_MIX: Record<DistrictType, [Finish, number][]> = {
     ['limestone', 0.18],
     ['darkStone', 0.1],
   ],
+  // Warehouses along the canal and the port: orange-red brick, some grey stone (PRD Phase 5)
   harbor: [
-    ['brick', 0.6],
-    ['metal', 0.4],
+    ['brick', 0.78],
+    ['darkStone', 0.12],
+    ['limestone', 0.1],
   ],
   depot: [
     ['darkStone', 0.6],
@@ -179,7 +181,9 @@ interface Part {
   faces?: Facing[];
 }
 
-export function buildBuildings(buildings: Building[], scene: THREE.Scene): BuildingSet {
+export function buildBuildings(all: Building[], scene: THREE.Scene): BuildingSet {
+  // Landmarks with their own meshes (`LandmarkView`) are only colliders here
+  const buildings = all.filter((b) => !b.custom);
   const parts: Part[] = [];
   for (const b of buildings) {
     const base = buildingBase(b);

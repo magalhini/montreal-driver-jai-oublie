@@ -65,7 +65,7 @@ export function fingerprint(id: string): string[] {
   for (const b of city.buildings) g('buildings').add(b);
   for (const w of city.walls) g('walls').add(w);
   g('features').add(city.features);
-  g('misc').add([city.bounds, city.depotPos, city.waterZ]);
+  g('misc').add([city.bounds, city.startPos, city.waterZ]);
 
   const o = city.bounds;
   for (let z = o.minZ; z <= o.maxZ; z += 4) for (let x = o.minX; x <= o.maxX; x += 4) g('surfaces').add(surfaceAt(city, { x, z }));

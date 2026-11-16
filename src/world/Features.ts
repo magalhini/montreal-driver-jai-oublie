@@ -1,6 +1,5 @@
 import { CONFIG } from '../config';
 import type { AABB, Block, Interior, Vec2 } from '../types';
-import type { DepotPlan } from './Depot';
 import type { PitStop } from './PitStops';
 import type { PoliceStation } from './PoliceStation';
 
@@ -32,8 +31,11 @@ export interface Canal {
   labelSub?: string;
 }
 
-/** `bridge`: a landmark block (arena, silos, clock tower) held back from the other planners. */
-export type BlockKind = 'normal' | 'lot' | 'pitStop' | 'bridge' | 'police' | 'park';
+/**
+ * `bridge`: a landmark block (arena, silos, basilica) held back from the other planners. `square`: a
+ * pedestrian square with a fountain (`maps/montreal/Squares.ts`).
+ */
+export type BlockKind = 'normal' | 'lot' | 'pitStop' | 'bridge' | 'police' | 'park' | 'square';
 
 /**
  * Alley (IMPROVEMENTS #19): a narrow road-level lane straight through a block, street to street, cut between
@@ -66,10 +68,84 @@ export interface CityFeatures {
   pitStops: PitStop[];
   /** Precinct with cruiser bays. Planned after the buildings (`planPoliceStation`). */
   station: PoliceStation | null;
-  /** The yard (`world/Depot.ts`): HQ, gates, planter wall, docks. */
-  depot: DepotPlan | null;
   /** Gardens inside a block: a lawn, a path, trees (`maps/montreal/Parks.ts`). */
   parks?: CityPark[];
+  /** Pedestrian squares with a fountain (`maps/montreal/Squares.ts`). Raised paving: no cars. */
+  squares?: CitySquare[];
+  /** The Old Port promenade along the river, its parking lot and the clock tower (`maps/montreal/Harbor.ts`). */
+  port?: OldPort;
+  /** Landmarks with their own meshes (`world/LandmarkView.ts`). */
+  basilica?: Basilica;
+  clock?: ClockTower;
+}
+
+/** Trees, lamps and benches on a square or the promenade (all also listed in `colliders`). */
+export interface PlazaDressing {
+  trees: Vec2[];
+  lamps: Vec2[];
+  benches: { pos: Vec2; yaw: number }[];
+  colliders: AABB[];
+}
+
+/**
+ * A pedestrian square: raised paving across the block (driving onto it is the sidewalk offense), a round
+ * fountain basin in the middle (drained and iced for December), rows of trees, globe lamps and benches.
+ */
+export interface CitySquare extends PlazaDressing {
+  block: number;
+  name?: string;
+  /** Paved area (the block's buildings outside it stay). */
+  plaza: AABB;
+  /** Snowy lawn quadrants between the walks that cross the square. */
+  lawns: AABB[];
+  fountain: { pos: Vec2; r: number };
+  /** A statue on a plinth in the basin (Place d'Armes), or jets (a plain basin). */
+  monument: boolean;
+}
+
+/**
+ * Vieux-Port: a long pedestrian promenade between the quay road and the St. Lawrence (raised: no cars), lawns
+ * along the road, a paved walk by the water, and at the east end a road-level parking lot and the clock tower.
+ */
+export interface OldPort extends PlazaDressing {
+  /** Road curb to the water. */
+  strip: AABB;
+  lawns: AABB[];
+  /** Paved walk along the water. */
+  walk: AABB;
+  /** Road-level lot and its curb cuts from the quay road (the cuts are also in `driveways`). */
+  lot: AABB;
+  mouths: AABB[];
+  /** Where pedestrians stroll: a line along the walk. */
+  stroll: { z: number; x0: number; x1: number };
+  /** Quays out into the river with a long hangar on each (scenery past the quay wall: not reachable). */
+  piers: { deck: AABB; shed: AABB }[];
+}
+
+/** Notre-Dame: front on Notre-Dame (facing -Z), two towers at the front corners, the nave behind. */
+export interface Basilica {
+  minX: number;
+  maxX: number;
+  /** Front wall (north) and apse end (south). */
+  minZ: number;
+  maxZ: number;
+  /** Tower side (square) and height to the parapet. */
+  tower: number;
+  towerH: number;
+  /** Nave eaves and ridge. */
+  eaves: number;
+  ridge: number;
+  /** Ground floor height. */
+  y: number;
+}
+
+/** Tour de l'Horloge: stone shaft, clock faces, lantern, dome and spire. */
+export interface ClockTower {
+  pos: Vec2;
+  /** Shaft side. */
+  side: number;
+  height: number;
+  y: number;
 }
 
 /**
@@ -104,7 +180,7 @@ export interface CityPark {
 }
 
 export function emptyFeatures(): CityFeatures {
-  return { canal: null, kinds: [], driveways: [], parking: [], curb: [], alleys: [], interiors: [], pitStops: [], station: null, depot: null };
+  return { canal: null, kinds: [], driveways: [], parking: [], curb: [], alleys: [], interiors: [], pitStops: [], station: null };
 }
 
 /** Within `margin` of a curb cut: a driveway or an alley mouth (no posts, trees or parked cars in front of it). */

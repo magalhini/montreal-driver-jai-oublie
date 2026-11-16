@@ -66,9 +66,7 @@ export class ParkedCars implements SimSystem {
   constructor(private world: World) {
     const f = world.city.features;
     this.add(f.parking, 0.42, 0, false);
-    // Vans at the yard's docks and staff cars in its bays
-    if (f.depot) this.add(f.depot.parked, 1, 51, false);
-    // Cruisers in the precinct lot (the open bays are left empty for a later dispatch)
+    // Cruisers in the precinct lot (some bays are left empty)
     if (f.station) this.add(f.station.parked, 1, 31, false);
     // Curb bays: each side of each block in runs of `chunk` bays (the planner lists them in order along the curb)
     const T = CURB_PARKED_TUNING;

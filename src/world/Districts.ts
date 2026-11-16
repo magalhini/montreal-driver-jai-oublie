@@ -1,7 +1,6 @@
 import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import type { Block, Building, DistrictType, Facing } from '../types';
-import { depotBuildings } from './Depot';
 import type { CityFeatures } from './Features';
 import { clearForecourt } from './PitStops';
 
@@ -11,11 +10,13 @@ interface Rule {
   height: (r: Rng, centerFactor: number) => number;
 }
 
+/** `depot` blocks are no longer generated (the yard is gone); they build as residential. */
 const RULES: Record<Exclude<DistrictType, 'depot'>, Rule> = {
   downtown: { maxLot: 30, gap: [1.5, 3], height: (r, c) => r.range(28, 70) + c * r.range(20, 70) },
   shotengai: { maxLot: 9, gap: [0.15, 0.5], height: (r) => (r.chance(0.15) ? r.range(16, 26) : r.range(5, 13)) },
   residential: { maxLot: 20, gap: [1.2, 3], height: (r) => (r.chance(0.3) ? r.range(18, 34) : r.range(8, 16)) },
-  harbor: { maxLot: 48, gap: [4, 8], height: (r) => r.range(8, 15) },
+  // Brick warehouses along the canal and the port: long lots, close together (PRD Phase 5)
+  harbor: { maxLot: 40, gap: [1, 2.5], height: (r) => r.range(9, 16) },
 };
 
 interface Rect {
@@ -69,10 +70,7 @@ export function generateBuildings(block: Block, rng: Rng, centerFactor: number, 
 function generateIn(block: Block, inner: Rect, rng: Rng, centerFactor: number): Building[] {
   const out: Building[] = [];
 
-  // The Dispatch Office HQ: tower and loading-dock wings (`Depot.ts`); one draw, so the stream stays the same
-  if (block.district === 'depot') return depotBuildings({ minX: inner.x0, minZ: inner.z0, maxX: inner.x1, maxZ: inner.z1 }, rng.int(0, 1e6));
-
-  const rule = RULES[block.district];
+  const rule = RULES[block.district === 'depot' ? 'residential' : block.district];
   const lots: Rect[] = [];
   split(inner, rule.maxLot, rng, lots);
   const eps = 0.01;
@@ -84,7 +82,6 @@ function generateIn(block: Block, inner: Rect, rng: Rng, centerFactor: number): 
     if (lot.z1 >= inner.z1 - eps) faces.push('S');
     const interior = faces.length === 0;
     if (interior && block.district === 'harbor') continue;
-    if (block.district === 'harbor' && rng.chance(0.3)) continue; // container yards
     const g = rng.range(rule.gap[0], rule.gap[1]) * 0.5;
     const b: Building = {
       minX: lot.x0 + g,

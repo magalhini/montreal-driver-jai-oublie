@@ -20,6 +20,8 @@ interface LampPost {
   arm: THREE.Matrix4;
   head: THREE.Matrix4;
   pool: THREE.Matrix4;
+  /** Vieux-Montréal globe lamp: a short black post with a glass globe on top, no arm (`globe` is its matrix). */
+  globe: THREE.Matrix4 | null;
   x: number;
   z: number;
 }
@@ -47,8 +49,16 @@ const INERTIA = (POLE_H * POLE_H) / 12;
 /** Knocked-down lamps lying around at once; the oldest is cleared past this. */
 const MAX_DEBRIS = 24;
 
+/** Globe lamps on the cobbles (PRD Phase 5): post height, globe radius, spacing along the curb. */
+export const GLOBE_LAMP = { height: 4.3, radius: 0.34, step: 19 };
+const G_HALF = GLOBE_LAMP.height / 2;
+
 const UP = new THREE.Vector3(0, 1, 0);
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
+const G_POLE_LOCAL = new THREE.Matrix4().makeScale(0.15, GLOBE_LAMP.height, 0.15);
+/** The collar and cap under and over the globe (one box, the pole mesh's material). */
+const G_COLLAR_LOCAL = new THREE.Matrix4().compose(new THREE.Vector3(0, GLOBE_LAMP.height - 0.05, 0), new THREE.Quaternion(), new THREE.Vector3(0.3, 0.22, 0.3));
+const G_GLOBE_LOCAL = new THREE.Matrix4().makeScale(GLOBE_LAMP.radius, GLOBE_LAMP.radius * 1.1, GLOBE_LAMP.radius).setPosition(0, GLOBE_LAMP.height + GLOBE_LAMP.radius, 0);
 const POLE_LOCAL = new THREE.Matrix4().makeScale(0.22, POLE_H, 0.22);
 const ARM_LOCAL = new THREE.Matrix4().compose(new THREE.Vector3(0, ARM_Y, ARM_LEN / 2), new THREE.Quaternion(), new THREE.Vector3(0.12, 0.12, ARM_LEN));
 const HEAD_LOCAL = new THREE.Matrix4().compose(new THREE.Vector3(0, HEAD_Y, HEAD_OUT), new THREE.Quaternion(), new THREE.Vector3(0.5, 0.16, 0.9));
@@ -62,6 +72,10 @@ const ENDS: End[] = [
   { at: new THREE.Vector3(0, HALF, 0), r: 0.12 },
   { at: new THREE.Vector3(0, HEAD_Y - HALF, HEAD_OUT), r: 0.4 },
 ];
+const GLOBE_ENDS: End[] = [
+  { at: new THREE.Vector3(0, -G_HALF, 0), r: 0.1 },
+  { at: new THREE.Vector3(0, G_HALF + GLOBE_LAMP.radius, 0), r: GLOBE_LAMP.radius },
+];
 
 interface Debris {
   obj: THREE.Group;
@@ -73,6 +87,8 @@ interface Debris {
   ang: THREE.Vector3;
   still: number;
   asleep: boolean;
+  ends: End[];
+  half: number;
 }
 
 interface Slot {
@@ -81,6 +97,9 @@ interface Slot {
   heads: THREE.InstancedMesh;
   pools: THREE.InstancedMesh;
   index: number;
+  /** The tile's globe mesh and this post's instance in it (globe lamps only). */
+  globes: THREE.InstancedMesh | null;
+  gIndex: number;
 }
 
 interface Tile {
@@ -108,7 +127,11 @@ export class StreetLamps implements SimSystem, ViewSystem {
   private poleGeo = new THREE.BoxGeometry(1, 1, 1);
   private boxGeo = new THREE.BoxGeometry(1, 1, 1);
   private poolGeo = new THREE.PlaneGeometry(13, 13);
-  private poleMat = new THREE.MeshStandardMaterial({ color: 0x2a2a33, roughness: 0.6, metalness: 0.5 });
+  private globeGeo = new THREE.SphereGeometry(1, 14, 10);
+  /** Black (PRD 4.4). */
+  private poleMat = new THREE.MeshStandardMaterial({ color: 0x18181c, roughness: 0.55, metalness: 0.5 });
+  /** Frosted glass, a warm bulb inside at low intensity by day. */
+  private globeMat = new THREE.MeshBasicMaterial({ color: LOOK.day ? new THREE.Color(1.18, 1.0, 0.8) : new THREE.Color(2.6, 2.0, 1.3) });
   /** On in the grey afternoon at a low warm glow (PRD 4.4), full strength at night. */
   private headMat = new THREE.MeshBasicMaterial({ color: LOOK.day ? new THREE.Color(1.3, 1.05, 0.75) : new THREE.Color(3.2, 2.2, 1.2) });
   private poolMat = new THREE.MeshBasicMaterial({
@@ -133,6 +156,11 @@ export class StreetLamps implements SimSystem, ViewSystem {
     posts.forEach((p, i) => this.byCollider.set(p.collider, i));
     this.poleGeo.translate(0, 0.5, 0);
     this.buildTiles();
+  }
+
+  /** Where the posts stand (props keep clear of them). */
+  get positions(): Vec2[] {
+    return this.posts.map((p) => ({ x: p.x, z: p.z }));
   }
 
   /** Start listening for knock-downs (the statics stop debris at walls). */
@@ -167,7 +195,7 @@ export class StreetLamps implements SimSystem, ViewSystem {
       d.pos.addScaledVector(d.vel, dt);
       this.integrate(d.quat, d.ang, dt);
       this.walls(d, px, pz);
-      for (let k = 0; k < 4; k++) for (const end of ENDS) this.contact(d, end);
+      for (let k = 0; k < 4; k++) for (const end of d.ends) this.contact(d, end);
       if (d.vel.length() < SLEEP_V && d.ang.length() < SLEEP_W) {
         d.still += dt;
         if (d.still > SLEEP_AFTER) {
@@ -199,8 +227,10 @@ export class StreetLamps implements SimSystem, ViewSystem {
     const armM: THREE.Matrix4[] = [];
     const headM: THREE.Matrix4[] = [];
     const poolM: THREE.Matrix4[] = [];
+    const globeM: THREE.Matrix4[] = [];
     for (const ids of buckets.values()) {
-      poleM.length = armM.length = headM.length = poolM.length = 0;
+      poleM.length = armM.length = headM.length = poolM.length = globeM.length = 0;
+      const gIndex = new Map<number, number>();
       let sx = 0;
       let sz = 0;
       for (const i of ids) {
@@ -209,6 +239,10 @@ export class StreetLamps implements SimSystem, ViewSystem {
         armM.push(p.arm);
         headM.push(p.head);
         poolM.push(p.pool);
+        if (p.globe) {
+          gIndex.set(i, globeM.length);
+          globeM.push(p.globe);
+        }
         sx += p.x;
         sz += p.z;
       }
@@ -223,9 +257,11 @@ export class StreetLamps implements SimSystem, ViewSystem {
       pools.renderOrder = 1;
       const g = new THREE.Group();
       g.add(poles, arms, heads, pools);
+      const globes = globeM.length ? fill(this.globeGeo, this.globeMat, globeM) : null;
+      if (globes) g.add(globes);
       this.group.add(g);
       this.tiles.push({ group: g, cx, cz, radius: radius + 8 });
-      ids.forEach((i, k) => (this.slots[i] = { poles, arms, heads, pools, index: k }));
+      ids.forEach((i, k) => (this.slots[i] = { poles, arms, heads, pools, index: k, globes: gIndex.has(i) ? globes : null, gIndex: gIndex.get(i) ?? -1 }));
     }
   }
 
@@ -241,19 +277,35 @@ export class StreetLamps implements SimSystem, ViewSystem {
     slot.arms.instanceMatrix.needsUpdate = true;
     slot.heads.instanceMatrix.needsUpdate = true;
     slot.pools.instanceMatrix.needsUpdate = true;
+    if (slot.globes) {
+      slot.globes.setMatrixAt(slot.gIndex, HIDDEN);
+      slot.globes.instanceMatrix.needsUpdate = true;
+    }
 
     const p = this.posts[i];
     const obj = new THREE.Group();
+    const half = p.globe ? G_HALF : HALF;
     const pole = new THREE.Mesh(this.poleGeo, this.poleMat);
-    pole.position.set(0, -HALF, 0);
-    pole.scale.set(0.22, POLE_H, 0.22);
-    const arm = new THREE.Mesh(this.boxGeo, this.poleMat);
-    arm.position.set(0, ARM_Y - HALF, ARM_LEN / 2);
-    arm.scale.set(0.12, 0.12, ARM_LEN);
-    const head = new THREE.Mesh(this.boxGeo, this.headMat);
-    head.position.set(0, HEAD_Y - HALF, HEAD_OUT);
-    head.scale.set(0.5, 0.16, 0.9);
-    obj.add(pole, arm, head);
+    pole.position.set(0, -half, 0);
+    if (p.globe) {
+      pole.scale.set(0.15, GLOBE_LAMP.height, 0.15);
+      const collar = new THREE.Mesh(this.boxGeo, this.poleMat);
+      collar.position.set(0, G_HALF - 0.05, 0);
+      collar.scale.set(0.3, 0.22, 0.3);
+      const globe = new THREE.Mesh(this.globeGeo, this.globeMat);
+      globe.position.set(0, G_HALF + GLOBE_LAMP.radius, 0);
+      globe.scale.set(GLOBE_LAMP.radius, GLOBE_LAMP.radius * 1.1, GLOBE_LAMP.radius);
+      obj.add(pole, collar, globe);
+    } else {
+      pole.scale.set(0.22, POLE_H, 0.22);
+      const arm = new THREE.Mesh(this.boxGeo, this.poleMat);
+      arm.position.set(0, ARM_Y - HALF, ARM_LEN / 2);
+      arm.scale.set(0.12, 0.12, ARM_LEN);
+      const head = new THREE.Mesh(this.boxGeo, this.headMat);
+      head.position.set(0, HEAD_Y - HALF, HEAD_OUT);
+      head.scale.set(0.5, 0.16, 0.9);
+      obj.add(pole, arm, head);
+    }
     obj.position.copy(p.center);
     obj.quaternion.copy(p.rot);
     this.group.add(obj);
@@ -268,7 +320,7 @@ export class StreetLamps implements SimSystem, ViewSystem {
     const spin = 1.5 + kick * 0.03;
     const vel = dir
       .clone()
-      .multiplyScalar(HALF * spin * 0.72 + kick * 0.05)
+      .multiplyScalar(half * spin * 0.72 + kick * 0.05)
       .addScaledVector(side, kick * 0.1);
     vel.y = 1.1 + Math.random() * 0.8;
     const ang = new THREE.Vector3(dir.z, 0, -dir.x).multiplyScalar(spin);
@@ -283,6 +335,8 @@ export class StreetLamps implements SimSystem, ViewSystem {
       ang,
       still: 0,
       asleep: false,
+      ends: p.globe ? GLOBE_ENDS : ENDS,
+      half,
     });
     if (this.debris.length > MAX_DEBRIS) this.group.remove(this.debris.shift()!.obj);
   }
@@ -325,7 +379,7 @@ export class StreetLamps implements SimSystem, ViewSystem {
   /** Buildings and standing props stop the flight. A post that already snapped is `off`, so the query skips it. */
   private walls(d: Debris, px: number, pz: number): void {
     if (!this.statics) return;
-    const y = d.pos.y - HALF;
+    const y = d.pos.y - d.half;
     const blocks = (b: AABB) => b.top === undefined || b.top > y;
     if (!this.statics.segmentBlocked({ x: px, z: pz }, { x: d.pos.x, z: d.pos.z }, blocks)) return;
     d.pos.x = px;
@@ -367,15 +421,17 @@ export function buildStreetLamps(city: CityModel): StreetLamps {
     const fixed = alongX ? a.pos.z : a.pos.x;
     const hw = e.width / 2;
     const P = (s: number, lat: number): Vec2 => (alongX ? { x: s, z: fixed + lat } : { x: fixed + lat, z: s });
+    const globe = e.cls === 'cobble';
     let side = 1;
-    for (let s = t0; s <= t1; s += 26) {
-      const lat = side * (hw + 0.7);
+    for (let s = t0; s <= t1; s += globe ? GLOBE_LAMP.step : 26) {
+      const lat = side * (hw + (globe ? 0.6 : 0.7));
       const p = P(s, lat);
       if (inDriveway(city, p, 0.6)) {
         side = -side;
         continue;
       }
-      const head = P(s, side * (hw - 1.2));
+      // Arm lamps light the lane; a globe lights the sidewalk around its post
+      const head = globe ? p : P(s, side * (hw - 1.2));
       const py = t.surfaceY(p.x, p.z);
       // Local +Z points from the pole toward the road.
       const yaw = Math.atan2(alongX ? 0 : -side, alongX ? -side : 0);
@@ -384,18 +440,20 @@ export function buildStreetLamps(city: CityModel): StreetLamps {
       t.gradient(head.x, head.z, g);
       nrm.set(-g.x, 1, -g.z).normalize();
       const tilt = new THREE.Quaternion().setFromUnitVectors(up, nrm).multiply(flat);
+      const poolScale = globe ? 0.62 : 1;
       posts.push({
-        center: new THREE.Vector3(p.x, py + HALF, p.z),
+        center: new THREE.Vector3(p.x, py + (globe ? G_HALF : HALF), p.z),
         rot,
         collider: { minX: p.x - 0.25, maxX: p.x + 0.25, minZ: p.z - 0.25, maxZ: p.z + 0.25, breakAt, breakHits: true },
-        pole: pose.clone().multiply(POLE_LOCAL),
-        arm: pose.clone().multiply(ARM_LOCAL),
-        head: pose.clone().multiply(HEAD_LOCAL),
+        pole: pose.clone().multiply(globe ? G_POLE_LOCAL : POLE_LOCAL),
+        arm: pose.clone().multiply(globe ? G_COLLAR_LOCAL : ARM_LOCAL),
+        head: globe ? HIDDEN.clone() : pose.clone().multiply(HEAD_LOCAL),
         pool: new THREE.Matrix4().compose(
-          new THREE.Vector3(head.x, t.heightAt(head.x, head.z) + 0.06, head.z),
+          new THREE.Vector3(head.x, (globe ? t.surfaceY(head.x, head.z) : t.heightAt(head.x, head.z)) + 0.06, head.z),
           tilt,
-          new THREE.Vector3(1, 1, 1),
+          new THREE.Vector3(poolScale, poolScale, 1),
         ),
+        globe: globe ? pose.clone().multiply(G_GLOBE_LOCAL) : null,
         x: p.x,
         z: p.z,
       });

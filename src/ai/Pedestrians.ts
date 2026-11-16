@@ -16,6 +16,13 @@ const SPAWN_MIN = 55;
 const TELEPORT_DIST = 40;
 const DISTRICT_WEIGHT: Record<DistrictType, number> = { shotengai: 1, downtown: 0.8, depot: 0.6, residential: 0.4, harbor: 0.15 };
 
+/**
+ * Where the crowd gathers (PRD Phase 5): a sidewalk beside a cobble street, a fountain loop or the Old Port's
+ * promenade is listed this many times among the spawn candidates, so it fills up first. The squares' walks
+ * spawn at `plazaShare` of their district's rate (nobody lingers by a drained fountain in December).
+ */
+export const PED_TUNING = { cobbleBoost: 3, plazaBoost: 1, promenadeBoost: 1, promenadeStep: 45, plazaShare: 0.5 };
+
 export interface WalkNode {
   id: number;
   pos: Vec2;
@@ -30,6 +37,9 @@ export interface WalkEdge {
   /** Set for crosswalks: the junction and the approach (edge) being crossed. */
   crossing: { node: number; edge: number } | null;
   district: DistrictType;
+  /** Spawn acceptance (the district's share unless overridden) and how often it is listed (`PED_TUNING`). */
+  weight: number;
+  boost: number;
 }
 
 export interface Ped extends DodgeState {
@@ -93,7 +103,19 @@ export class WalkGraph {
       pts.forEach((pos, k) => this.nodes.push({ id: corner(b, k), pos, edges: [] }));
     }
     for (const b of city.blocks) {
-      for (let k = 0; k < 4; k++) this.sidewalkEdges.push(this.link(corner(b, k), corner(b, (k + 1) % 4), null, b.district));
+      // The road beside each side, in corner order: N, E, S, W
+      const at = (i: number, j: number) => city.nodeAt(i, j).id;
+      const roads = [
+        city.edgeBetween(at(b.gi, b.gj), at(b.gi + 1, b.gj)),
+        city.edgeBetween(at(b.gi + 1, b.gj), at(b.gi + 1, b.gj + 1)),
+        city.edgeBetween(at(b.gi, b.gj + 1), at(b.gi + 1, b.gj + 1)),
+        city.edgeBetween(at(b.gi, b.gj), at(b.gi, b.gj + 1)),
+      ];
+      for (let k = 0; k < 4; k++) {
+        const cobble = roads[k]?.cls === 'cobble';
+        const id = this.link(corner(b, k), corner(b, (k + 1) % 4), null, b.district, cobble ? 1 : undefined, cobble ? PED_TUNING.cobbleBoost : 1);
+        this.sidewalkEdges.push(id);
+      }
     }
     const block = (i: number, j: number) => city.blocks[j * gx + i];
     // Crossings over vertical roads (axis 'z') between block (i-1, j) and (i, j)
@@ -116,12 +138,50 @@ export class WalkGraph {
         this.link(corner(n, 2), corner(s, 1), { node: city.nodeAt(i + 1, j).id, edge: road }, s.district);
       }
     }
+    // A loop around each square's fountain, with a walk in from the middle of the sidewalk on each open side
+    for (const sq of city.features.squares ?? []) {
+      const b = city.blocks[sq.block];
+      const c = sq.fountain.pos;
+      const r = sq.fountain.r + 5;
+      const w = (x: number, y: number) => this.link(x, y, null, b.district, DISTRICT_WEIGHT[b.district] * PED_TUNING.plazaShare, PED_TUNING.plazaBoost);
+      // On the walks' axes round the basin: ring[0] east, then south, west, north
+      const ring = [0, 1, 2, 3].map((k) => this.node({ x: c.x + Math.cos((k * Math.PI) / 2) * r, z: c.z + Math.sin((k * Math.PI) / 2) * r }));
+      for (let k = 0; k < 4; k++) this.sidewalkEdges.push(w(ring[k], ring[(k + 1) % 4]));
+      // Along the walks from the middle of each sidewalk the square opens onto (always the south one)
+      const open = CONFIG.SIDEWALK + 0.5;
+      const sides: [number, number, Vec2, number][] = [[2, 3, { x: c.x, z: b.max.z - INSET }, 1]];
+      if (sq.plaza.minZ <= b.min.z + open) sides.push([0, 1, { x: c.x, z: b.min.z + INSET }, 3]);
+      if (sq.plaza.minX <= b.min.x + open) sides.push([3, 0, { x: b.min.x + INSET, z: c.z }, 2]);
+      if (sq.plaza.maxX >= b.max.x - open) sides.push([1, 2, { x: b.max.x - INSET, z: c.z }, 0]);
+      for (const [ca, cb, pos, rk] of sides) {
+        const mid = this.node(pos);
+        this.sidewalkEdges.push(w(corner(b, ca), mid), w(mid, corner(b, cb)), w(mid, ring[rk]));
+      }
+    }
+    // The Old Port's promenade: one long walk by the water (walkers turn round at its ends)
+    const port = city.features.port;
+    if (port) {
+      const { z, x0, x1 } = port.stroll;
+      const n = Math.max(1, Math.round((x1 - x0) / PED_TUNING.promenadeStep));
+      let prev = this.node({ x: x0, z });
+      for (let k = 1; k <= n; k++) {
+        const next = this.node({ x: x0 + ((x1 - x0) * k) / n, z });
+        this.sidewalkEdges.push(this.link(prev, next, null, 'harbor', 1, PED_TUNING.promenadeBoost));
+        prev = next;
+      }
+    }
   }
 
-  private link(a: number, b: number, crossing: WalkEdge['crossing'], district: DistrictType): number {
+  private node(pos: Vec2): number {
+    const id = this.nodes.length;
+    this.nodes.push({ id, pos, edges: [] });
+    return id;
+  }
+
+  private link(a: number, b: number, crossing: WalkEdge['crossing'], district: DistrictType, weight = DISTRICT_WEIGHT[district], boost = 1): number {
     const pa = this.nodes[a].pos;
     const pb = this.nodes[b].pos;
-    const e: WalkEdge = { id: this.edges.length, a, b, length: Math.hypot(pb.x - pa.x, pb.z - pa.z), crossing, district };
+    const e: WalkEdge = { id: this.edges.length, a, b, length: Math.hypot(pb.x - pa.x, pb.z - pa.z), crossing, district, weight, boost };
     this.edges.push(e);
     this.nodes[a].edges.push(e.id);
     this.nodes[b].edges.push(e.id);
@@ -197,13 +257,15 @@ export class Pedestrians implements SimSystem {
     this.nearCenter = { ...pp };
     const g = this.graph;
     const r = CONFIG.PED_RADIUS + 20;
-    this.near = g.sidewalkEdges.filter((id) => {
+    this.near = [];
+    for (const id of g.sidewalkEdges) {
       const e = g.edges[id];
       const a = g.nodes[e.a].pos;
       const b = g.nodes[e.b].pos;
       const t = segT(pp, a, b);
-      return Math.hypot(a.x + (b.x - a.x) * t - pp.x, a.z + (b.z - a.z) * t - pp.z) < r;
-    });
+      if (Math.hypot(a.x + (b.x - a.x) * t - pp.x, a.z + (b.z - a.z) * t - pp.z) >= r) continue;
+      for (let k = 0; k < e.boost; k++) this.near.push(id);
+    }
     return this.near;
   }
 
@@ -216,7 +278,7 @@ export class Pedestrians implements SimSystem {
     const near = this.nearbyEdges();
     if (!near.length) return;
     const e = g.edges[rng.pick(near)];
-    if (!rng.chance(DISTRICT_WEIGHT[e.district])) return;
+    if (!rng.chance(e.weight)) return;
     const t = rng.range(0.05, 0.95);
     const pa = g.nodes[e.a].pos;
     const pb = g.nodes[e.b].pos;

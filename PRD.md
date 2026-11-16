@@ -349,7 +349,7 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 **Steps**
 
 1. Basilica block on Notre-Dame in Vieux-Montréal: twin towers, rose window, stone front, the side streets still drivable. Collision is the footprint only.
-2. Push brick warehouse masses along the canal and the port, using the heights already in `Massing.ts` and `Harbor.ts`. The clock tower stays a landmark, dressed so it reads as stone and a spire in daylight.
+2. Push brick warehouse masses along the canal and the port, using the heights already in `Massing.ts` and `Harbor.ts`. The clock tower stays a landmark, dressed so it reads as stone and a spire in daylight. The Harbor should be more like the Old Port: a long stretch of a pedestrian park, with a long stretch of road, ending with a parking lot and the clock tower. The Vieux-Port should resemble the real one as much as possible. It's illegal to drive there.
 3. Cobble streets from Phase 2 get trees, a few terraces, and bike-shaped props on the sidewalk. Pedestrian density up on those blocks only.
 4. Globe lamps on the cobbles, black poles, warm bulbs at low intensity.
 5. No more "Dispatch" locations, replace them with other relevant buildings or parks. Montreal has pedestrianizes parks with fountains surrounded by streets, for example

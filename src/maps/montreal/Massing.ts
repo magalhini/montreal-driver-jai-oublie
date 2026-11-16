@@ -1,6 +1,8 @@
 import type { Block, Building, Facing } from '../../types';
 import type { CityModel } from '../../world/RoadGraph';
-import { ARENA, CLOCK, SILOS, heightOf } from './layout';
+import { CONFIG } from '../../config';
+import { carveBuilding } from './Parks';
+import { ARENA, BASILICA, SILOS, heightOf } from './layout';
 
 const faces = (list: Facing[]): Facing[] => list;
 
@@ -145,21 +147,59 @@ export function placeSilos(city: CityModel): void {
   }
 }
 
-/** A slim shaft at the southeast corner, standing in for the clock tower. */
-export function placeClock(city: CityModel): void {
-  const bl = city.blocks.find((b) => b.gi === CLOCK.i && b.gj === CLOCK.j);
+/** Notre-Dame Basilica, in meters (PRD 4.4: twin towers, rose window, stone; low poly). */
+export const BASILICA_SIZE = {
+  width: 40,
+  depth: 74,
+  /** Parvis between the sidewalk and the front steps. */
+  parvis: 8,
+  tower: 12.5,
+  /** Top of the towers' parapet; the corner pinnacles rise above it (the real towers are 69 m). */
+  towerH: 61,
+  eaves: 22,
+  ridge: 33,
+};
+
+/**
+ * The basilica replaces the middle of its block's Notre-Dame frontage: the buildings on its footprint and the
+ * parvis go, the rest of the block keeps its street wall. Its colliders are plain footprint boxes (two towers,
+ * the front between them, the nave) with `custom` set: `LandmarkView` draws it.
+ */
+export function placeBasilica(city: CityModel): void {
+  const bl = city.blocks.find((b) => b.gi === BASILICA.i && b.gj === BASILICA.j);
   if (!bl) return;
-  const s = 11;
-  const box = { minX: bl.max.x - 8 - s, maxX: bl.max.x - 8, minZ: bl.max.z - 8 - s, maxZ: bl.max.z - 8 };
-  city.buildings = city.buildings.filter(
-    (b) => b.maxX < box.minX - 1 || b.minX > box.maxX + 1 || b.maxZ < box.minZ - 1 || b.minZ > box.maxZ + 1,
-  );
-  city.buildings.push({
-    ...box,
-    height: 46,
-    district: 'residential',
-    faces: faces(['N', 'S', 'E', 'W']),
-    seed: 1922,
-    tower: { inset: 1.3, podium: 14 },
+  const S = BASILICA_SIZE;
+  const sw = CONFIG.SIDEWALK;
+  const cx = (bl.min.x + bl.max.x) / 2;
+  const minX = cx - S.width / 2;
+  const maxX = cx + S.width / 2;
+  const minZ = bl.min.z + sw + S.parvis;
+  const maxZ = Math.min(bl.max.z - sw - 6, minZ + S.depth);
+  const hole = { minX: minX - 3, maxX: maxX + 3, minZ: bl.min.z, maxZ: maxZ + 3 };
+  const kept: Building[] = [];
+  for (const b of city.buildings) {
+    const next = carveBuilding(b, [hole]);
+    if (next) kept.push(next);
+  }
+  city.buildings = kept;
+  const t = S.tower;
+  const part = (x0: number, x1: number, z0: number, z1: number, height: number, seed: number): Building => ({
+    minX: x0,
+    maxX: x1,
+    minZ: z0,
+    maxZ: z1,
+    height,
+    district: 'shotengai',
+    faces: [],
+    seed,
+    landmark: true,
+    custom: 'basilica',
   });
+  city.buildings.push(
+    part(minX, minX + t, minZ, minZ + t, S.towerH, 1824),
+    part(maxX - t, maxX, minZ, minZ + t, S.towerH, 1825),
+    part(minX + t, maxX - t, minZ, minZ + t, S.ridge + 4, 1826),
+    part(minX + 1.5, maxX - 1.5, minZ + t, maxZ, S.ridge, 1827),
+  );
+  city.features.basilica = { minX, maxX, minZ, maxZ, tower: t, towerH: S.towerH, eaves: S.eaves, ridge: S.ridge, y: CONFIG.CURB_HEIGHT };
 }

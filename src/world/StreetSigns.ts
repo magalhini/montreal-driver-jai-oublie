@@ -145,9 +145,11 @@ function pickCorner(city: CityModel, n: RoadNode, raised: (x: number, z: number)
     [1, 1],
     [-1, -1],
   ]) {
-    // Inside the curb of the north-south road on this side, and of the east-west road
+    // Inside the curb of the north-south road on this side, and of the east-west road. At a signal, every corner
+    // has a mast-arm pole just past the junction: step back along the sidewalk, clear of it.
+    const back = n.signalized ? 3.6 : 1.1;
     const x = n.pos.x + sx * (Math.max(n.hx, halfWidth('z', sz)) + 1.1);
-    const z = n.pos.z + sz * (Math.max(n.hz, halfWidth('x', sx)) + 1.1);
+    const z = n.pos.z + sz * (Math.max(n.hz, halfWidth('x', sx)) + back);
     if (raised(x, z) && !inDriveway(city.features, { x, z }, 1.5)) return { x, z };
   }
   return null;

@@ -80,6 +80,12 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   const b = city.bounds;
   let outer: Vec2[] | null = null;
   if (grid) raised.push(...outerRing(city));
+  // The Old Port's parking lot and its curb cuts, at road level in the promenade
+  const port = f.port;
+  if (port) {
+    lots.patch(port.lot.minX, port.lot.minZ, port.lot.maxX, port.lot.maxZ, 0, 3);
+    for (const m of port.mouths) ground.patch(m.minX, m.minZ, m.maxX, m.maxZ, 0, 3);
+  }
   else {
     // Sidewalk from the outer curb line out to the bounds
     outer = outerCurb(city);
@@ -284,7 +290,11 @@ function outerRing(city: CityModel): Rect[] {
   const ox1 = city.xs[city.nx - 1] + city.hwX[city.nx - 1];
   const oz0 = city.zs[0] - city.hwZ[0];
   const oz1 = city.zs[city.nz - 1] + city.hwZ[city.nz - 1];
-  const out: Rect[] = [rect(ox0 - sw - 40, oz0 - sw - 40, ox1 + sw + 40, oz0), rect(ox0 - sw, oz1, ox1 + sw, city.waterZ)];
+  // South of the last road: the quay, or the Old Port's promenade minus its road-level lot
+  let quay: Rect[] = [rect(ox0 - sw, oz1, ox1 + sw, city.waterZ)];
+  const port = city.features.port;
+  if (port) for (const cut of [port.lot, ...port.mouths]) quay = quay.flatMap((q) => subtractRect(q, cut));
+  const out: Rect[] = [rect(ox0 - sw - 40, oz0 - sw - 40, ox1 + sw + 40, oz0), ...quay];
   const k = city.features.canal;
   const spans: [number, number][] = k
     ? [

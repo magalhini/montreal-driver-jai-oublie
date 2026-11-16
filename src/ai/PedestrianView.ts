@@ -4,6 +4,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { CONFIG } from '../config';
 import { clamp } from '../core/math';
 import { hash01 } from '../core/Rng';
+import { LOOK } from '../render/Look';
 import type { ViewSystem } from '../types';
 import { DIVE_AIR, DIVE_DOWN, DIVE_GETUP, STEP_T } from './PedestrianDodge';
 import type { Ped, Pedestrians } from './Pedestrians';
@@ -16,6 +17,14 @@ const SKIN = [0xffffff, 0xf2e2d8, 0xe6cfbf, 0xd2b8a2];
 const LEG_SKIN = [0xe8c8b0, 0xdcb195, 0xd1a284, 0xbf9070];
 const HAIR = [0x14110f, 0x14110f, 0x1c1612, 0x2a1c14, 0x3d2b1c, 0x5c4030, 0x8a6848];
 const TIGHTS = 0x2a2630;
+/** December (PRD Phase 5): coats, toques and scarves. Coats run dark with a few loud parkas. */
+const WINTER = LOOK.day;
+const COATS = [0x16171c, 0x1f2638, 0x34373e, 0x7a5a3a, 0x5e1c22, 0x2e3a2a, 0xb0322a, 0x6e7076, 0x1d4654, 0xcfc8b8, 0x15151a, 0x2a2a46];
+const KNITS = [0xc8302a, 0xe8e2d4, 0x2a5a9a, 0xe0a020, 0x1a1a1e, 0x3a7a4a, 0xd85a8a, 0x8a8c90];
+/** Share of the crowd in a toque, and in a scarf (`hash01` salts 15 and 16). */
+const TOQUE_SHARE = 0.55;
+const SCARF_SHARE = 0.6;
+const TOPS = WINTER ? COATS : CLOTHES;
 /** Half the crowd uses the narrower build and long hair (`hash01` salt). */
 const FEMME_SALT = 5;
 /** Of those, the share who wear a skirt instead of trousers. */
@@ -69,6 +78,35 @@ function torsoGeometry(femme: boolean): THREE.BufferGeometry {
   ])!;
 }
 
+/** Winter coat: bulkier, down to mid-thigh (the legs swing under the hem), thick sleeves, a raised collar. */
+function coatGeometry(femme: boolean): THREE.BufferGeometry {
+  if (!femme) {
+    return mergeGeometries([
+      boxAt(0.48, 0.78, 0.32, 0, 1.08, 0),
+      boxAt(0.14, 0.6, 0.16, -0.3, 1.14, 0),
+      boxAt(0.14, 0.6, 0.16, 0.3, 1.14, 0),
+      boxAt(0.3, 0.08, 0.26, 0, 1.5, -0.02),
+    ])!;
+  }
+  return mergeGeometries([
+    boxAt(0.36, 0.44, 0.28, 0, 1.26, 0),
+    new THREE.CylinderGeometry(0.22, 0.3, 0.5, 6).translate(0, 0.82, 0),
+    boxAt(0.12, 0.54, 0.14, -0.22, 1.18, 0),
+    boxAt(0.12, 0.54, 0.14, 0.22, 1.18, 0),
+    boxAt(0.26, 0.08, 0.22, 0, 1.5, -0.02),
+  ])!;
+}
+
+/** Knit toque with a pompom; it sits over any hair style. */
+function toqueGeometry(): THREE.BufferGeometry {
+  return mergeGeometries([boxAt(0.29, 0.16, 0.29, 0, 1.79, -0.01), boxAt(0.3, 0.05, 0.3, 0, 1.72, -0.01), boxAt(0.09, 0.08, 0.09, 0, 1.9, -0.01)])!;
+}
+
+/** Scarf wound at the neck, a tail down the front. */
+function scarfGeometry(): THREE.BufferGeometry {
+  return mergeGeometries([boxAt(0.3, 0.1, 0.3, 0, 1.49, 0), boxAt(0.09, 0.32, 0.04, 0.07, 1.32, 0.15)])!;
+}
+
 /** Short crop, loose hair past the shoulders, or a ponytail. They walk toward +z, so the face is +z. */
 function hairGeometry(style: 'short' | 'loose' | 'tie'): THREE.BufferGeometry {
   const long = style !== 'short';
@@ -99,6 +137,8 @@ export class PedestrianView implements ViewSystem {
   private legs: THREE.InstancedMesh;
   private skirts: THREE.InstancedMesh;
   private umbrellas: THREE.InstancedMesh;
+  private toques: THREE.InstancedMesh;
+  private scarves: THREE.InstancedMesh;
   private ys: Float32Array;
   private seenM: Int32Array;
   private seenF: Int32Array;
@@ -135,8 +175,11 @@ export class PedestrianView implements ViewSystem {
 
     const cloth = new THREE.MeshStandardMaterial({ roughness: 0.85, emissive: 0x1a1428 });
     const hair = new THREE.MeshStandardMaterial({ roughness: 0.72, emissive: 0x0c0a10 });
-    this.torsoM = instanced(torsoGeometry(false), cloth, n);
-    this.torsoF = instanced(torsoGeometry(true), cloth, n);
+    this.torsoM = instanced(WINTER ? coatGeometry(false) : torsoGeometry(false), cloth, n);
+    this.torsoF = instanced(WINTER ? coatGeometry(true) : torsoGeometry(true), cloth, n);
+    const knit = new THREE.MeshStandardMaterial({ roughness: 0.95, emissive: 0x0c0a10 });
+    this.toques = instanced(toqueGeometry(), knit, n);
+    this.scarves = instanced(scarfGeometry(), knit, n);
     this.legs = instanced(legGeo, cloth, n * 2);
     this.skirts = instanced(skirtGeometry(), cloth, n);
     this.head = instanced(headGeo, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.7, emissive: 0x140e14 }), n);
@@ -148,7 +191,7 @@ export class PedestrianView implements ViewSystem {
       new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }),
       n,
     );
-    scene.add(this.torsoM, this.torsoF, this.legs, this.skirts, this.head, this.hairM, this.hairLoose, this.hairTie, this.umbrellas);
+    scene.add(this.torsoM, this.torsoF, this.legs, this.skirts, this.head, this.hairM, this.hairLoose, this.hairTie, this.umbrellas, this.toques, this.scarves);
     this.ys = new Float32Array(n).fill(CONFIG.CURB_HEIGHT);
     this.seenM = new Int32Array(n).fill(-1);
     this.seenF = new Int32Array(n).fill(-1);
@@ -205,6 +248,8 @@ export class PedestrianView implements ViewSystem {
     let li = 0;
     let si = 0;
     let ui = 0;
+    let ti = 0;
+    let ki = 0;
     for (const p of this.peds.peds) {
       if (!p.active) continue;
       const x = p.prev.x + (p.pos.x - p.prev.x) * alpha;
@@ -250,18 +295,18 @@ export class PedestrianView implements ViewSystem {
         this.hairM.setMatrixAt(mi, body);
         if (this.seenM[mi] !== p.look) {
           this.seenM[mi] = p.look;
-          this.paint(this.torsoM, mi, this.pick(CLOTHES, p.look, 1));
+          this.paint(this.torsoM, mi, this.pick(TOPS, p.look, 1));
           this.paint(this.hairM, mi, this.pick(HAIR, p.look, 7));
         }
       }
 
       if (femme && this.seenF[fi] !== p.look) {
         this.seenF[fi] = p.look;
-        this.paint(this.torsoF, fi, this.pick(CLOTHES, p.look, 1));
+        this.paint(this.torsoF, fi, this.pick(TOPS, p.look, 1));
       }
       if (skirt && this.seenSkirt[si] !== p.look) {
         this.seenSkirt[si] = p.look;
-        const top = this.pick(CLOTHES, p.look, 1);
+        const top = this.pick(TOPS, p.look, 1);
         this.paint(this.skirts, si, hash01(p.look, 8) < 0.55 ? top : this.pick(CLOTHES, p.look, 8));
       }
 
@@ -279,7 +324,7 @@ export class PedestrianView implements ViewSystem {
       if (this.seenLegs[li] !== p.look) {
         this.seenLegs[li] = p.look;
         const pants = this.color.setHex(
-          skirt ? (hash01(p.look, 14) < 0.4 ? TIGHTS : this.pick(LEG_SKIN, p.look, 2)) : this.pick(PANTS, p.look, 3),
+          skirt ? (WINTER || hash01(p.look, 14) < 0.4 ? TIGHTS : this.pick(LEG_SKIN, p.look, 2)) : this.pick(PANTS, p.look, 3),
         );
         this.legs.setColorAt(li * 2, pants);
         this.legs.setColorAt(li * 2 + 1, pants);
@@ -296,6 +341,17 @@ export class PedestrianView implements ViewSystem {
       hi++;
       li++;
 
+      if (WINTER && hash01(p.look, 15) < TOQUE_SHARE) {
+        this.toques.setMatrixAt(ti, body);
+        this.toques.setColorAt(ti, this.color.setHex(this.pick(KNITS, p.look, 17)));
+        ti++;
+      }
+      if (WINTER && hash01(p.look, 16) < SCARF_SHARE) {
+        this.scarves.setMatrixAt(ki, body);
+        this.scarves.setColorAt(ki, this.color.setHex(this.pick(KNITS, p.look, 18)));
+        ki++;
+      }
+
       if (p.umbrella || hash01(p.look, 9) < this.rain * 0.85) {
         this.umbrellas.setMatrixAt(ui, this.part.multiplyMatrices(body, this.pivot.makeRotationX(0.12)));
         this.umbrellas.setColorAt(ui, this.color.setHex(this.pick(UMBRELLAS, p.look, 4)));
@@ -310,9 +366,13 @@ export class PedestrianView implements ViewSystem {
     this.legs.count = li * 2;
     this.skirts.count = si;
     this.umbrellas.count = ui;
-    for (const m of [this.torsoM, this.torsoF, this.head, this.hairM, this.hairLoose, this.hairTie, this.legs, this.skirts, this.umbrellas]) {
+    this.toques.count = ti;
+    this.scarves.count = ki;
+    for (const m of [this.torsoM, this.torsoF, this.head, this.hairM, this.hairLoose, this.hairTie, this.legs, this.skirts, this.umbrellas, this.toques, this.scarves]) {
       m.instanceMatrix.needsUpdate = true;
     }
     if (ui > 0) this.umbrellas.instanceColor!.needsUpdate = true;
+    if (ti > 0) this.toques.instanceColor!.needsUpdate = true;
+    if (ki > 0) this.scarves.instanceColor!.needsUpdate = true;
   }
 }

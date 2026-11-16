@@ -55,6 +55,8 @@ export function buildStreetProps(city: CityModel, scene: THREE.Scene): AABB[] {
     const dPlus = sideDistrict(P(midT, hw + 2));
     const dMinus = sideDistrict(P(midT, -hw - 2));
 
+    // The cobbles are dressed by `OldCityProps` (bare trees, bikes, terraces): no poles or wires there
+    if (e.cls === 'cobble') continue;
     // Utility poles + wires + sakura trees on residential / shotengai sides (street lamps: StreetLamps)
     for (const s of [1, -1]) {
       const dist = s === 1 ? dPlus : dMinus;
@@ -198,7 +200,8 @@ function buildShopfrontProps(city: CityModel, scene: THREE.Scene, rng: Rng, coll
           colliders.push({ minX: p.x - sx / 2, maxX: p.x + sx / 2, minZ: p.z - sz / 2, maxZ: p.z + sz / 2 });
         }
       }
-      if (b.district === 'shotengai') {
+      // Paper lanterns are the Tokyo night kit; Montreal's old city has none (PRD 5.8)
+      if (b.district === 'shotengai' && !LOOK.day) {
         const nL = Math.max(1, Math.floor(len / 3.5));
         const red = rng.chance(0.7);
         for (let k = 0; k < nL; k++) {
@@ -222,8 +225,10 @@ function buildHarbor(city: CityModel, scene: THREE.Scene, rng: Rng, colliders: A
   const COLORS = [0x8a2b1e, 0x1e4f8a, 0x2a6b3a, 0xc4651d, 0x55585f, 0x7a1e5c].map((c) => new THREE.Color(c));
   const hit = (r: AABB, b: AABB, m: number) => r.minX < b.maxX + m && r.maxX > b.minX - m && r.minZ < b.maxZ + m && r.maxZ > b.minZ - m;
   const overlaps = (r: AABB) => city.buildings.some((b) => hit(r, b, 1)) || city.features.driveways.some((q) => hit(r, q, 6));
+  // The Old Port (PRD Phase 5) is brick, water and the clock: no container yards, no gantry cranes
+  const oldPort = !!city.features.port;
   for (const bl of city.blocks) {
-    if (bl.district !== 'harbor') continue;
+    if (bl.district !== 'harbor' || oldPort) continue;
     for (let x = bl.min.x + sw + 2; x < bl.max.x - sw - 7; x += 7.5) {
       for (let z = bl.min.z + sw + 2; z < bl.max.z - sw - 3; z += 3.4) {
         const r = { minX: x, maxX: x + 6.1, minZ: z, maxZ: z + 2.5 };
@@ -245,7 +250,7 @@ function buildHarbor(city: CityModel, scene: THREE.Scene, rng: Rng, colliders: A
   const x0 = city.xs[0];
   const x1 = city.xs[city.nx - 1];
   const wz = city.waterZ;
-  const cranes = Math.max(4, Math.round((x1 - x0) / 220));
+  const cranes = oldPort ? 0 : Math.max(4, Math.round((x1 - x0) / 220));
   for (let k = 0; k < cranes; k++) {
     const x = x0 + ((k + 0.5) / cranes) * (x1 - x0) + rng.range(-20, 20);
     legs.push(box(1.4, 34, 1.4, x - 6, H, wz - 2), box(1.4, 34, 1.4, x + 6, H, wz - 2));
@@ -263,7 +268,8 @@ function buildHarbor(city: CityModel, scene: THREE.Scene, rng: Rng, colliders: A
   const posts: M[] = [];
   for (let x = city.bounds.minX; x < city.bounds.maxX; x += 2.5) posts.push(box(0.12, 1.0, 0.12, x, H, wz - 0.3));
   posts.push(box(city.bounds.maxX - city.bounds.minX, 0.1, 0.12, (city.bounds.minX + city.bounds.maxX) / 2, H + 1.0, wz - 0.3));
-  scene.add(instanced(unitBox, new THREE.MeshStandardMaterial({ color: 0x8a8a95, metalness: 0.7, roughness: 0.3 }), posts));
+  // The promenade's railing is black iron like its lamps
+  scene.add(instanced(unitBox, new THREE.MeshStandardMaterial({ color: oldPort ? 0x1c1c20 : 0x8a8a95, metalness: oldPort ? 0.5 : 0.7, roughness: oldPort ? 0.5 : 0.3 }), posts));
 }
 
 /** Within `margin` of a driveway or an alley (keep lamps, poles, trees and vending machines out of them). */

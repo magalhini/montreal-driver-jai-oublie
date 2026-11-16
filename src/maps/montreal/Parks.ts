@@ -187,7 +187,7 @@ function hits(p: Vec2, box: AABB, m: number): boolean {
 }
 
 /** Drop a building whose middle sits in a hole. Otherwise pull the intruding edge back, so the street face stays. */
-function carveBuilding(b: Building, holes: AABB[]): Building | null {
+export function carveBuilding(b: Building, holes: AABB[]): Building | null {
   const gap = 1.2;
   for (const h of holes) {
     if (b.maxX <= h.minX || b.minX >= h.maxX || b.maxZ <= h.minZ || b.minZ >= h.maxZ) continue;

@@ -166,14 +166,31 @@ export function colClass(i: number, _j: number): StreetClass {
 /** Block row the Lachine Canal cuts through (between Wellington and the south bank). */
 export const CANAL_ROW = 12;
 
-/** Dispatch yard: Griffintown, between Drummond and Peel, William and Ottawa. */
-export const DEPOT = { i: 3, j: 10 };
 /** Centre Bell: the low hall between Lucien-L'Allier and de la Montagne, south of René-Lévesque. */
 export const ARENA = { i: 1, j: 4 };
 /** Farine Five Roses and the Peel basin sheds, south of the canal. */
 export const SILOS = { i: 4, j: 13 };
-/** Clock tower, approximated at the southeast corner where the port meets the river. */
-export const CLOCK = { i: 17, j: 14 };
+/**
+ * Notre-Dame Basilica: south side of Notre-Dame, Saint-François-Xavier to Saint-Urbain (standing in for
+ * Saint-Sulpice), its front on Place d'Armes across the street.
+ */
+export const BASILICA = { i: 11, j: 8 };
+
+/**
+ * Pedestrian squares with a fountain, surrounded by streets. Place d'Armes runs from Saint-Jacques to Notre-Dame,
+ * facing the basilica across the street, with buildings either side; the Griffintown square is where the old
+ * dispatch yard stood (Drummond to Peel, William to Ottawa). `keep`: meters of street wall left standing along
+ * the block's north edge; `width`: the square's width, centered (the rest of the block keeps its buildings).
+ */
+export const SQUARES: { i: number; j: number; name?: string; monument: boolean; keep: number; width?: number }[] = [
+  { i: 11, j: 7, name: "Place d'Armes", monument: true, keep: 0, width: 84 },
+  { i: 3, j: 10, monument: false, keep: 34 },
+];
+
+export const isSquare = (i: number, j: number) => SQUARES.find((s) => s.i === i && s.j === j);
+
+/** The session starts on the street by the Griffintown square, west of downtown (PRD 9). */
+export const START = { i: 3, j: 10 };
 
 /**
  * Parks big enough to be a whole block. Keys are "column,row".
@@ -185,7 +202,6 @@ export const PARKS = new Set(['4,3', '4,4', '8,2', '8,6', '4,7', '9,9', '14,6', 
 export const isPark = (i: number, j: number): boolean => PARKS.has(`${i},${j}`);
 
 export function districtAt(i: number, j: number): DistrictType {
-  if (i === DEPOT.i && j === DEPOT.j) return 'depot';
   if (j >= CANAL_ROW) return 'harbor';
   if (j >= 8 && i >= 9) return 'shotengai'; // Vieux-Montréal
   if (j >= 8) return 'residential'; // Griffintown, Cité du Multimédia

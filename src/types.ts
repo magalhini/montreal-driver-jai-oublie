@@ -183,6 +183,11 @@ export interface Building extends AABB {
   landmark?: boolean;
   /** Facade look instead of the district's: shader style (0 office, 1 shops, 2 warehouse, 3 apartments, 4 media), base color, lit share. */
   facade?: { style: number; color: [number, number, number]; lit: number };
+  /**
+   * A landmark with its own mesh (`world/LandmarkView.ts`): the box is only its collider, camera wall and map
+   * footprint. The building mesh, roof snow and facade details skip it.
+   */
+  custom?: 'basilica' | 'clock';
 }
 
 export interface VehicleInput {

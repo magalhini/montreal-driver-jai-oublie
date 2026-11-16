@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONFIG } from '../config';
 import type { BodyStyle } from './Car';
 import { PROFILES } from './BodyProfiles';
 import type { V2 } from './CarGeometry';
@@ -6,8 +7,11 @@ import { Kit, bake, look, paintBase } from './CarKit';
 import { CHROME, GLOW, LAMP, MATTE, rgb } from './CarMaterial';
 import { CLUSTER_W, DIAL_R } from './CockpitGauges';
 
-/** Left-hand traffic means right-hand drive. The car's +x is its left, so the driver sits at -x. */
-const SIDE = -1;
+/**
+ * The driver sits on the side away from the curb: left-hand drive for right-hand traffic (Montreal), right-hand
+ * drive for left-hand traffic. The car's +x is its left, so a left-hand-drive driver sits at +x.
+ */
+const SIDE = CONFIG.DRIVE_SIDE === 'right' ? 1 : -1;
 
 const DASH = look(rgb(0.045, 0.045, 0.05), MATTE);
 const PANEL = look(rgb(0.085, 0.082, 0.088), MATTE);

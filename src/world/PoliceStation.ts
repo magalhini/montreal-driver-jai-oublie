@@ -71,12 +71,12 @@ export function planPoliceStation(city: CityModel): void {
   const clear = (lot: AABB) =>
     !f.alleys.some((a) => overlaps(a.box, lot, 3)) && !f.interiors.some((r) => overlaps(r.box, lot, 3)) && !f.driveways.some((d) => overlaps(d, lot, 3));
   const taken = (): Block[] => [
-    city.depotBlock,
+    ...city.blocks.filter((b) => f.kinds[b.id] === 'square'),
     ...f.pitStops.map((p) => city.blocks[p.block]),
   ];
   const gx = city.nx - 1;
   const gz = city.nz - 1;
-  // West of downtown, off the depot block at the middle of the grid
+  // West of downtown, near the middle of the grid
   const ti = 0.3 * (gx - 1);
   const tj = 0.36 * (gz - 1);
   const blocks = city.blocks

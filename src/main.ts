@@ -83,7 +83,9 @@ import { RainView } from "./world/RainView";
 import { buildSnowBerms } from "./world/SnowCover";
 import { SNOW_TUNING, SnowView } from "./world/SnowView";
 import { Weather } from "./world/Weather";
-import { buildDepot } from "./world/DepotView";
+import { buildLandmarks } from "./world/LandmarkView";
+import { buildOldCity } from "./world/OldCityProps";
+import { buildPlazas } from "./world/PlazaView";
 import { buildPoliceStation } from "./world/PoliceStationView";
 import { buildPitStops } from "./world/PitStopView";
 import { buildRoads } from "./world/RoadMesh";
@@ -109,8 +111,8 @@ const staticStart = r.scene.children.length;
 const envParts = buildEnvironment(r.scene, r.renderer, city);
 const roadMats = buildRoads(city, r.scene, map.markings);
 const buildings = buildBuildings(city.buildings, r.scene);
-// The yard: HQ dressing, lit gates, planter wall, docks
-buildDepot(city, r.scene);
+// Notre-Dame and the clock tower (their own meshes; their boxes are in `city.buildings` as colliders)
+buildLandmarks(city, r.scene);
 buildPoliceStation(city, r.scene);
 const propColliders = buildStreetProps(city, r.scene);
 // Street lamps break away (and still hit the car), so their meshes are edited per instance and stay out of the tiling
@@ -120,11 +122,15 @@ const streetLamps = buildStreetLamps(city);
 const signPosts = buildRoadSigns(city);
 // Street blades at the boulevard corners and parking plates on the residential curbs (static)
 const streetSignColliders = buildStreetSigns(city, r.scene);
+// Vieux-Montréal's cobbles: bare trees, bike racks and winter terraces on the sidewalks (PRD Phase 5)
+const oldCityColliders = buildOldCity(city, r.scene, streetLamps.positions);
 const canal = buildCanal(city, r.scene);
 buildAlleys(city, r.scene);
 // IMPROVEMENTS #20: garages (pit stops)
 buildPitStops(city, r.scene);
 buildParks(city, r.scene);
+// Fountain squares and the Old Port's promenade, lot and railing
+buildPlazas(city, r.scene);
 // Winter (PRD 4.4): plowed snow along the curbs (roof caps come with the buildings)
 if (CONFIG.SKY === "winterDay") buildSnowBerms(city, r.scene);
 // Cut the whole-city meshes into tiles so they can be frustum / distance culled
@@ -144,13 +150,15 @@ const landmarkColliders = [
   ...city.features.pitStops.flatMap((p) => p.colliders),
   ...(city.features.station?.colliders ?? []),
   ...(city.features.parks ?? []).flatMap((p) => p.colliders),
-  ...(city.features.depot ? [...city.features.depot.planters, ...city.features.depot.colliders] : []),
+  ...(city.features.squares ?? []).flatMap((s) => s.colliders),
+  ...(city.features.port?.colliders ?? []),
 ];
 const statics = new SpatialHash([
   ...city.buildings.flatMap(solidParts),
   ...city.walls,
   ...propColliders,
   ...streetSignColliders,
+  ...oldCityColliders,
   ...streetLamps.colliders,
   ...signPosts.colliders,
   ...lightView.colliders,
@@ -160,8 +168,8 @@ const world = new World(city, events, rng, statics, lights);
 signPosts.attach(events, statics);
 streetLamps.attach(events, statics);
 
-// The car starts on the street by the yard, in the lane, pointed the way traffic goes
-const lane = city.nearestLanePoint(city.depotPos);
+// The car starts on the street by the Griffintown square, in the lane, pointed the way traffic goes
+const lane = city.nearestLanePoint(city.startPos);
 const start = {
   pos: lane.pos,
   yaw: Math.atan2(lane.lane.dir.x, lane.lane.dir.z),

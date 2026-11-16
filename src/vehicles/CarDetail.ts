@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONFIG } from '../config';
 import type { CarDetail, CarStyle } from './Car';
 import type { BodyProfile } from './BodyProfiles';
 import { circle, disc, onX, prep, rbox, slice, strip, yAt } from './CarGeometry';
@@ -62,8 +63,9 @@ function addPatrol(kit: Kit, st: BodyProfile): void {
   kit.add(rbox(hl + 0.08, hl + 0.14, 0.5, 0.57, -hw + 0.22, hw - 0.22, 0.012, 0.006), steel);
   kit.add(rbox(hl - 0.02, hl + 0.045, 0.46, 0.54, hw - 0.34, hw - 0.18, 0.01, 0.005), look(rgb(0.75, 0.03, 0.02), GLOW));
   kit.add(rbox(hl - 0.02, hl + 0.045, 0.46, 0.54, -hw + 0.18, -hw + 0.34, 0.01, 0.005), look(rgb(0.08, 0.16, 0.75), GLOW));
-  // Driver's spotlight on the side of the right A-pillar, behind the glass plane so the head
-  // comes out of the pillar instead of sitting in front of the windshield.
+  // Driver's spotlight on the driver's A-pillar (the left one on a left-hand-drive car: +x), behind the glass
+  // plane so the head comes out of the pillar instead of sitting in front of the windshield.
+  const driver = CONFIG.DRIVE_SIDE === 'right' ? 1 : -1;
   const [ws0, ws1] = st.ws;
   const along = 0.42;
   const vz = ws1[0] - ws0[0];
@@ -73,9 +75,11 @@ function addPatrol(kit: Kit, st: BodyProfile): void {
   const gy = ws0[1] + vy * along - (vy / vlen) * 0.05;
   const roofTop = Math.max(ws1[1], st.bl[0][1], ...st.roof.map((p) => p[1]));
   const tumble = 1 + (st.tumble - 1) * THREE.MathUtils.clamp((gy - st.belt) / (roofTop - st.belt), 0, 1);
-  const face = -(st.gW / 2) * tumble;
-  kit.add(rbox(gz - 0.02, gz + 0.012, gy - 0.026, gy + 0.026, face - 0.075, face + 0.04, 0.014, 0.006), chrome);
-  kit.add(disc(0.022, face - 0.04, gy, gz + 0.02, 1), look(rgb(0.95, 0.95, 0.88), GLOW));
+  const face = driver * (st.gW / 2) * tumble;
+  // The housing reaches outward from the glass face: toward -x on the right pillar, +x on the left
+  const out = (o: number) => face + driver * o;
+  kit.add(rbox(gz - 0.02, gz + 0.012, gy - 0.026, gy + 0.026, Math.min(out(0.075), out(-0.04)), Math.max(out(0.075), out(-0.04)), 0.014, 0.006), chrome);
+  kit.add(disc(0.022, out(0.04), gy, gz + 0.02, 1), look(rgb(0.95, 0.95, 0.88), GLOW));
   const bz = (st.doors[0] + (st.doors[1] ?? st.doors[0])) / 2;
   const by = st.belt - 0.22;
   kit.both(onX(circle(bz, by, 0.06), hw + 0.012), chrome);
