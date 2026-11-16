@@ -38,6 +38,8 @@ export interface SoakResult {
   crossings: number;
   /** Collision events between two moving AI cars (traffic, police; parked cars not counted). */
   aiCollisions: number;
+  /** Traffic or police touching a parked car (curb bays sit beside the lanes: should stay near 0). */
+  parkedHits: number;
   /** Share of AI car samples (1 Hz) that were not on road-level drivable ground. */
   offRoad: number;
   /** Average AI cars alive. */
@@ -94,13 +96,26 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   add(new CollisionSystem(statics, () => world.cars, events));
   add({ update: (dt) => (world.time += dt) });
 
-  const res: SoakResult = { seed, seconds, redRuns: 0, crossings: 0, aiCollisions: 0, offRoad: 0, cars: 0, msPerStep: 0, collisionLog: [] };
+  const res: SoakResult = { seed, seconds, redRuns: 0, crossings: 0, aiCollisions: 0, parkedHits: 0, offRoad: 0, cars: 0, msPerStep: 0, collisionLog: [] };
   const lastHit = new Map<string, number>();
   const isAi = (id: number | null) => {
     const k = id === null ? null : world.carById(id)?.kind;
     return k === 'traffic' || k === 'police';
   };
+  const isParked = (id: number | null) => id !== null && world.carById(id)?.kind === 'parked';
   events.on('collision', (e) => {
+    if ((isAi(e.a) && isParked(e.b)) || (isParked(e.a) && isAi(e.b))) {
+      const key = `p${Math.min(e.a, e.b!)}_${Math.max(e.a, e.b!)}`;
+      const last = lastHit.get(key);
+      lastHit.set(key, world.time);
+      if (last === undefined || world.time - last >= 2) {
+        res.parkedHits++;
+        const ai = world.carById(isAi(e.a) ? e.a : e.b!)!;
+        const node = city.nodeBoxAt(e.pos, 2);
+        res.collisionLog.push(`t=${world.time.toFixed(1)} ${ai.kind}/parked impulse ${Math.round(e.impulse)} speed ${(ai.phys.state.speed * 3.6).toFixed(0)} km/h ${node ? 'in junction' : 'on road'}`);
+      }
+      return;
+    }
     if (!isAi(e.a) || !isAi(e.b)) return;
     // One crash fires an event per step while the cars touch: count it once (same pair within 2 s)
     const key = `${Math.min(e.a, e.b!)}_${Math.max(e.a, e.b!)}`;
@@ -111,8 +126,14 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
     const ka = world.carById(e.a)!;
     const kb = world.carById(e.b!)!;
     const node = city.nodeBoxAt(e.pos, 2);
+    const move = (id: number) => {
+      const d = drivers().find((x) => x.car.id === id);
+      if (!d) return '?';
+      const ed = city.edges[d.lane.edgeId];
+      return `${ed.cls[0]}${d.lane.index}->${city.edges[d.next.lane.edgeId].cls[0]}${d.next.lane.index} ${d.next.turn}`;
+    };
     res.collisionLog.push(
-      `t=${world.time.toFixed(1)} ${ka.kind}/${kb.kind} impulse ${Math.round(e.impulse)} speeds ${(ka.phys.state.speed * 3.6).toFixed(0)}/${(kb.phys.state.speed * 3.6).toFixed(0)} km/h ${node ? 'in junction' : 'on road'}`,
+      `t=${world.time.toFixed(1)} ${ka.kind}/${kb.kind} impulse ${Math.round(e.impulse)} speeds ${(ka.phys.state.speed * 3.6).toFixed(0)}/${(kb.phys.state.speed * 3.6).toFixed(0)} km/h ${node ? `in junction ${node.gi},${node.gj}` : 'on road'} [${move(e.a)} | ${move(e.b!)}]`,
     );
   });
 

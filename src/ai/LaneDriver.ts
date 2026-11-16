@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { clamp, dot, fwd, leftOf, leftVec } from '../core/math';
 import type { Walker, World } from '../core/World';
-import type { Lane, TurnType, Vec2 } from '../types';
+import type { Lane, RoadNode, TurnType, Vec2 } from '../types';
 import type { Blinker, Car } from '../vehicles/Car';
 import { pointAt } from '../world/Polyline';
 import { RIDER_HALF_L, RIDER_HALF_W } from './Rider';
@@ -61,6 +61,13 @@ export const DRIVER_TUNING = {
   launchMin: 0.25,
   launchMax: 0.85,
 };
+
+/** The driver of each AI car, so opposing turners can settle who goes first (see `passesOpposingTurner`). */
+const DRIVER_OF = new WeakMap<Car, LaneDriver>();
+
+/** Look into the junction for a stranded car this far before the stop line (m), and what counts as stranded (m/s). */
+const BOX_LOOK = 14;
+const BOX_STUCK_SPEED = 2.5;
 
 export interface NextLeg {
   lane: Lane;
@@ -173,6 +180,7 @@ export class LaneDriver {
     lane: Lane,
   ) {
     this.lane = lane;
+    DRIVER_OF.set(car, this);
     this.temper = world.rng.next();
     this.speedMul = 0.86 + 0.16 * this.temper + world.rng.range(-0.03, 0.03);
     this.headway = 1.45 - 0.55 * this.temper;
@@ -218,8 +226,11 @@ export class LaneDriver {
       const d1 = city.lanes[leaving[0]].dir;
       const turn = turnType(this.lane.endDir, d1);
       if (edge.lanesPerDir > 1) {
+        // Turn from the lane next to it: the curb-side turn from the curb lane, the crossing turn from the inner
+        // lane. A boulevard's middle lanes go straight (turning from one would cut across the lane beside it).
         const inner = this.lane.index === 0;
-        if (inner && turn === EASY_TURN) continue;
+        const curb = this.lane.index === edge.lanesPerDir - 1;
+        if (!curb && turn === EASY_TURN) continue;
         if (!inner && turn === HARD_TURN) continue;
       }
       const idx = turn === 'straight' ? Math.min(this.lane.index, leaving.length - 1) : turn === EASY_TURN ? leaving.length - 1 : 0;
@@ -370,8 +381,42 @@ export class LaneDriver {
     // Amber: stop if it can be done braking at this driver's comfort level (pushy drivers go through later),
     // or if the line is too far to reach before red anyway (a slow turning car would enter on red)
     if (st === 'yellow') return dStop > (v * v) / (2 * (4.5 - 1.2 * this.temper)) + 1 || dStop > v * AMBER_REACH;
+    if (dStop < BOX_LOOK && this.boxBlocked(node)) return true;
     if (this.next.turn === HARD_TURN && dStop < 30) return this.oncomingTraffic(node.pos);
     return false;
+  }
+
+  /**
+   * Don't block the box: a car still in the junction from the last phase (a turner that waited for a bike, a
+   * car nosing out of a queue) and sitting on our way through it. Entering anyway is how two turners end up
+   * nose to nose waiting on each other, which the tighter Montreal lanes made easy. Cars going our way are
+   * left to the following logic.
+   */
+  private boxBlocked(node: RoadNode): boolean {
+    const city = this.world.city;
+    const f = fwd(this.car.yaw);
+    for (const o of this.world.cars) {
+      if (o === this.car || o.removed || o.speed > BOX_STUCK_SPEED) continue;
+      if (Math.abs(o.pos.x - node.pos.x) > node.hx + 2 || Math.abs(o.pos.z - node.pos.z) > node.hz + 2) continue;
+      if (city.nodeBoxAt(o.pos, 1) !== node || dot(fwd(o.yaw), f) > 0.5) continue;
+      const q = this.onPath(o.pos);
+      if (q.s > 0 && Math.abs(q.lat) < this.car.halfW + o.halfW + 0.5) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Two cars turning across traffic from opposite approaches meet in the middle of the junction and pass
+   * driver side to driver side. On Montreal's narrower lanes each one's path runs close enough to the other to
+   * read as blocked, and both would wait forever: the lower car id goes first, as long as the other is clear
+   * of its path; the other keeps waiting for it.
+   */
+  private passesOpposingTurner(o: Car): boolean {
+    if (this.next.turn !== HARD_TURN || o.id < this.car.id) return false;
+    const od = DRIVER_OF.get(o);
+    if (!od || od.car !== o || od.next.turn !== HARD_TURN || !od.pastLane) return false;
+    if (od.lane.to !== this.lane.to || dot(od.lane.endDir, this.lane.endDir) > -0.5) return false;
+    return Math.abs(this.onPath(o.pos).lat) >= this.car.halfW + o.halfW + 0.15;
   }
 
   private oncomingTraffic(nodePos: Vec2): boolean {
@@ -613,6 +658,7 @@ export class LaneDriver {
       const r = { x: o.pos.x - s.pos.x, z: o.pos.z - s.pos.z };
       const ahead = dot(r, f);
       if (ahead <= 0 || ahead > 45) continue;
+      if (inTurn && this.passesOpposingTurner(o)) continue;
       // Its footprint in our frame (a car turning away still has its tail in our lane): half extents across / along
       const c = Math.abs(dot(fwd(o.yaw), f));
       const sn = Math.sqrt(Math.max(0, 1 - c * c));

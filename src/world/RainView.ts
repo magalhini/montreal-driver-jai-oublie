@@ -142,7 +142,7 @@ export class RainView implements ViewSystem {
     density: number;
     env: number;
     asphalt: THREE.Color;
-    rough: [number, number, number];
+    rough: [number, number, number, number];
   };
   private readonly rainFog = new THREE.Color(0x2c2238);
   private readonly rainBg = new THREE.Color(0x1d1428);
@@ -230,6 +230,7 @@ export class RainView implements ViewSystem {
         roads.asphalt.roughness,
         roads.lots.roughness,
         roads.walk.roughness,
+        roads.setts.roughness,
       ],
     };
     camera.getWorldPosition(this.camPrev);
@@ -287,6 +288,7 @@ export class RainView implements ViewSystem {
     this.roads.asphalt.roughness = b.rough[0] * (1 - 0.45 * wet);
     this.roads.lots.roughness = b.rough[1] * (1 - 0.45 * wet);
     this.roads.walk.roughness = b.rough[2] * (1 - 0.4 * wet);
+    this.roads.setts.roughness = b.rough[3] * (1 - 0.4 * wet);
     this.roads.asphalt.color.copy(b.asphalt).multiplyScalar(1 - 0.18 * wet);
   }
 

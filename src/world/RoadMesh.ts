@@ -11,7 +11,7 @@ import { offset } from './Polyline';
 import { polygonArea } from './RoadIndex';
 import { SurfaceBuilder } from './SurfaceBuilder';
 import { blockFloor } from './Surfaces';
-import { asphaltTextures, grassTexture, pavingTextures, puddleTexture } from './textures';
+import { asphaltTextures, grassTexture, pavingTextures, puddleTexture, settTextures } from './textures';
 
 type Rect = AABB;
 const rect = (minX: number, minZ: number, maxX: number, maxZ: number): Rect => ({ minX, minZ, maxX, maxZ });
@@ -22,6 +22,8 @@ export interface RoadMaterials {
   asphalt: THREE.MeshStandardMaterial;
   lots: THREE.MeshStandardMaterial;
   walk: THREE.MeshStandardMaterial;
+  /** Granite setts on the cobble streets. */
+  setts: THREE.MeshStandardMaterial;
 }
 
 /**
@@ -38,6 +40,7 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   const f = city.features;
 
   const ground = new SurfaceBuilder(H);
+  const setts = new SurfaceBuilder(H);
   const lots = new SurfaceBuilder(H);
   const walk = new SurfaceBuilder(H);
   const paving = new SurfaceBuilder(H);
@@ -47,7 +50,7 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   const grid = city.nx > 0;
 
   // Roads between junctions, and the junction areas
-  for (const e of city.edges) roadRibbon(ground, e);
+  for (const e of city.edges) roadRibbon(e.cls === 'cobble' ? setts : ground, e);
   for (const n of city.nodes) {
     const r = asRect(n.poly);
     if (r) ground.patch(r.minX, r.minZ, r.maxX, r.maxZ);
@@ -127,6 +130,12 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   lotMat.color.set(0x7a7a88);
   scene.add(lots.mesh(lotMat));
 
+  const sett = settTextures();
+  sett.map.repeat.set(1 / 2, 1 / 2);
+  sett.normalMap.repeat.set(1 / 2, 1 / 2);
+  const settMat = new THREE.MeshStandardMaterial({ color: 0x9a9aa0, map: sett.map, normalMap: sett.normalMap, normalScale: new THREE.Vector2(0.9, 0.9), roughness: 0.85, metalness: 0.05 });
+  if (setts.vertexCount > 0) scene.add(setts.mesh(settMat));
+
   const pave = pavingTextures();
   pave.map.repeat.set(1 / 2, 1 / 2);
   pave.normalMap.repeat.set(1 / 2, 1 / 2);
@@ -144,7 +153,7 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   }
 
   scene.add(buildMarkings(city, markings));
-  return { asphalt, lots: lotMat, walk: walkMat };
+  return { asphalt, lots: lotMat, walk: walkMat, setts: settMat };
 }
 
 /** Far ground beyond Tokyo's outer ring (cut around the canal). */

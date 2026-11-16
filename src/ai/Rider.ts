@@ -1,12 +1,13 @@
 import { CONFIG } from '../config';
 import { dot, fwd, leftVec } from '../core/math';
 import type { Lane, TurnType, Vec2 } from '../types';
+import type { World } from '../core/World';
 import type { Car } from '../vehicles/Car';
 
 // Bicycle / scooter state and geometry helpers shared by Riders (sim), RiderDodge, LaneDriver and RiderView.
 
 export type RiderKind = 'bicycle' | 'scooter';
-/** Riders keep this far from the outer lane's center toward the curb (the curb is LANE_WIDTH / 2 from it). */
+/** Riders keep this far from the outer lane's center toward the curb (its edge: the parking band or the curb is half a lane width out). */
 export const CURB_OFFSET = 1.35;
 /** Rider footprint: half the handlebar width and half the bike length. */
 export const RIDER_HALF_W = 0.32;
@@ -124,3 +125,22 @@ export const curbVec = (d: Vec2): Vec2 => {
   const l = leftVec(d);
   return { x: l.x * CURB_SIDE, z: l.z * CURB_SIDE };
 };
+
+/**
+ * Free distance (m, up to `max`) from `pos` toward the curb along `n`: the nearest static collider, or the side
+ * of a car parked in the curb band (riders ride along the parked row and must not swerve into it).
+ */
+export function curbRoom(world: World, pos: Vec2, n: Vec2, max: number): number {
+  let room = world.statics.rayDistance(pos, n, max);
+  const l = leftVec(n);
+  for (const c of world.cars) {
+    if (c.kind !== 'parked' || c.removed) continue;
+    const rx = c.pos.x - pos.x;
+    const rz = c.pos.z - pos.z;
+    const ahead = rx * n.x + rz * n.z;
+    if (ahead <= 0 || ahead > max + c.halfW) continue;
+    if (Math.abs(rx * l.x + rz * l.z) > c.halfL + RIDER_HALF_L) continue;
+    room = Math.min(room, Math.max(0, ahead - c.halfW));
+  }
+  return room;
+}

@@ -3,7 +3,7 @@ import { Rng, hash01 } from '../core/Rng';
 import type { AABB, Block, Building, Facing } from '../types';
 import { inner } from './Features';
 import { partFaces, subtractRect } from './Interiors';
-import type { CityModel } from './RoadGraph';
+import { blockRoads, type CityModel } from './RoadGraph';
 
 /**
  * Skyline dressing after the city is planned (own decisions, so alleys and lot landmarks stay put):
@@ -241,18 +241,16 @@ function cutForSquare(city: CityModel, bl: Block, square: AABB): void {
 
 function placeScrambles(city: CityModel): void {
   const rng = new Rng(CONFIG.SEED + 44);
-  const LW = CONFIG.LANE_WIDTH;
+  /** A boulevard is at least this wide each side of its centerline; a street or cobble lane is less. */
+  const WIDE = 9;
   const ranked = city.blocks
     .filter((bl) => city.features.kinds[bl.id] === 'normal' && bl.district === 'downtown' && bl.gj !== city.features.canal?.row)
     .map((bl) => {
       const r = inner(bl);
       const w = r.maxX - r.minX;
       const d = r.maxZ - r.minZ;
-      const ave =
-        (city.hwX[bl.gi] > LW + 0.1 ? 1 : 0) +
-        (city.hwX[bl.gi + 1] > LW + 0.1 ? 1 : 0) +
-        (city.hwZ[bl.gj] > LW + 0.1 ? 1 : 0) +
-        (city.hwZ[bl.gj + 1] > LW + 0.1 ? 1 : 0);
+      const side = blockRoads(city, bl);
+      const ave = [side.N, side.S, side.W, side.E].filter((hw) => hw > WIDE).length;
       return { bl, r, w, d, ave, score: ave * 80 - Math.hypot(bl.center.x, bl.center.z) * 0.12 + Math.min(w, d) };
     })
     .filter((c) => c.w >= 58 && c.d >= 58)
@@ -265,13 +263,15 @@ function placeScrambles(city: CityModel): void {
     for (const c of ranked) {
       if (placed.length >= SCRAMBLE_COUNT) return;
       if (!sepOk(c.bl, sep)) continue;
-      const hw = (sx: -1 | 1, sz: -1 | 1) => (sx < 0 ? city.hwX[c.bl.gi] : city.hwX[c.bl.gi + 1]) + (sz < 0 ? city.hwZ[c.bl.gj] : city.hwZ[c.bl.gj + 1]);
+      const side = blockRoads(city, c.bl);
+      const hw = (sx: -1 | 1, sz: -1 | 1) => (sx < 0 ? side.W : side.E) + (sz < 0 ? side.N : side.S);
       let pick: { box: AABB; faces: Facing[]; side: number; score: number } | null = null;
       for (const sx of [-1, 1] as const) {
         for (const sz of [-1, 1] as const) {
           const fit = fitCorner(city, c.bl, c.r, sx, sz);
           if (!fit) continue;
-          const score = fit.side + (hw(sx, sz) > LW * 2 ? 10 : 0);
+          // a corner on at least one boulevard
+          const score = fit.side + (hw(sx, sz) > WIDE + 4 ? 10 : 0);
           if (!pick || score > pick.score) pick = { ...fit, score };
         }
       }

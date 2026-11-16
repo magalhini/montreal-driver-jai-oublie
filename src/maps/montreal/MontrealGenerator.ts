@@ -1,21 +1,22 @@
 import { CONFIG, KMH } from '../../config';
 import { leftVec, scale } from '../../core/math';
 import { Rng } from '../../core/Rng';
-import type { Block, Building, Lane, RoadEdge, RoadNode, Vec2 } from '../../types';
+import type { Block, Building, Lane, RoadEdge, RoadNode, StreetClass, Vec2 } from '../../types';
 import { planAlleys } from '../../world/Alleys';
 import { generateBuildings } from '../../world/Districts';
 import { settleBuildings } from '../../world/Settle';
+import { planCurbParking } from '../../world/CurbParking';
 import { emptyFeatures } from '../../world/Features';
 import { planDepot } from '../../world/Depot';
 import { planPitStops } from '../../world/PitStops';
 import { planPoliceStation } from '../../world/PoliceStation';
-import { CityModel } from '../../world/RoadGraph';
+import { CityModel, laneOffset } from '../../world/RoadGraph';
 import { dressSkyline } from '../../world/Skyline';
 import { Terrain } from '../../world/Terrain';
 import { layHarbor, openHarbor } from './Harbor';
 import { fitHeights, openCourtyards, placeArena, placeClock, placeSilos } from './Massing';
 import { layParks } from './Parks';
-import { ARENA, CANAL_ROW, CLOCK, SILOS, X_RAW, Z_RAW, avenueX, avenueZ, districtAt, heightOf, isPark } from './layout';
+import { ARENA, CANAL_ROW, CLOCK, SILOS, STREET_CLASSES, X_RAW, Z_RAW, classWidth, colClass, districtAt, heightOf, isPark, rowClass } from './layout';
 
 const OUTER = 28;
 
@@ -23,6 +24,10 @@ const OUTER = 28;
  * Downtown Montreal, Guy to Saint-Hubert, Sherbrooke to the river: real block spacing, gardens instead of
  * whole-block lawns, the Lachine Canal as the east-west water, a paved lane along the quay, and roof heights
  * taken from the blocks. Lanes follow `CONFIG.DRIVE_SIDE` (right-hand traffic).
+ *
+ * Every edge carries its street class (`layout.ts`: boulevard, street or cobble) and the widths that go with
+ * it. A row can change class part way (Sainte-Catherine, Saint-Paul), so a junction box is as wide as the
+ * widest road through it, and each block's curb follows the road actually beside it.
  */
 export function generateMontreal(seed = CONFIG.SEED): CityModel {
   const rng = new Rng(seed);
@@ -30,26 +35,32 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   city.flatGround = true;
   const GX = X_RAW.length - 1;
   const GZ = Z_RAW.length - 1;
-  const LW = CONFIG.LANE_WIDTH;
   const xMid = (X_RAW[0] + X_RAW[GX]) / 2;
   const zMid = (Z_RAW[0] + Z_RAW[GZ]) / 2;
   city.xs = X_RAW.map((x) => x - xMid);
   city.zs = Z_RAW.map((z) => z - zMid);
-  city.hwX = city.xs.map((_, i) => (avenueX(i) ? 2 * LW + 0.25 : LW));
-  city.hwZ = city.zs.map((_, j) => (avenueZ(j) ? 2 * LW + 0.25 : LW));
+  // Half widths: of the row-j road between columns i and i + 1, and of the column-i road between rows j and j + 1
+  const hwRow = (i: number, j: number) => classWidth(rowClass(i, j)) / 2;
+  const hwCol = (i: number, j: number) => classWidth(colClass(i, j)) / 2;
+  const widest = (n: number, f: (k: number) => number) => Math.max(...Array.from({ length: n }, (_, k) => f(k)));
+  city.hwX = city.xs.map((_, i) => widest(GZ, (j) => hwCol(i, j)));
+  city.hwZ = city.zs.map((_, j) => widest(GX, (i) => hwRow(i, j)));
 
   for (let j = 0; j <= GZ; j++) {
     for (let i = 0; i <= GX; i++) {
+      // The box spans the widest road through the junction on each axis
+      const hx = Math.max(j > 0 ? hwCol(i, j - 1) : 0, j < GZ ? hwCol(i, j) : 0);
+      const hz = Math.max(i > 0 ? hwRow(i - 1, j) : 0, i < GX ? hwRow(i, j) : 0);
       const n: RoadNode = {
         id: j * (GX + 1) + i,
         gi: i,
         gj: j,
         pos: { x: city.xs[i], z: city.zs[j] },
-        hx: city.hwX[i],
-        hz: city.hwZ[j],
+        hx,
+        hz,
         edges: [],
         signalized: false,
-        poly: box(city.xs[i] - city.hwX[i], city.zs[j] - city.hwZ[j], city.xs[i] + city.hwX[i], city.zs[j] + city.hwZ[j]),
+        poly: box(city.xs[i] - hx, city.zs[j] - hz, city.xs[i] + hx, city.zs[j] + hz),
         control: 'none',
       };
       city.nodes.push(n);
@@ -59,8 +70,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   const addLane = (e: RoadEdge, from: RoadNode, to: RoadNode, index: number): number => {
     const d: Vec2 = e.axis === 'x' ? { x: Math.sign(to.pos.x - from.pos.x), z: 0 } : { x: 0, z: Math.sign(to.pos.z - from.pos.z) };
     const side = CONFIG.DRIVE_SIDE === 'left' ? 1 : -1;
-    const med = e.avenue ? 0.25 : 0;
-    const off = scale(leftVec(d), side * (med + LW * (index + 0.5)));
+    const off = scale(leftVec(d), side * laneOffset(e, index));
     const fromExt = e.axis === 'x' ? from.hx : from.hz;
     const toExt = e.axis === 'x' ? to.hx : to.hz;
     const start = { x: from.pos.x + d.x * (fromExt + 1) + off.x, z: from.pos.z + d.z * (fromExt + 1) + off.z };
@@ -87,8 +97,9 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
     return lane.id;
   };
 
-  const addEdge = (a: RoadNode, b: RoadNode, axis: 'x' | 'z', avenue: boolean) => {
-    const lanesPerDir = avenue ? 2 : 1;
+  const addEdge = (a: RoadNode, b: RoadNode, axis: 'x' | 'z', cls: StreetClass) => {
+    const k = STREET_CLASSES[cls];
+    const lanesPerDir = k.lanesPerDir;
     const ux = axis === 'x' ? 1 : 0;
     const uz = 1 - ux;
     const ea = axis === 'x' ? a.hx : a.hz;
@@ -104,9 +115,13 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
       ],
       oneWay: false,
       lanesPerDir,
-      avenue,
-      width: lanesPerDir * 2 * LW + (avenue ? 0.5 : 0),
-      speedLimit: (avenue ? CONFIG.AVENUE_LIMIT_KMH : CONFIG.STREET_LIMIT_KMH) * KMH,
+      avenue: cls === 'boulevard',
+      cls,
+      laneWidth: k.laneWidth,
+      parking: k.parking,
+      median: k.median,
+      width: classWidth(cls),
+      speedLimit: k.limitKmh * KMH,
       length: Math.hypot(b.pos.x - a.pos.x, b.pos.z - a.pos.z),
       lanesAB: [],
       lanesBA: [],
@@ -122,10 +137,10 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   };
 
   for (let j = 0; j <= GZ; j++) {
-    for (let i = 0; i < GX; i++) addEdge(city.nodeAt(i, j), city.nodeAt(i + 1, j), 'x', avenueZ(j));
+    for (let i = 0; i < GX; i++) addEdge(city.nodeAt(i, j), city.nodeAt(i + 1, j), 'x', rowClass(i, j));
   }
   for (let i = 0; i <= GX; i++) {
-    for (let j = 0; j < GZ; j++) addEdge(city.nodeAt(i, j), city.nodeAt(i, j + 1), 'z', avenueX(i));
+    for (let j = 0; j < GZ; j++) addEdge(city.nodeAt(i, j), city.nodeAt(i, j + 1), 'z', colClass(i, j));
   }
   for (const n of city.nodes) {
     n.signalized = n.edges.length >= 3;
@@ -134,8 +149,9 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
 
   for (let j = 0; j < GZ; j++) {
     for (let i = 0; i < GX; i++) {
-      const min = { x: city.xs[i] + city.hwX[i], z: city.zs[j] + city.hwZ[j] };
-      const max = { x: city.xs[i + 1] - city.hwX[i + 1], z: city.zs[j + 1] - city.hwZ[j + 1] };
+      // Curbs of the four roads around the block (a cobble row leaves a deeper block than the boulevard beside it)
+      const min = { x: city.xs[i] + hwCol(i, j), z: city.zs[j] + hwRow(i, j) };
+      const max = { x: city.xs[i + 1] - hwCol(i + 1, j), z: city.zs[j + 1] - hwRow(i, j + 1) };
       const block: Block = {
         id: j * GX + i,
         gi: i,
@@ -226,6 +242,8 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   placeSilos(city);
   placeClock(city);
   settleBuildings(city);
+  // Last: the bays keep clear of every curb cut the planners above made
+  f.curb = planCurbParking(city);
   return city;
 }
 

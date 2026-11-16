@@ -54,8 +54,10 @@ export interface CityFeatures {
   kinds: BlockKind[];
   /** Driveway gaps in the sidewalk ring (road level, no curb). Where driving is allowed: see `Surfaces.ts`. */
   driveways: AABB[];
-  /** Parked car slots: position + heading. */
+  /** Parked car slots in lots: position + heading. */
   parking: { pos: Vec2; yaw: number }[];
+  /** Parking bays in the curb lanes of streets and boulevards (`world/CurbParking.ts`). */
+  curb: CurbBay[];
   /** Alleys through blocks (shortcuts). */
   alleys: Alley[];
   /** Semi-indoor areas (garages, passages under buildings, covered nooks). */
@@ -68,6 +70,21 @@ export interface CityFeatures {
   depot: DepotPlan | null;
   /** Gardens inside a block: a lawn, a path, trees (`maps/montreal/Parks.ts`). */
   parks?: CityPark[];
+}
+
+/**
+ * One parking space in a road's curb band: an arc-length span along its edge's centerline, on one side, with
+ * the spot a parked car stands on (nose the way traffic on that side drives).
+ */
+export interface CurbBay {
+  edge: number;
+  /** Side of the centerline (+1 = left of a -> b, as `leftVec`). */
+  side: 1 | -1;
+  /** Arc lengths along `edge.pts` where the bay starts and ends. */
+  s0: number;
+  s1: number;
+  pos: Vec2;
+  yaw: number;
 }
 
 /** A garden cut out of one block. The rest of the block keeps its street wall. */
@@ -87,7 +104,13 @@ export interface CityPark {
 }
 
 export function emptyFeatures(): CityFeatures {
-  return { canal: null, kinds: [], driveways: [], parking: [], alleys: [], interiors: [], pitStops: [], station: null, depot: null };
+  return { canal: null, kinds: [], driveways: [], parking: [], curb: [], alleys: [], interiors: [], pitStops: [], station: null, depot: null };
+}
+
+/** Within `margin` of a curb cut: a driveway or an alley mouth (no posts, trees or parked cars in front of it). */
+export function inDriveway(f: CityFeatures, p: Vec2, margin: number): boolean {
+  const near = (d: AABB) => p.x > d.minX - margin && p.x < d.maxX + margin && p.z > d.minZ - margin && p.z < d.maxZ + margin;
+  return f.driveways.some(near) || f.alleys.some((a) => near(a.box));
 }
 
 /** Block area inside the sidewalk ring. */

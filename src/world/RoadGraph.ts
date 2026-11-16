@@ -13,12 +13,37 @@ export function lanePoint(l: Lane, t: number): Vec2 {
   return { x: l.start.x + (l.end.x - l.start.x) * t, z: l.start.z + (l.end.z - l.start.z) * t };
 }
 
+/** Distance of lane `index`'s line from a two-way edge's centerline (index 0 = innermost). */
+export function laneOffset(e: RoadEdge, index: number): number {
+  return e.median + e.laneWidth * (index + 0.5);
+}
+
+/** Distance from a two-way edge's centerline to the outer edge of its travel lanes (where parking starts). */
+export function travelHalf(e: RoadEdge): number {
+  return e.median + e.laneWidth * e.lanesPerDir;
+}
+
+/**
+ * Half width of the road along each side of a grid block (N = -Z), read off the block's own curbs: a row that
+ * changes class part way has no single width, so `hwX` / `hwZ` (the junction boxes) can overstate it.
+ */
+export function blockRoads(city: CityModel, bl: Block): { N: number; S: number; W: number; E: number } {
+  return {
+    N: bl.min.z - city.zs[bl.gj],
+    S: city.zs[bl.gj + 1] - bl.max.z,
+    W: bl.min.x - city.xs[bl.gi],
+    E: city.xs[bl.gi + 1] - bl.max.x,
+  };
+}
+
 /** City data: road graph, blocks and buildings plus spatial queries. Pure data, no three.js. */
 export class CityModel {
   xs: number[] = []; // vertical road centerlines (run along Z)
   zs: number[] = []; // horizontal road centerlines (run along X)
-  hwX: number[] = []; // half width of vertical road i
-  hwZ: number[] = []; // half width of horizontal road j
+  /** Half width of vertical road i: the widest of its edges (junction boxes). Blocks use their own edges' widths. */
+  hwX: number[] = [];
+  /** Half width of horizontal road j: the widest of its edges (a row can narrow, e.g. Sainte-Catherine's cobbles). */
+  hwZ: number[] = [];
   nodes: RoadNode[] = [];
   edges: RoadEdge[] = [];
   lanes: Lane[] = [];

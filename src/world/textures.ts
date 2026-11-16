@@ -267,6 +267,67 @@ export function pavingTextures(): { map: THREE.Texture; normalMap: THREE.Texture
   return { map, normalMap };
 }
 
+/**
+ * Granite setts for the old-city streets (PRD 3, the Sainte-Catherine cobble photo): small grey blocks in
+ * staggered courses, each a slightly different tone, with dark joints and rounded tops. One repeat covers
+ * 2 m: 9 setts by 16 courses (about 0.22 x 0.125 m).
+ */
+export function settTextures(): { map: THREE.Texture; normalMap: THREE.Texture } {
+  const size = 512;
+  const rng = new Rng(17);
+  const [c, g] = canvas(size, size);
+  const [cn, gn] = canvas(size, size);
+  const img = g.createImageData(size, size);
+  const nimg = gn.createImageData(size, size);
+  const cols = 9;
+  const rows = 16;
+  const tone = Array.from({ length: cols * rows }, () => rng.range(0.72, 1.12));
+  const warm = Array.from({ length: cols * rows }, () => rng.range(-0.04, 0.05));
+  const n = tileNoise(rng, 48);
+  /** Course, sett and 0..1 "height" (0 in the joint, 1 on the crown) at a texel. */
+  const sett = (x: number, y: number) => {
+    const ty = (((y % size) + size) % size) / size * rows;
+    const r = Math.floor(ty);
+    const tx = ((((x % size) + size) % size) / size) * cols + (r % 2 ? 0.5 : 0);
+    const k = Math.floor(tx) % cols;
+    const fx = Math.min(tx - Math.floor(tx), Math.ceil(tx) - tx) * 2.4; // setts are longer than tall
+    const fy = Math.min(ty - r, r + 1 - ty) * 1.35;
+    const h = Math.min(1, Math.min(fx, fy) * 9);
+    return { id: r * cols + k, h: Math.sqrt(h) };
+  };
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const k = y * size + x;
+      const s = sett(x, y);
+      const grain = 0.08 * n(x / size, y / size) + 0.07 * (rng.next() - 0.5);
+      const t = (0.5 + grain) * tone[s.id] * (0.35 + 0.65 * s.h);
+      const w = warm[s.id];
+      img.data[k * 4] = Math.min(255, t * (150 + 60 * w));
+      img.data[k * 4 + 1] = Math.min(255, t * 150);
+      img.data[k * 4 + 2] = Math.min(255, t * (156 - 40 * w));
+      img.data[k * 4 + 3] = 255;
+      const dx = (sett(x + 1, y).h - sett(x - 1, y).h) * 1.6;
+      const dy = (sett(x, y + 1).h - sett(x, y - 1).h) * 1.6;
+      const l = Math.hypot(dx, dy, 1);
+      nimg.data[k * 4] = (-dx / l * 0.5 + 0.5) * 255;
+      nimg.data[k * 4 + 1] = (-dy / l * 0.5 + 0.5) * 255;
+      nimg.data[k * 4 + 2] = (1 / l * 0.5 + 0.5) * 255;
+      nimg.data[k * 4 + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  gn.putImageData(nimg, 0, 0);
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const normalMap = new THREE.CanvasTexture(cn);
+  normalMap.colorSpace = THREE.NoColorSpace;
+  for (const t of [map, normalMap]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+  }
+  return { map, normalMap };
+}
+
 /** Tileable ripple normal map for water (scrolled over time). */
 export function waterNormalTexture(size = 512): THREE.Texture {
   const rng = new Rng(77);

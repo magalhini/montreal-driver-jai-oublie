@@ -125,7 +125,7 @@ export class RoadIndex {
   /** Lane whose part of the road contains p (by lateral offset), and p's offset from that lane's line (+ = left). */
   laneOnEdge(e: RoadEdge, p: Vec2): { lane: Lane; lateral: number } {
     const lat = lateralOn(e.pts, p);
-    const LW = CONFIG.LANE_WIDTH;
+    const LW = e.laneWidth;
     let ids: number[];
     let idx: number;
     if (e.oneWay) {
@@ -136,8 +136,8 @@ export class RoadIndex {
     } else {
       const abSide = CONFIG.DRIVE_SIDE === 'left' ? lat > 0 : lat < 0;
       ids = abSide ? e.lanesAB : e.lanesBA;
-      const med = e.avenue ? 0.25 : 0;
-      idx = Math.min(ids.length - 1, Math.max(0, Math.floor((Math.abs(lat) - med) / LW)));
+      // The parking band counts as the curb lane
+      idx = Math.min(ids.length - 1, Math.max(0, Math.floor((Math.abs(lat) - e.median) / LW)));
     }
     const lane = this.lanes[ids[idx]];
     return { lane, lateral: lateralOn(lane.pts, p) };

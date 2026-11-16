@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Rng } from '../core/Rng';
 import type { Vec2, ViewSystem } from '../types';
-import type { CityModel } from './RoadGraph';
+import { laneOffset, type CityModel } from './RoadGraph';
 
 /**
  * Manhole covers on the streets, and steam rising from some of them in the busy districts (downtown,
@@ -86,7 +86,7 @@ export class SteamVents implements ViewSystem {
       for (let k = 0; k < count; k++) {
         const t = rng.range(t0, t1);
         // in the middle of a lane (where the sewer runs under it)
-        const lane = (rng.chance(0.5) ? 1 : -1) * (e.avenue ? 6.2 : 2.0);
+        const lane = (rng.chance(0.5) ? 1 : -1) * laneOffset(e, e.lanesPerDir > 1 ? 1 : 0);
         const pos = alongX ? { x: t, z: fixed + lane } : { x: fixed + lane, z: t };
         const y = city.terrain.heightAt(pos.x, pos.z);
         covers.push(new THREE.Matrix4().compose(new THREE.Vector3(pos.x, y + 0.035, pos.z), flat, new THREE.Vector3(0.75, 0.75, 1)));

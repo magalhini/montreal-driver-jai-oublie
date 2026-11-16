@@ -1,4 +1,4 @@
-import type { DistrictType } from '../../types';
+import type { DistrictType, StreetClass } from '../../types';
 
 /**
  * The street grid, rotated so it lies on the game's axes.
@@ -44,7 +44,7 @@ export const Z_RAW = [
   -201, // Saint-Jacques
   -45, // Notre-Dame
   80, // Saint-Paul
-  185, // William
+  185, // William (de la Commune east of McGill, along the Old Port)
   318, // Ottawa
   484, // Wellington
   564, // south bank of the canal
@@ -55,13 +55,48 @@ export const Z_RAW = [
 export const COLS = X_RAW.length - 1;
 export const ROWS = Z_RAW.length - 1;
 
-/** Column index of a cross-street that is a boulevard (two lanes each way). */
+/** Column index of a cross-street that is a boulevard. */
 const AVENUE_X = new Set([4, 7, 13, 17]); // Peel, Robert-Bourassa, Saint-Laurent, Berri
 /** Row index of an east-west boulevard. */
 const AVENUE_Z = new Set([0, 2, 4, 8, 12]); // Sherbrooke, Sainte-Catherine, René-Lévesque, Notre-Dame, Wellington
 
 export const avenueX = (i: number): boolean => AVENUE_X.has(i);
 export const avenueZ = (j: number): boolean => AVENUE_Z.has(j);
+
+/** Shape of each street class (PRD 4.2). Widths in meters; the limit is what `RoadEdge.speedLimit` gets. */
+export const STREET_CLASSES: Record<StreetClass, { lanesPerDir: number; laneWidth: number; parking: number; median: number; limitKmh: number }> = {
+  boulevard: { lanesPerDir: 3, laneWidth: 3.5, parking: 2.4, median: 0.25, limitKmh: 50 },
+  street: { lanesPerDir: 1, laneWidth: 3.6, parking: 2.3, median: 0, limitKmh: 40 },
+  cobble: { lanesPerDir: 1, laneWidth: 3.1, parking: 0, median: 0, limitKmh: 30 },
+};
+
+/** Curb-to-curb width of a street class. */
+export function classWidth(c: StreetClass): number {
+  const k = STREET_CLASSES[c];
+  return 2 * (k.median + k.lanesPerDir * k.laneWidth + k.parking);
+}
+
+/** First column of Vieux-Montréal (McGill): Saint-Paul and de la Commune are setts from here east. */
+const OLD_CITY_I = 9;
+/** Row of Saint-Paul, and of William, which is de la Commune once it reaches the old city. */
+const SAINT_PAUL = 9;
+const COMMUNE = 10;
+/** Sainte-Catherine through the Quartier latin, Saint-Laurent to Berri: the one paved stretch off the old city. */
+const SAINTE_CATHERINE = 2;
+const LATIN_I0 = 13;
+const LATIN_I1 = 17;
+
+/** Class of the east-west road on row j between columns i and i + 1. */
+export function rowClass(i: number, j: number): StreetClass {
+  if ((j === SAINT_PAUL || j === COMMUNE) && i >= OLD_CITY_I) return 'cobble';
+  if (j === SAINTE_CATHERINE && i >= LATIN_I0 && i < LATIN_I1) return 'cobble';
+  return avenueZ(j) ? 'boulevard' : 'street';
+}
+
+/** Class of the north-south road on column i between rows j and j + 1. */
+export function colClass(i: number, _j: number): StreetClass {
+  return avenueX(i) ? 'boulevard' : 'street';
+}
 
 /** Block row the Lachine Canal cuts through (between Wellington and the south bank). */
 export const CANAL_ROW = 12;

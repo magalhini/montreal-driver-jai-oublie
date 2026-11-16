@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CONFIG, KMH } from '../config';
 import type { Vec2 } from '../types';
-import type { CityModel } from './RoadGraph';
+import { laneOffset, type CityModel } from './RoadGraph';
 import { RoadSignPosts, type SignPost } from './RoadSignPosts';
 import { inDriveway } from './StreetProps';
 
@@ -10,7 +10,8 @@ import { inDriveway } from './StreetProps';
  * stretched along the lane) and a round regulatory sign on the curb side at the start of each block.
  * Speeding is an offense, so the city should say what the limit is (the HUD repeats it).
  */
-const LIMITS = [CONFIG.STREET_LIMIT_KMH, CONFIG.AVENUE_LIMIT_KMH];
+/** Which side of a lane its curb is on (+1 = left, as `leftVec`). */
+const CURB_SIDE = CONFIG.DRIVE_SIDE === 'left' ? 1 : -1;
 const FONT = "'Helvetica Neue', Arial, sans-serif";
 
 function canvasTex(w: number, h: number, draw: (g: CanvasRenderingContext2D) => void): THREE.CanvasTexture {
@@ -70,10 +71,11 @@ function signTexture(kmh: number): THREE.Texture {
  */
 export function buildRoadSigns(city: CityModel, scene: THREE.Scene): RoadSignPosts {
   const t = city.terrain;
+  // One texture per posted limit in use (km/h): 50 / 40 / 30 for boulevards, streets and cobbles
+  const LIMITS = [...new Set(city.edges.map((e) => Math.round(e.speedLimit / KMH)))].sort((a, b) => b - a);
   const paint: THREE.Matrix4[][] = LIMITS.map(() => []);
   const posts: SignPost[] = [];
   const breakAt = CONFIG.SIGN_BREAK_KMH * KMH;
-  const LW = CONFIG.LANE_WIDTH;
   const up = new THREE.Vector3(0, 1, 0);
   const g: Vec2 = { x: 0, z: 0 };
 
@@ -81,7 +83,6 @@ export function buildRoadSigns(city: CityModel, scene: THREE.Scene): RoadSignPos
     const which = LIMITS.findIndex((k) => Math.abs(k * KMH - e.speedLimit) < 0.1);
     if (which < 0) continue;
     const hw = e.width / 2;
-    const med = e.avenue ? 0.25 : 0;
     for (const id of [...e.lanesAB, ...e.lanesBA]) {
       const lane = city.lanes[id];
       if (lane.length < 30) continue;
@@ -99,9 +100,10 @@ export function buildRoadSigns(city: CityModel, scene: THREE.Scene): RoadSignPos
       paint[which].push(m);
       // One sign per direction, on the curb side, at the start of the block
       if (lane.index !== 0) continue;
-      const off = med + LW * (lane.index + 0.5);
+      // From the lane's line out past the curb on its own side (the right with right-hand traffic)
+      const out = CURB_SIDE * (hw + 0.45 - laneOffset(e, lane.index));
       for (const along of [11, 16, 21]) {
-        const q = { x: lane.start.x + d.x * along + left.x * (hw + 0.45 - off), z: lane.start.z + d.z * along + left.z * (hw + 0.45 - off) };
+        const q = { x: lane.start.x + d.x * along + left.x * out, z: lane.start.z + d.z * along + left.z * out };
         if (inDriveway(city, q, 0.8)) continue;
         const y = t.surfaceY(q.x, q.z);
         // The face looks back at the oncoming driver (+Z of lookAt(eye, target) points from target to eye)

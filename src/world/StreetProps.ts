@@ -3,6 +3,7 @@ import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import type { AABB, Facing, Vec2 } from '../types';
 import { AVIATION, buildingBase } from './BuildingDetails';
+import { inDriveway as curbCut } from './Features';
 import type { CityModel } from './RoadGraph';
 
 type M = THREE.Matrix4;
@@ -258,6 +259,5 @@ function buildHarbor(city: CityModel, scene: THREE.Scene, rng: Rng, colliders: A
 
 /** Within `margin` of a driveway or an alley (keep lamps, poles, trees and vending machines out of them). */
 export function inDriveway(city: CityModel, p: Vec2, margin: number): boolean {
-  const near = (d: AABB) => p.x > d.minX - margin && p.x < d.maxX + margin && p.z > d.minZ - margin && p.z < d.maxZ + margin;
-  return city.features.driveways.some(near) || city.features.alleys.some((a) => near(a.box));
+  return curbCut(city.features, p, margin);
 }

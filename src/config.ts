@@ -10,13 +10,12 @@ export const CONFIG = {
   SEED: MAPS[MAP].seed,
   DRIVE_SIDE: MAPS[MAP].driveSide,
 
-  // Street dimensions (meters). The grid itself is `maps/montreal/layout.ts`.
-  LANE_WIDTH: 6,
+  // Street dimensions (meters). The grid, and each edge's lanes and parking, are `maps/montreal/layout.ts`.
   SIDEWALK: 4,
   CURB_HEIGHT: 0.15,
   STOP_OFFSET: 4.5, // distance from intersection box edge to stop line
+  /** Limits live on each edge (`RoadEdge.speedLimit`); this one only applies before the car has touched a road. */
   STREET_LIMIT_KMH: 40,
-  AVENUE_LIMIT_KMH: 60,
   SPEEDING_MARGIN_KMH: 25,
 
   // Population

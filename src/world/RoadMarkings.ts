@@ -4,15 +4,24 @@ import type { MarkingStyle } from '../maps/MapDef';
 import { MONTREAL_MARKINGS } from '../maps/MapDef';
 import type { RoadEdge, Vec2 } from '../types';
 import { cumulative, offset, pointAt, tangentAt } from './Polyline';
-import type { CityModel } from './RoadGraph';
+import { travelHalf, type CityModel } from './RoadGraph';
 
 const LOT = new THREE.Color(0.75, 0.75, 0.72);
+/** The slot drain down the middle of a cobble street: a dark iron channel between the setts. */
+const DRAIN = new THREE.Color(0.1, 0.1, 0.11);
+/** Parking-band ticks: how far into the band from the travel lane's edge line (fraction of the band). */
+const TICK = 0.55;
 
 /**
  * Lane lines, stop lines, crosswalks, parking bays, draped on the terrain (T42: along any road
  * shape). Lines follow the edge's centerline offset sideways (mitered), dashes are laid by arc length, stop
  * lines run square to the lanes' `endDir`, crosswalks cross each approach just off the junction. Straight
  * axis-aligned pieces are drawn exactly as on the grid; the look comes from the map's `MarkingStyle`.
+ *
+ * Per street class (PRD 4.2): boulevards get a double yellow center line, dashed white lanes and an edge line
+ * with a tick at every curb bay; streets a dashed yellow center line, edge lines and ticks; cobbles no paint
+ * along the road, only the slot drain down the middle. Every lengthwise line runs stop line to stop line, so
+ * they all end flush at the junctions.
  */
 export function buildMarkings(city: CityModel, style: MarkingStyle = MONTREAL_MARKINGS): THREE.Mesh {
   const t = city.terrain;
@@ -85,14 +94,29 @@ export function buildMarkings(city: CityModel, style: MarkingStyle = MONTREAL_MA
     for (let s = s0; s < s1; s += dash[0] + dash[1]) piece(s, Math.min(s + dash[0], s1));
   };
 
-  const LW = CONFIG.LANE_WIDTH;
   const SO = CONFIG.STOP_OFFSET;
   const cw = style.crosswalk;
+  const bays = new Map<number, Set<number>[]>();
+  for (const b of city.features.curb) {
+    const sides = bays.get(b.edge) ?? [new Set<number>(), new Set<number>()];
+    bays.set(b.edge, sides);
+    const set = sides[b.side > 0 ? 0 : 1];
+    set.add(Math.round(b.s0 * 100) / 100);
+    set.add(Math.round(b.s1 * 100) / 100);
+  }
   for (const e of city.edges) {
     const hw = e.width / 2;
+    const LW = e.laneWidth;
+    const th = travelHalf(e);
     const pts = e.pts;
     const cum = cumulative(pts);
     const L = cum[cum.length - 1];
+    /** Point at arc length s, lateral offset o (+ = left of a -> b). */
+    const at = (s: number, o: number): Vec2 => {
+      const c = pointAt(pts, cum, s);
+      const d = tangentAt(pts, cum, s);
+      return { x: c.x + d.z * o, z: c.z - d.x * o };
+    };
     /** Lengthwise line at lateral offset d (+ = left of a -> b), from the stop offset to the stop offset. */
     const lineAt = (d: number, w: number, c: THREE.Color, dash?: [number, number]) => {
       const off = d === 0 ? pts : offset(pts, d);
@@ -100,21 +124,37 @@ export function buildMarkings(city: CityModel, style: MarkingStyle = MONTREAL_MA
       const OL = oc[oc.length - 1];
       along(off, SO * (OL / L), OL - SO * (OL / L), w, c, dash);
     };
-    lineAt(-(hw - 0.3), 0.15, WHITE);
-    lineAt(hw - 0.3, 0.15, WHITE);
     const dividers = (from: number, sgn: number) => {
       for (let k = 1; k < e.lanesPerDir; k++) lineAt(sgn * (from + LW * k), 0.14, WHITE, style.laneDash);
     };
-    if (e.oneWay) dividers(-(e.lanesPerDir * LW) / 2, 1);
-    else if (e.avenue) {
-      lineAt(-0.18, 0.15, CENTER);
-      lineAt(0.18, 0.15, CENTER);
-      dividers(0.25, -1);
-      dividers(0.25, 1);
+    if (e.cls === 'cobble') {
+      // Setts, no paint: a slot drain down the middle, from crosswalk to crosswalk
+      const s0 = 0.6 + cw.depth + 0.4;
+      along(pts, s0, L - s0, 0.3, DRAIN);
     } else {
-      lineAt(0, 0.14, WHITE, style.streetDash);
-      dividers(0, -1);
-      dividers(0, 1);
+      // Edge lines where the travel lanes end: at the parking band, else just off the curb
+      const edge = e.parking > 0 ? th : hw - 0.3;
+      lineAt(-edge, 0.13, WHITE);
+      lineAt(edge, 0.13, WHITE);
+      if (e.oneWay) dividers(-(e.lanesPerDir * LW) / 2, 1);
+      else if (e.avenue) {
+        lineAt(-0.18, 0.15, CENTER);
+        lineAt(0.18, 0.15, CENTER);
+        dividers(e.median, -1);
+        dividers(e.median, 1);
+      } else {
+        lineAt(0, 0.14, CENTER, style.streetDash);
+        dividers(e.median, -1);
+        dividers(e.median, 1);
+      }
+      // A tick into the parking band at each end of every bay
+      const sides = bays.get(e.id);
+      if (sides && e.parking > 0) {
+        sides.forEach((set, k) => {
+          const sgn = k === 0 ? 1 : -1;
+          for (const s of set) band(at(s, sgn * edge), at(s, sgn * (edge + e.parking * TICK)), 0.13, WHITE);
+        });
+      }
     }
 
     for (const end of [0, 1]) {
@@ -127,11 +167,6 @@ export function buildMarkings(city: CityModel, style: MarkingStyle = MONTREAL_MA
 
     /** Crosswalk bars across the road between arc lengths a and b. */
     function crosswalk(a: number, b: number): void {
-      const at = (s: number, o: number): Vec2 => {
-        const c = pointAt(pts, cum, s);
-        const d = tangentAt(pts, cum, s);
-        return { x: c.x + d.z * o, z: c.z - d.x * o };
-      };
       // Bars at laterals o (+ = left): anchored at the curb nearer the world's -x / -z (the grid's look), or centered
       const left = at((a + b) / 2, 1);
       const mid = pointAt(pts, cum, (a + b) / 2);
@@ -152,7 +187,8 @@ export function buildMarkings(city: CityModel, style: MarkingStyle = MONTREAL_MA
       const c = pointAt(pts, cum, s);
       const u = { x: l0.endDir.z, z: -l0.endDir.x };
       const side = Math.sign((l0.end.x - c.x) * u.x + (l0.end.z - c.z) * u.z) || 1;
-      const [o0, o1] = edge.oneWay ? [-hw + 0.2, hw - 0.2] : [0.2, hw - 0.2];
+      // Across the travel lanes only: from the center line's edge out to the parking band (or the curb)
+      const [o0, o1] = edge.oneWay ? [-hw + 0.2, hw - 0.2] : [Math.max(0.2, edge.median + 0.05), edge.parking > 0 ? travelHalf(edge) : hw - 0.2];
       const p = (o: number) => ({ x: c.x + u.x * side * o, z: c.z + u.z * side * o });
       band(p(o0), p(o1), 0.4, WHITE);
     }

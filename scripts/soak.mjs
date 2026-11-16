@@ -27,7 +27,7 @@ try {
   for (let s = 0; s < seeds; s++) {
     const r = soak(id, 1000 + s, minutes * 60);
     bad ||= r.redRuns > 0;
-    const line = `seed ${r.seed}: red runs ${r.redRuns}/${r.crossings}, AI collisions ${r.aiCollisions}, off-road ${(r.offRoad * 100).toFixed(2)}%, cars ${r.cars.toFixed(1)}`;
+    const line = `seed ${r.seed}: red runs ${r.redRuns}/${r.crossings}, AI collisions ${r.aiCollisions}, parked hits ${r.parkedHits}, off-road ${(r.offRoad * 100).toFixed(2)}%, cars ${r.cars.toFixed(1)}`;
     lines.push(line);
     console.log(`${line}, ${r.msPerStep.toFixed(2)} ms/step`);
     for (const l of r.collisionLog) console.log(`  ${l}`);

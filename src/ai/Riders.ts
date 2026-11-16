@@ -2,7 +2,7 @@ import { CONFIG } from '../config';
 import { clamp, dot, fwd, leftVec, wrapAngle } from '../core/math';
 import type { World } from '../core/World';
 import type { DistrictType, Lane, SimSystem, TurnType, Vec2 } from '../types';
-import { corridorGap, CURB_OFFSET, curbVec, pathDir, RIDER_HALF_L, RIDER_HALF_W, turnType, type Rider, type RiderKind } from './Rider';
+import { corridorGap, CURB_OFFSET, curbRoom, curbVec, pathDir, RIDER_HALF_L, RIDER_HALF_W, turnType, type Rider, type RiderKind } from './Rider';
 
 
 const EASY_TURN: TurnType = CONFIG.DRIVE_SIDE === 'left' ? 'left' : 'right';
@@ -302,8 +302,8 @@ export class Riders implements SimSystem {
     else r.blockedT = Math.max(0, r.blockedT - dt);
     if (r.blockedT > GO_AROUND_AFTER && r.swerveHold <= 0) {
       const n = curbVec(pathDir(r));
-      const curbRoom = w.statics.rayDistance(r.pos, n, 3);
-      r.swerveTarget = curbRoom > 1.6 ? 1.3 : -1.8;
+      const room = curbRoom(w, r.pos, n, 3);
+      r.swerveTarget = room > 1.6 ? 1.3 : -1.8;
       r.swerveHold = 3;
       r.blockedT = 0;
     }

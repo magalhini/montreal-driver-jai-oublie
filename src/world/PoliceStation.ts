@@ -3,7 +3,7 @@ import { Rng } from '../core/Rng';
 import type { AABB, Block, Building, Facing, Vec2 } from '../types';
 import type { CarLook } from '../vehicles/Car';
 import { inner } from './Features';
-import type { CityModel } from './RoadGraph';
+import { blockRoads, type CityModel } from './RoadGraph';
 
 /**
  * The police station (pure data): a precinct building at the back of a lot cut out of a block's street
@@ -99,7 +99,8 @@ function layout(city: CityModel, bl: Block, rng: Rng): PoliceStation {
   const sw = CONFIG.SIDEWALK;
   const D = STATION;
   const r = inner(bl);
-  const south = city.hwZ[bl.gj + 1] > city.hwZ[bl.gj] || (city.hwZ[bl.gj + 1] === city.hwZ[bl.gj] && rng.chance(0.5));
+  const side = blockRoads(city, bl);
+  const south = side.S > side.N || (side.S === side.N && rng.chance(0.5));
   const face: Facing = south ? 'S' : 'N';
   const out = OUT[face];
   const along: Vec2 = { x: -out.z, z: out.x };

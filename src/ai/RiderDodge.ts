@@ -2,7 +2,7 @@ import { clamp, dot, fwd, leftOf, leftVec, wrapAngle } from '../core/math';
 import type { World } from '../core/World';
 import type { SimSystem, Vec2 } from '../types';
 import type { Car } from '../vehicles/Car';
-import { curbVec, pathDir, RIDER_HALF_L, RIDER_HALF_W, type Rider } from './Rider';
+import { curbRoom, curbVec, pathDir, RIDER_HALF_L, RIDER_HALF_W, type Rider } from './Rider';
 
 /** Seconds of a fast car's motion predicted when looking for riders in its way. */
 const LOOKAHEAD = 0.9;
@@ -120,7 +120,7 @@ export class RiderDodge implements SimSystem {
       r.brakeT = Math.max(r.brakeT, 1.2);
       return;
     }
-    const curbMax = Math.min(SWERVE_CURB, r.swerve + Math.max(0, this.world.statics.rayDistance(r.pos, n, 3) - RIDER_HALF_W - 0.1));
+    const curbMax = Math.min(SWERVE_CURB, r.swerve + Math.max(0, curbRoom(this.world, r.pos, n, 3) - RIDER_HALF_W - 0.1));
     // Swerve that puts the rider just clear of either side of the car's path
     const a = r.swerve + ((th.clear + 0.2) - th.lat) / k;
     const b = r.swerve + (-(th.clear + 0.2) - th.lat) / k;

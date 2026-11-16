@@ -20,7 +20,9 @@ export interface EdgeSpec {
   width?: number;
 }
 
-const LW = () => CONFIG.LANE_WIDTH;
+/** Lane width for hand-made networks (Montreal's grid sets widths per street class in `maps/montreal/layout.ts`). */
+const LANE = 6;
+const LW = () => LANE;
 
 /**
  * Turns node positions and edge specs into the city's road graph: centerlines trimmed back to each junction,
@@ -92,6 +94,10 @@ export function buildNetwork(city: CityModel, positions: Vec2[], specs: EdgeSpec
       oneWay: !!s.oneWay,
       lanesPerDir,
       avenue: !!s.avenue,
+      cls: s.avenue ? 'boulevard' : 'street',
+      laneWidth: LW(),
+      parking: 0,
+      median: s.avenue ? 0.25 : 0,
       width: width(s),
       speedLimit: s.speedKmh * KMH,
       length: L,
@@ -112,7 +118,7 @@ export function buildNetwork(city: CityModel, positions: Vec2[], specs: EdgeSpec
     armPts[a.id].push({ x: p0.x + d0.z * hw, z: p0.z - d0.x * hw }, { x: p0.x - d0.z * hw, z: p0.z + d0.x * hw });
     armPts[b.id].push({ x: p1.x + d1.z * hw, z: p1.z - d1.x * hw }, { x: p1.x - d1.z * hw, z: p1.z + d1.x * hw });
 
-    const med = e.avenue ? 0.25 : 0;
+    const med = e.median;
     const lane = (line: Vec2[], from: RoadNode, to: RoadNode, index: number, lateral: number): number => {
       const off = offset(line, lateral);
       const oc = cumulative(off);

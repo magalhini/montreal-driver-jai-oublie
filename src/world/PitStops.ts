@@ -2,7 +2,7 @@ import { CONFIG } from '../config';
 import type { Rng } from '../core/Rng';
 import type { AABB, Block, Building, Facing } from '../types';
 import { inner } from './Features';
-import type { CityModel } from './RoadGraph';
+import { blockRoads, type CityModel } from './RoadGraph';
 
 /**
  * Pit stops (IMPROVEMENTS #20), pure data: corner gas stations with a lit canopy over two pump islands. Stop
@@ -84,10 +84,7 @@ function layout(city: CityModel, bl: Block, name: string, rng: Rng): PitStop {
   const sw = CONFIG.SIDEWALK;
   const r = inner(bl);
   // Corner on the widest pair of streets (avenues first)
-  const hwN = city.hwZ[bl.gj];
-  const hwS = city.hwZ[bl.gj + 1];
-  const hwW = city.hwX[bl.gi];
-  const hwE = city.hwX[bl.gi + 1];
+  const { N: hwN, S: hwS, W: hwW, E: hwE } = blockRoads(city, bl);
   const sx = hwE > hwW || (hwE === hwW && rng.chance(0.5)) ? 1 : -1;
   const sz = hwS > hwN || (hwS === hwN && rng.chance(0.5)) ? 1 : -1;
   const { sizeX: X, sizeZ: Z } = PIT_STOP;

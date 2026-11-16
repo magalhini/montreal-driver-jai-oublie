@@ -10,9 +10,9 @@ export interface RoadNode {
   gi: number;
   gj: number;
   pos: Vec2;
-  /** half extent of the intersection box along X (half width of the road running along Z) */
+  /** Half extent of the intersection box along X: the widest of the roads running along Z that meet here. */
   hx: number;
-  /** half extent of the intersection box along Z (half width of the road running along X) */
+  /** Half extent of the intersection box along Z: the widest of the roads running along X that meet here. */
   hz: number;
   edges: number[];
   signalized: boolean;
@@ -42,6 +42,12 @@ export interface Lane {
   length: number;
 }
 
+/**
+ * How wide a road is and how it is paved (Montreal Driver, PRD 4.2): boulevards are three lanes each way with a
+ * parking lane on each curb, streets one lane each way plus parking, cobbles one narrow lane each way on setts.
+ */
+export type StreetClass = 'boulevard' | 'street' | 'cobble';
+
 export interface RoadEdge {
   id: number;
   a: number;
@@ -53,11 +59,20 @@ export interface RoadEdge {
   /** Lanes only run a -> b (`lanesBA` is empty). */
   oneWay: boolean;
   lanesPerDir: number;
+  /** Curb to curb: travel lanes, the center gap and both parking bands. */
   width: number;
+  cls: StreetClass;
+  /** Width of one travel lane (m). */
+  laneWidth: number;
+  /** Parking band along each curb, outside the travel lanes (m; 0 = none). */
+  parking: number;
+  /** Gap from the centerline to the innermost lane's edge (m; boulevards keep a painted double line there). */
+  median: number;
   speedLimit: number; // m/s
   length: number; // node-to-node
   lanesAB: number[];
   lanesBA: number[];
+  /** `cls === 'boulevard'`: the wide roads (map colour, signs, the markings' double center line). */
   avenue: boolean;
 }
 
