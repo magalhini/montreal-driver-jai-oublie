@@ -45,7 +45,7 @@ export class Cockpit {
   /** Driver's eye in the car body's frame. */
   readonly eye = new THREE.Vector3();
   /** Cabin slice of the body shell (front z, rear z) to cut away while inside. */
-  cabin: [number, number] = [0, 0];
+  cabin: [number, number, number] = [0, 0, 0];
   mirrorEnabled = true;
   /** Style and redline the interior was built for. The tach marks depend on the redline. */
   private builtKey = '';

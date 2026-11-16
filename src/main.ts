@@ -39,6 +39,7 @@ import { WreckView } from "./gameplay/WreckView";
 import { Breakdown } from "./gameplay/Breakdown";
 import { BreakdownView } from "./gameplay/BreakdownView";
 import { PitStopSystem } from "./gameplay/PitStop";
+import { PotholeHits } from "./gameplay/PotholeHits";
 import { OfficerView } from "./gameplay/OfficerView";
 import { CollisionSystem } from "./physics/Collision";
 import { SpatialHash } from "./physics/SpatialHash";
@@ -88,6 +89,9 @@ import { buildOldCity } from "./world/OldCityProps";
 import { buildPlazas } from "./world/PlazaView";
 import { buildPoliceStation } from "./world/PoliceStationView";
 import { buildPitStops } from "./world/PitStopView";
+import { Potholes } from "./world/Potholes";
+import { buildPotholes } from "./world/PotholeView";
+import { buildMedians } from "./world/BoulevardMedians";
 import { buildRoads } from "./world/RoadMesh";
 import { buildStreetLamps } from "./world/StreetLamps";
 import { buildStreetProps } from "./world/StreetProps";
@@ -106,6 +110,8 @@ const map = currentMap();
 const city = map.generate(CONFIG.SEED);
 VehiclePhysics.ground = city.terrain;
 
+// Potholes are rolled first: the boulevard islands keep off them
+const potholes = new Potholes(city, CONFIG.SEED);
 // Everything added to the scene from here to the tiling below is static city (IMPROVEMENTS #20)
 const staticStart = r.scene.children.length;
 const envParts = buildEnvironment(r.scene, r.renderer, city);
@@ -124,6 +130,8 @@ const signPosts = buildRoadSigns(city);
 const streetSignColliders = buildStreetSigns(city, r.scene);
 // Vieux-Montréal's cobbles: bare trees, bike racks and winter terraces on the sidewalks (PRD Phase 5)
 const oldCityColliders = buildOldCity(city, r.scene, streetLamps.positions);
+// Planted islands with bare trees down the middle of René-Lévesque and the other long boulevards
+const medianColliders = buildMedians(city, r.scene, potholes.pits);
 const canal = buildCanal(city, r.scene);
 buildAlleys(city, r.scene);
 // IMPROVEMENTS #20: garages (pit stops)
@@ -138,6 +146,8 @@ const tiles = new StaticTiles();
 tiles.split(r.scene.children.slice(staticStart));
 r.scene.add(streetLamps.group);
 r.scene.add(signPosts.group);
+// Potholes (PRD 5.4): seeded craters in the lanes, not on any map. One decal mesh, kept out of the tiling
+buildPotholes(city, potholes.pits, r.scene);
 const lights = new TrafficLights(city, rng);
 const lightView = new TrafficLightView(
   city,
@@ -159,6 +169,7 @@ const statics = new SpatialHash([
   ...propColliders,
   ...streetSignColliders,
   ...oldCityColliders,
+  ...medianColliders,
   ...streetLamps.colliders,
   ...signPosts.colliders,
   ...lightView.colliders,
@@ -267,6 +278,9 @@ game.addSim(riderDodge);
 const dogs = new DogWalkers(world, peds);
 game.addSim(dogs);
 game.addSim({ update: (dt) => world.cars.forEach((c) => c.step(dt)) });
+// Wheels into the pits: the player's car is kicked and damaged, nearby traffic only bounces
+const potholeHits = new PotholeHits(world, potholes);
+game.addSim(potholeHits);
 game.addSim({ update: () => world.compact() });
 game.addSim(new CollisionSystem(statics, () => world.cars, events));
 game.addSim(signPosts);
@@ -556,6 +570,8 @@ adoptSpec = addDebugPanels({
   pitStops,
   builds,
   tires,
+  potholes,
+  potholeHits,
   openPitShop: (s) => shop.open(s),
 }).adoptSpec;
 const routeView = new RouteDebugView(
@@ -662,6 +678,7 @@ function resetSession(): void {
   recovery.cancel();
   police.standDown();
   heat.reset();
+  potholeHits.reset();
   repair(player);
   player.teleport(start.pos, start.yaw);
   player.blinker = null;
@@ -746,6 +763,9 @@ function viewHeading(cam: THREE.Camera): number {
   builds,
   steam,
   parked,
+  potholes,
+  potholeHits,
   signPosts,
   streetSignColliders,
+  medianColliders,
 };

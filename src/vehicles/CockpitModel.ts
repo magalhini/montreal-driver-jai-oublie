@@ -81,8 +81,11 @@ export interface CockpitParts {
   charmAt: THREE.Vector3;
   /** Rear-facing camera for the mirror image. */
   mirrorCam: THREE.Vector3;
-  /** Slice of the car body around the cabin (z front, z rear) to cut away while inside. */
-  cabin: [number, number];
+  /**
+   * Slice of the car body around the cabin to cut away while inside: z front, z rear, and the half width it
+   * stops at (just outside the body's sides, so the door mirrors that stick out past them stay).
+   */
+  cabin: [number, number, number];
 }
 
 const face = (x: number, y: number, z: number, rx = 0, ry = Math.PI): Placement => ({ at: V(x, y, z), rot: new THREE.Euler(rx, ry, 0, 'XYZ') });
@@ -217,6 +220,14 @@ export function buildCockpit(style: BodyStyle): CockpitParts {
     k.add(box(0.016, 0.022, 0.08, s * (hwD - 0.005), belt - 0.08, eye.z + 0.28), ALLOY);
   }
 
+  // Door mirrors (they are on the body, outside): the black sail at the front of each window that holds them
+  const sailZ = style === 'sports' ? bz - 0.2 : style === 'coupe' || style === 'wagon' ? bz - 0.16 : null;
+  if (sailZ !== null) {
+    const xIn = hwD + 0.01;
+    const xOut = st.W / 2 + 0.04;
+    for (const s of [1, -1]) k.add(box(xOut - xIn, 0.09, 0.13, (s * (xIn + xOut)) / 2, belt + 0.045, sailZ), BLACK);
+  }
+
   // A-pillars, header, roof rails, headliner, sun visors
   for (const s of [1, -1]) {
     k.add(beam(V(s * (hwB - 0.01), belt + 0.01, bz - 0.01), V(s * hwR, ty - 0.01, tz - 0.03), 0.07, 0.06), PILLAR);
@@ -268,6 +279,6 @@ export function buildCockpit(style: BodyStyle): CockpitParts {
     mirror,
     charmAt: V(0, my - mh / 2 - 0.004, mz + 0.012),
     mirrorCam: V(0, eye.y + 0.04, rearZ + 0.15),
-    cabin: [bz, st.bl[1][0]],
+    cabin: [bz, st.bl[1][0], st.W / 2 + 0.015],
   };
 }

@@ -368,7 +368,7 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 3. Traffic may nudge visually if that is cheap; it must not pile up damage or leave the lane permanently.
 4. The first heavy hit emits the pothole message, then a cooldown so a cluster does not spam the HUD.
 
-**Done when:** At 30 km/h a big pit twitches the wheel and ticks the damage bar. At walking speed it does not. A clean street still exists. The tire curve file is untouched.
+**Done when:** At 40 km/h a big pit twitches the wheel and ticks the damage bar. At walking speed it does not. A clean street still exists. The tire curve file is untouched.
 
 ### Phase 7 — Rue barrée, cones, and a GPS that lies
 

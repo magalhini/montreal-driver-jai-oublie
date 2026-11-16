@@ -341,12 +341,15 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
     const y = st.belt + 0.09;
     kit.both(rbox(z - 0.045, z + 0.06, y - 0.04, y + 0.035, hw + 0.03, hw + 0.13, 0.03, 0.012), body);
     kit.both(rbox(z - 0.05, z + 0.055, y - 0.035, y + 0.0, hw - 0.06, hw + 0.04, 0.012, 0.006), dark);
+    // The glass, facing back at the driver
+    kit.both(rbox(z - 0.052, z - 0.04, y - 0.032, y + 0.027, hw + 0.04, hw + 0.12, 0.004, 0.002), glass);
   } else if (style === 'coupe' || style === 'wagon') {
     const z = st.ws[0][0] - 0.16;
     const y = st.belt + 0.07;
     const m = style === 'coupe' ? chrome : trim;
     kit.both(rbox(z - 0.05, z + 0.05, y - 0.035, y + 0.035, hw + 0.02, hw + 0.13, 0.025, 0.01), m);
     kit.both(prep(new THREE.BoxGeometry(0.05, 0.03, 0.03).translate(hw + 0.0, y - 0.02, z)), m);
+    kit.both(rbox(z - 0.057, z - 0.045, y - 0.027, y + 0.027, hw + 0.03, hw + 0.12, 0.004, 0.002), glass);
   } else if (style === 'city') {
     // Small chrome mirrors on the front fenders, just ahead of the cowl
     const z = 1.12;

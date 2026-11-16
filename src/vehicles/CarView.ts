@@ -196,7 +196,7 @@ export class CarView implements ViewSystem {
   private q = new THREE.Quaternion();
   private e = new THREE.Euler(0, 0, 0, 'YXZ');
   /** Body paint with a slab cut out (the cabin around the cockpit camera); see `setCutaway`. */
-  private cutPlanes = [new THREE.Plane(), new THREE.Plane()];
+  private cutPlanes = [new THREE.Plane(), new THREE.Plane(), new THREE.Plane(), new THREE.Plane()];
   private cutMat = carMaterial({ roughness: 0.32, metalness: 0.45, clippingPlanes: this.cutPlanes, clipIntersection: true });
   private cutId: number | null = null;
   time = 0;
@@ -241,10 +241,11 @@ export class CarView implements ViewSystem {
   }
 
   /**
-   * Hides the slice of one car's body between z = rear and z = front (car frame), so a camera inside the
-   * cabin sees the cockpit instead of the solid body shell. Call after `sync` each frame; null restores it.
+   * Hides the slice of one car's body between z = rear and z = front (car frame) and within `half` of its
+   * centerline, so a camera inside the cabin sees the cockpit instead of the solid body shell, and still sees
+   * the door mirrors outside it. Call after `sync` each frame; null restores it.
    */
-  setCutaway(id: number | null, front = 0, rear = 0): void {
+  setCutaway(id: number | null, front = 0, rear = 0, half = 99): void {
     if (this.cutId !== null && this.cutId !== id) {
       const old = this.visuals.get(this.cutId);
       if (old) old.paint.material = MAT.paint;
@@ -258,6 +259,10 @@ export class CarView implements ViewSystem {
     const at = new THREE.Vector3();
     this.cutPlanes[0].setFromNormalAndCoplanarPoint(n, at.set(0, 0, front).applyMatrix4(m));
     this.cutPlanes[1].setFromNormalAndCoplanarPoint(n.negate(), at.set(0, 0, rear).applyMatrix4(m));
+    // Clipped only where all four agree (clipIntersection): inside the slab and inside the body's sides
+    const side = this.v3.setFromMatrixColumn(m, 0).normalize();
+    this.cutPlanes[2].setFromNormalAndCoplanarPoint(side, at.set(half, 0, 0).applyMatrix4(m));
+    this.cutPlanes[3].setFromNormalAndCoplanarPoint(side.negate(), at.set(-half, 0, 0).applyMatrix4(m));
   }
 
   private halo(v: Visual, at: THREE.Vector3, face: THREE.Quaternion, g: { color: THREE.Color; size: number }, grow: number): void {

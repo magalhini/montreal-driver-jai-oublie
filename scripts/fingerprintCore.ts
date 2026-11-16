@@ -8,6 +8,7 @@ import { CONFIG } from '../src/config';
 import { mapDef } from '../src/maps';
 import { resolveMap } from '../src/maps/catalog';
 import { cumulative, pointAt } from '../src/world/Polyline';
+import { rollPotholes } from '../src/world/Potholes';
 import { surfaceAt } from '../src/world/Surfaces';
 
 class Hash {
@@ -77,6 +78,8 @@ export function fingerprint(id: string): string[] {
       g('water').add(t.waterAt(x, z) ?? 'dry');
     }
   }
+  // Potholes (Phase 6): rolled from the seed after the city, so they move only when the roll or the roads do
+  for (const p of rollPotholes(city, def.seed)) g('potholes').add([p.edge, p.s, p.lat, p.r, p.depth]);
 
   return [`map ${map} seed ${def.seed}`, ...Object.entries(groups).map(([k, h]) => `${k.padEnd(10)} ${String(h.count).padStart(8)} ${h.hex}`)];
 }

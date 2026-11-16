@@ -18,6 +18,8 @@ import type { Economy } from './gameplay/Economy';
 import type { Gps } from './gameplay/Gps';
 import { TIRE_TUNING, type Tires } from './gameplay/Tires';
 import { PIT_TUNING, type PitStopSystem } from './gameplay/PitStop';
+import { POTHOLE_TUNING, type PotholeHits } from './gameplay/PotholeHits';
+import type { Potholes } from './world/Potholes';
 import type { CameraRig } from './render/CameraRig';
 import { GRAPHICS, GRAPHICS_OPTIONS, POSTFX, setGraphic, type GraphicsKey } from './render/PostFX';
 import type { StaticTiles } from './render/StaticTiles';
@@ -54,6 +56,8 @@ export interface DebugSystems {
   pitStops: PitStopSystem;
   builds: Builds;
   tires: Tires;
+  potholes: Potholes;
+  potholeHits: PotholeHits;
   openPitShop: (stop: PitStop) => void;
 }
 
@@ -81,6 +85,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   tires.add(TIRE_TUNING, 'summerGrip', 0.6, 1, 0.01).name('summer grip x');
   tires.add(TIRE_TUNING, 'winterGrip', 0.6, 1.1, 0.01).name('winter grip x');
   Debug.watch('tires', () => `${sys.tires.set}  grip x${sys.tires.grip.toFixed(2)}`);
+  addPotholePanel(sys);
   Debug.watch('cars', () => {
     const trucks = [...traffic.drivers.values()].filter((d) => d.car.look.style === 'truck' || d.car.look.style === 'keitruck').length;
     const moods = { yield: 0, evade: 0, ped: 0 };
@@ -322,4 +327,55 @@ function addWorldPanel({ city, player, camRig, tiles, pitStops, openPitShop }: D
       )
       .name('teleport to police station');
   }
+}
+
+/** Phase 6: pothole thresholds and kicks, the last hit, and a button that lines the car up on a big pit. */
+function addPotholePanel(sys: DebugSystems): void {
+  const { potholes, potholeHits: hits, player, city, events } = sys;
+  const T = POTHOLE_TUNING;
+  const f = Debug.addFolder('Potholes');
+  f.add(T, 'safeKmh', 0, 60, 1).name('no damage below km/h');
+  f.add(T, 'hardKmh', 20, 120, 1).name('serious above km/h');
+  f.add(T, 'smallHigh', 0, 0.05, 0.001).name('small dmg at hard km/h-');
+  f.add(T, 'bigHigh', 0, 0.1, 0.001).name('big dmg at hard km/h-');
+  f.add(T, 'bigHard', 0, 0.2, 0.005).name('big dmg past hard');
+  f.add(T, 'bigPerKmh', 0, 0.01, 0.0005).name('big dmg per km/h over');
+  f.add(T, 'wheelCap', 0, 0.4, 0.01).name('max dmg per wheel');
+  f.add(T, 'damageScale', 0, 2, 0.05).name('damage x');
+  f.add(T, 'pitch', 0, 0.2, 0.005).name('nose kick rad');
+  f.add(T, 'shove', 0, 0.1, 0.005).name('shove x speed');
+  f.add(T, 'yank', 0, 0.3, 0.01).name('steering yank rad');
+  f.add(T, 'thump', 0, 1, 0.01).name('thump per m/s');
+  f.add(T, 'messageCooldown', 0, 120, 1).name('message cooldown s');
+  // Put the car 45 m before the nearest big pit, on its line, pointed the way that lane drives
+  f.add(
+    {
+      go: () => {
+        let best = null as (typeof potholes.pits)[number] | null;
+        let bestD = Infinity;
+        for (const p of potholes.pits) {
+          if (p.depth !== 'big') continue;
+          const d = (p.pos.x - player.pos.x) ** 2 + (p.pos.z - player.pos.z) ** 2;
+          if (d < bestD && d > 60 * 60) {
+            best = p;
+            bestD = d;
+          }
+        }
+        if (!best) return;
+        const lane = city.laneOnEdge(city.edges[best.edge], best.pos).lane;
+        const dir = lane.dir;
+        player.teleport({ x: best.pos.x - dir.x * 45, z: best.pos.z - dir.z * 45 }, Math.atan2(dir.x, dir.z));
+        sys.camRig.snap();
+        events.message(`Big pothole (r ${best.r.toFixed(1)} m) 45 m ahead`, 'info');
+      },
+    },
+    'go',
+  ).name('line up on a big pothole');
+  const big = potholes.pits.filter((p) => p.depth === 'big').length;
+  const edges = new Set(potholes.pits.map((p) => p.edge)).size;
+  Debug.watch('potholes', () => {
+    const l = hits.last;
+    const last = l ? `  last ${l.depth} @${l.kmh.toFixed(0)} km/h +${(l.damage * 100).toFixed(1)}%` : '';
+    return `${potholes.pits.length} (${big} big) on ${edges}/${city.edges.length} edges  hits ${hits.hits}${last}`;
+  });
 }
