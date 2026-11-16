@@ -4,27 +4,34 @@ import type { SpatialHash } from '../physics/SpatialHash';
 import type { AABB, SimSystem, Vec2, ViewSystem } from '../types';
 import type { CityGround } from './Ground';
 
+/** A kind of sign face: its shape (unit size, in the XY plane, facing +Z), look, size and height. */
+export interface SignFace {
+  geo: THREE.BufferGeometry;
+  mat: THREE.Material;
+  /** Width and height (m). */
+  w: number;
+  h: number;
+  /** Height of the face's middle above the foot of the pole (m). */
+  y: number;
+}
+
 /** One curb sign as placed by `buildRoadSigns`. */
 export interface SignPost {
-  /** Middle of the pole (the debris body's origin). */
-  center: THREE.Vector3;
+  /** Foot of the pole on the sidewalk. */
+  foot: THREE.Vector3;
   /** Yaw only: local +Z points back at the oncoming driver. */
   rot: THREE.Quaternion;
-  /** Which speed limit face (index into the face materials). */
-  kind: number;
+  /** Faces on this pole (indices into the face kinds), top to bottom. */
+  faces: number[];
   /** Breakaway collider (`breakAt` set). */
   collider: AABB;
 }
 
-/** Pole and face layout in the post's frame (origin = pole middle). */
-const POLE_H = 2.75;
-const FACE_Y = 2.45 - POLE_H / 2;
-const FACE_SIZE = 0.66;
+/** The pole runs a little past the top face. */
+const POLE_OVER = 0.12;
 
-// Debris body: a rod of unit mass, contact points at both ends (the face sits just inside the top one)
-const HALF = 1.42;
+// Debris body: a rod of unit mass (contact points at both ends; its half length is the post's)
 const RADIUS = 0.06;
-const INERTIA = (2 * HALF) ** 2 / 12;
 const GRAVITY = 9.81;
 const BOUNCE = 0.3;
 /** Slower landings than this don't bounce (resting contact: otherwise the two ends see-saw forever). */
@@ -48,14 +55,17 @@ interface Debris {
   ang: THREE.Vector3;
   still: number;
   asleep: boolean;
+  /** Half the pole's length, and the rod's inertia about its middle. */
+  half: number;
+  inertia: number;
 }
 
 const UP = new THREE.Vector3(0, 1, 0);
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
-const ENDS = [new THREE.Vector3(0, -HALF, 0), new THREE.Vector3(0, HALF, 0)];
+const FLIP = new THREE.Quaternion().setFromAxisAngle(UP, Math.PI);
 
 /**
- * The speed-limit signs at the curb, as breakaway posts: a car at `CONFIG.SIGN_BREAK_KMH` or faster snaps one
+ * The curb signs (speed plates, ARRÊT and its plaque), as breakaway posts: a car at `CONFIG.SIGN_BREAK_KMH` or faster snaps one
  * off (the collision system switches its collider off and leaves the car alone), the standing instance is
  * hidden and a loose copy tumbles away from the car and comes to rest on the ground. It never collides with
  * cars again. The standing signs are edited per instance, so they're kept out of `StaticTiles`.
@@ -64,14 +74,13 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
   readonly colliders: AABB[];
   readonly group = new THREE.Group();
   private poles: THREE.InstancedMesh;
-  private backs: THREE.InstancedMesh;
-  private faces: THREE.InstancedMesh[];
-  /** Index of each post's face within its kind's mesh. */
-  private faceIndex: number[] = [];
+  private fronts: THREE.InstancedMesh[];
+  private backs: THREE.InstancedMesh[];
+  /** Index of each post's faces within their kind's meshes. */
+  private faceIndex: number[][] = [];
   private byCollider = new Map<AABB, number>();
   private debris: Debris[] = [];
   private poleGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 8);
-  private discGeo = new THREE.CircleGeometry(0.5, 28);
   private poleMat = new THREE.MeshStandardMaterial({ color: 0x9aa0a8, roughness: 0.4, metalness: 0.7 });
   private backMat = new THREE.MeshStandardMaterial({ color: 0x777a80, roughness: 0.5, metalness: 0.6 });
   private statics: SpatialHash | null = null;
@@ -81,30 +90,56 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
   private tmp = new THREE.Vector3();
   private dq = new THREE.Quaternion();
   private m = new THREE.Matrix4();
+  /** Contact points at the two ends of a debris rod (refilled per body). */
+  private ends = [new THREE.Vector3(0, -1, 0), new THREE.Vector3(0, 1, 0)];
 
   constructor(
-    private posts: SignPost[],
-    private faceMats: THREE.Material[],
+    readonly posts: SignPost[],
+    private kinds: SignFace[],
     private ground: CityGround,
   ) {
     this.colliders = posts.map((p) => p.collider);
     posts.forEach((p, i) => this.byCollider.set(p.collider, i));
     const n = posts.length;
     this.poles = new THREE.InstancedMesh(this.poleGeo, this.poleMat, Math.max(1, n));
-    this.backs = new THREE.InstancedMesh(this.discGeo, this.backMat, Math.max(1, n));
-    const counts = faceMats.map(() => 0);
-    for (const p of posts) this.faceIndex.push(counts[p.kind]++);
-    this.faces = faceMats.map((mat, k) => new THREE.InstancedMesh(this.discGeo, mat, Math.max(1, counts[k])));
-    this.group.add(this.poles, this.backs, ...this.faces);
-    this.poles.count = this.backs.count = n;
-    this.faces.forEach((im, k) => (im.count = counts[k]));
-    const pose = new THREE.Matrix4();
+    const counts = kinds.map(() => 0);
+    for (const p of posts) this.faceIndex.push(p.faces.map((k) => counts[k]++));
+    this.fronts = kinds.map((k, i) => new THREE.InstancedMesh(k.geo, k.mat, Math.max(1, counts[i])));
+    this.backs = kinds.map((k, i) => new THREE.InstancedMesh(k.geo, this.backMat, Math.max(1, counts[i])));
+    this.group.add(this.poles, ...this.fronts, ...this.backs);
+    this.poles.count = n;
+    kinds.forEach((_, i) => (this.fronts[i].count = this.backs[i].count = counts[i]));
     posts.forEach((p, i) => {
-      pose.compose(p.center, p.rot, new THREE.Vector3(1, 1, 1));
-      this.poles.setMatrixAt(i, this.m.multiplyMatrices(pose, POLE_LOCAL));
-      this.backs.setMatrixAt(i, this.m.multiplyMatrices(pose, BACK_LOCAL));
-      this.faces[p.kind].setMatrixAt(this.faceIndex[i], this.m.multiplyMatrices(pose, FACE_LOCAL));
+      const pose = this.poseOf(p);
+      this.poles.setMatrixAt(i, this.m.multiplyMatrices(pose, this.poleLocal(p)));
+      p.faces.forEach((k, j) => {
+        this.fronts[k].setMatrixAt(this.faceIndex[i][j], this.m.multiplyMatrices(pose, this.faceLocal(p, k, false)));
+        this.backs[k].setMatrixAt(this.faceIndex[i][j], this.m.multiplyMatrices(pose, this.faceLocal(p, k, true)));
+      });
     });
+  }
+
+  /** Pole length: up to just over the highest face. */
+  private poleH(p: SignPost): number {
+    return Math.max(...p.faces.map((k) => this.kinds[k].y + this.kinds[k].h / 2)) + POLE_OVER;
+  }
+
+  /** The post's frame: origin at the middle of the pole. */
+  private poseOf(p: SignPost): THREE.Matrix4 {
+    const c = p.foot.clone();
+    c.y += this.poleH(p) / 2;
+    return new THREE.Matrix4().compose(c, p.rot, new THREE.Vector3(1, 1, 1));
+  }
+
+  private poleLocal(p: SignPost): THREE.Matrix4 {
+    return new THREE.Matrix4().makeScale(0.07, this.poleH(p), 0.07);
+  }
+
+  /** A face (or its bare metal back) in the post's frame. */
+  private faceLocal(p: SignPost, k: number, back: boolean): THREE.Matrix4 {
+    const f = this.kinds[k];
+    const y = f.y - this.poleH(p) / 2;
+    return new THREE.Matrix4().compose(new THREE.Vector3(0, y, back ? 0 : 0.03), back ? FLIP : new THREE.Quaternion(), new THREE.Vector3(f.w, f.h, 1));
   }
 
   /** Start listening for knock-downs (the statics stop debris at walls). */
@@ -119,21 +154,27 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
   private knockDown(i: number, carVel: Vec2, carPos: Vec2): void {
     const p = this.posts[i];
     this.poles.setMatrixAt(i, HIDDEN);
-    this.backs.setMatrixAt(i, HIDDEN);
-    this.faces[p.kind].setMatrixAt(this.faceIndex[i], HIDDEN);
     this.poles.instanceMatrix.needsUpdate = true;
-    this.backs.instanceMatrix.needsUpdate = true;
-    this.faces[p.kind].instanceMatrix.needsUpdate = true;
+    p.faces.forEach((k, j) => {
+      for (const im of [this.fronts[k], this.backs[k]]) {
+        im.setMatrixAt(this.faceIndex[i][j], HIDDEN);
+        im.instanceMatrix.needsUpdate = true;
+      }
+    });
 
     const obj = new THREE.Group();
-    const pole = new THREE.Mesh(this.poleGeo, this.poleMat);
-    POLE_LOCAL.decompose(pole.position, pole.quaternion, pole.scale);
-    const back = new THREE.Mesh(this.discGeo, this.backMat);
-    BACK_LOCAL.decompose(back.position, back.quaternion, back.scale);
-    const face = new THREE.Mesh(this.discGeo, this.faceMats[p.kind]);
-    FACE_LOCAL.decompose(face.position, face.quaternion, face.scale);
-    obj.add(pole, back, face);
-    obj.position.copy(p.center);
+    const add = (geo: THREE.BufferGeometry, mat: THREE.Material, local: THREE.Matrix4) => {
+      const mesh = new THREE.Mesh(geo, mat);
+      local.decompose(mesh.position, mesh.quaternion, mesh.scale);
+      obj.add(mesh);
+    };
+    add(this.poleGeo, this.poleMat, this.poleLocal(p));
+    for (const k of p.faces) {
+      add(this.kinds[k].geo, this.kinds[k].mat, this.faceLocal(p, k, false));
+      add(this.kinds[k].geo, this.backMat, this.faceLocal(p, k, true));
+    }
+    const center = new THREE.Vector3().setFromMatrixPosition(this.poseOf(p));
+    obj.position.copy(center);
     obj.quaternion.copy(p.rot);
     this.group.add(obj);
 
@@ -141,7 +182,7 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
     const speed = Math.hypot(carVel.x, carVel.z);
     const dir = new THREE.Vector3(carVel.x, 0, carVel.z).divideScalar(speed || 1);
     const side = new THREE.Vector3(-dir.z, 0, dir.x);
-    if ((p.center.x - carPos.x) * side.x + (p.center.z - carPos.z) * side.z < 0) side.negate();
+    if ((center.x - carPos.x) * side.x + (center.z - carPos.z) * side.z < 0) side.negate();
     const vel = dir
       .clone()
       .multiplyScalar(speed * (0.6 + Math.random() * 0.2))
@@ -151,16 +192,19 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
       .crossVectors(dir, UP)
       .multiplyScalar(4 + speed * 0.12 + Math.random() * 2)
       .add(new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5).multiplyScalar(3));
+    const half = this.poleH(p) / 2;
     this.debris.push({
       obj,
-      pos: p.center.clone(),
-      prevPos: p.center.clone(),
+      pos: center.clone(),
+      prevPos: center.clone(),
       quat: p.rot.clone(),
       prevQuat: p.rot.clone(),
       vel,
       ang,
       still: 0,
       asleep: false,
+      half,
+      inertia: (2 * half) ** 2 / 12,
     });
     if (this.debris.length > MAX_DEBRIS) this.group.remove(this.debris.shift()!.obj);
   }
@@ -178,7 +222,7 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
       this.integrate(d.quat, d.ang, dt);
       this.walls(d, px, pz);
       // A few passes: with both ends down, each end's impulse partly undoes the other's
-      for (let k = 0; k < 4; k++) for (const end of ENDS) this.contact(d, end);
+      for (let k = 0; k < 4; k++) for (const end of this.ends) this.contact(d, end.set(0, Math.sign(end.y || 1) * d.half, 0));
       // Settle: stop once it has been barely moving for a moment
       if (d.vel.length() < SLEEP_V && d.ang.length() < SLEEP_W) {
         d.still += dt;
@@ -218,9 +262,9 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
     if (vn >= 0) return;
     // Normal impulse along +Y
     const rn = this.tmp.crossVectors(r, UP);
-    const j = (-(1 + (vn < -BOUNCE_MIN ? BOUNCE : 0)) * vn) / (1 + rn.lengthSq() / INERTIA);
+    const j = (-(1 + (vn < -BOUNCE_MIN ? BOUNCE : 0)) * vn) / (1 + rn.lengthSq() / d.inertia);
     d.vel.y += j;
-    d.ang.addScaledVector(rn, j / INERTIA);
+    d.ang.addScaledVector(rn, j / d.inertia);
     // Friction against the sliding direction, capped by Coulomb
     vp.crossVectors(d.ang, r).add(d.vel);
     vp.y = 0;
@@ -228,9 +272,9 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
     if (vt < 1e-3) return;
     const t = vp.divideScalar(vt);
     const rt = this.tmp.crossVectors(r, t);
-    const jt = Math.min(vt / (1 + rt.lengthSq() / INERTIA), FRICTION * j);
+    const jt = Math.min(vt / (1 + rt.lengthSq() / d.inertia), FRICTION * j);
     d.vel.addScaledVector(t, -jt);
-    d.ang.addScaledVector(rt, -jt / INERTIA);
+    d.ang.addScaledVector(rt, -jt / d.inertia);
     const axis = this.tmp.set(0, 1, 0).applyQuaternion(d.quat);
     d.ang.addScaledVector(axis, -d.ang.dot(axis) * ROLL_LOSS);
   }
@@ -238,7 +282,7 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
   /** Buildings and standing props stop the flight. A post that already snapped is `off`, so the query skips it. */
   private walls(d: Debris, px: number, pz: number): void {
     if (!this.statics) return;
-    const y = d.pos.y - HALF;
+    const y = d.pos.y - d.half;
     const blocks = (b: AABB) => b.top === undefined || b.top > y;
     if (!this.statics.segmentBlocked({ x: px, z: pz }, { x: d.pos.x, z: d.pos.z }, blocks)) return;
     d.pos.x = px;
@@ -248,11 +292,3 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
     d.ang.multiplyScalar(0.5);
   }
 }
-
-const POLE_LOCAL = new THREE.Matrix4().makeScale(0.07, POLE_H, 0.07);
-const FACE_LOCAL = new THREE.Matrix4().compose(new THREE.Vector3(0, FACE_Y, 0.03), new THREE.Quaternion(), new THREE.Vector3(FACE_SIZE, FACE_SIZE, 1));
-const BACK_LOCAL = new THREE.Matrix4().compose(
-  new THREE.Vector3(0, FACE_Y, 0),
-  new THREE.Quaternion().setFromAxisAngle(UP, Math.PI),
-  new THREE.Vector3(FACE_SIZE, FACE_SIZE, 1),
-);

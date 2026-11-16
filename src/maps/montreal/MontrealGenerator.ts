@@ -1,7 +1,7 @@
 import { CONFIG, KMH } from '../../config';
 import { leftVec, scale } from '../../core/math';
-import { Rng } from '../../core/Rng';
-import type { Block, Building, Lane, RoadEdge, RoadNode, StreetClass, Vec2 } from '../../types';
+import { Rng, hash01 } from '../../core/Rng';
+import type { Block, Building, Lane, RoadEdge, RoadNode, StreetClass, StreetName, Vec2 } from '../../types';
 import { planAlleys } from '../../world/Alleys';
 import { generateBuildings } from '../../world/Districts';
 import { settleBuildings } from '../../world/Settle';
@@ -16,7 +16,7 @@ import { Terrain } from '../../world/Terrain';
 import { layHarbor, openHarbor } from './Harbor';
 import { fitHeights, openCourtyards, placeArena, placeClock, placeSilos } from './Massing';
 import { layParks } from './Parks';
-import { ARENA, CANAL_ROW, CLOCK, SILOS, STREET_CLASSES, X_RAW, Z_RAW, classWidth, colClass, districtAt, heightOf, isPark, rowClass } from './layout';
+import { ARENA, CANAL_ROW, CLOCK, SILOS, STREET_CLASSES, X_RAW, Z_RAW, classWidth, colClass, colName, districtAt, heightOf, isPark, junctionControl, rowClass, rowName } from './layout';
 
 const OUTER = 28;
 
@@ -97,7 +97,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
     return lane.id;
   };
 
-  const addEdge = (a: RoadNode, b: RoadNode, axis: 'x' | 'z', cls: StreetClass) => {
+  const addEdge = (a: RoadNode, b: RoadNode, axis: 'x' | 'z', cls: StreetClass, name: StreetName | null) => {
     const k = STREET_CLASSES[cls];
     const lanesPerDir = k.lanesPerDir;
     const ux = axis === 'x' ? 1 : 0;
@@ -126,6 +126,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
       lanesAB: [],
       lanesBA: [],
     };
+    if (name) e.name = name;
     city.edges.push(e);
     city.registerEdge(e);
     a.edges.push(e.id);
@@ -137,14 +138,16 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   };
 
   for (let j = 0; j <= GZ; j++) {
-    for (let i = 0; i < GX; i++) addEdge(city.nodeAt(i, j), city.nodeAt(i + 1, j), 'x', rowClass(i, j));
+    for (let i = 0; i < GX; i++) addEdge(city.nodeAt(i, j), city.nodeAt(i + 1, j), 'x', rowClass(i, j), rowName(i, j));
   }
   for (let i = 0; i <= GX; i++) {
-    for (let j = 0; j < GZ; j++) addEdge(city.nodeAt(i, j), city.nodeAt(i, j + 1), 'z', colClass(i, j));
+    for (let j = 0; j < GZ; j++) addEdge(city.nodeAt(i, j), city.nodeAt(i, j + 1), 'z', colClass(i, j), colName(i));
   }
   for (const n of city.nodes) {
-    n.signalized = n.edges.length >= 3;
-    n.control = n.signalized ? 'signal' : 'none';
+    n.control = junctionControl(n.edges.map((id) => city.edges[id].cls), hash01(n.id, 41));
+    n.signalized = n.control === 'signal';
+    // The all-way plaque under the ARRÊT signs at about a third of the stops
+    if (n.control === 'stop' && hash01(n.id, 43) < 0.35) n.allWayPlaque = true;
   }
 
   for (let j = 0; j < GZ; j++) {

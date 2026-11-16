@@ -36,6 +36,10 @@ export interface SoakResult {
   redRuns: number;
   /** Stop-line crossings by AI cars at signalized junctions. */
   crossings: number;
+  /** AI cars that went past an ARRÊT line without taking their turn at the all-way stop. */
+  stopRuns: number;
+  /** Stop-line crossings by AI cars at all-way stops. */
+  stopCrossings: number;
   /** Collision events between two moving AI cars (traffic, police; parked cars not counted). */
   aiCollisions: number;
   /** Traffic or police touching a parked car (curb bays sit beside the lanes: should stay near 0). */
@@ -44,10 +48,15 @@ export interface SoakResult {
   offRoad: number;
   /** Average AI cars alive. */
   cars: number;
+  /** AI cars that sat still for `STALL_S` or longer (a locked junction, a queue that never moves), not counting queues behind the stuck bot. */
+  stalls: number;
   msPerStep: number;
   /** One line per AI-vs-AI collision. */
   collisionLog: string[];
 }
+
+/** Standing still this long (s) counts as stalled: longer than any red phase. */
+const STALL_S = 90;
 
 export function soak(id: string, seed: number, seconds: number): SoakResult {
   const map = resolveMap(id);
@@ -96,7 +105,7 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   add(new CollisionSystem(statics, () => world.cars, events));
   add({ update: (dt) => (world.time += dt) });
 
-  const res: SoakResult = { seed, seconds, redRuns: 0, crossings: 0, aiCollisions: 0, parkedHits: 0, offRoad: 0, cars: 0, msPerStep: 0, collisionLog: [] };
+  const res: SoakResult = { seed, seconds, redRuns: 0, crossings: 0, stopRuns: 0, stopCrossings: 0, aiCollisions: 0, parkedHits: 0, offRoad: 0, cars: 0, stalls: 0, msPerStep: 0, collisionLog: [] };
   const lastHit = new Map<string, number>();
   const isAi = (id: number | null) => {
     const k = id === null ? null : world.carById(id)?.kind;
@@ -140,6 +149,9 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   // Stop-line watch: before / past the line per driver, by lane
   const before = new Map<number, { lane: number; d: number }>();
   const drivers = (): LaneDriver[] => [...traffic.drivers.values(), ...[...police.cops.values()].map((c) => c.driver)];
+  // Seconds each AI car has been standing still (1 Hz samples), and the ones already counted as stalled
+  const still = new Map<number, number>();
+  const stalled = new Set<number>();
   let samples = 0;
   let off = 0;
   let carSum = 0;
@@ -153,9 +165,16 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
       const prev = before.get(d.car.id);
       if (prev && prev.lane === d.lane.id && prev.d > 0 && dStop < 0) {
         const node = city.nodes[d.lane.to];
-        if (node.signalized && !(d.car.kind === 'police' && police.cops.get(d.car.id)?.chase)) {
+        const chasing = d.car.kind === 'police' && !!police.cops.get(d.car.id)?.chase;
+        if (node.signalized && !chasing) {
           res.crossings++;
           if (lights.state(node.id, d.lane.edgeId) === 'red') res.redRuns++;
+        } else if (node.control === 'stop' && !chasing && !d.ignoreLights) {
+          res.stopCrossings++;
+          if (!d.stopCleared) {
+            res.stopRuns++;
+            res.collisionLog.push(`t=${world.time.toFixed(1)} ${d.car.kind} #${d.car.id} ran the ARRÊT at ${node.gi},${node.gj} at ${(d.car.speed * 3.6).toFixed(0)} km/h (${d.mood}/${d.waiting})`);
+          }
         }
       }
       before.set(d.car.id, { lane: d.lane.id, d: dStop });
@@ -166,6 +185,20 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
         if (c.kind !== 'traffic' && c.kind !== 'police') continue;
         n++;
         samples++;
+        const t = Math.abs(c.speed) < 0.3 ? (still.get(c.id) ?? 0) + 1 : 0;
+        still.set(c.id, t);
+        if (t >= STALL_S && !stalled.has(c.id) && !(c.kind === 'police' && police.cops.get(c.id)?.chase)) {
+          stalled.add(c.id);
+          const d = drivers().find((x) => x.car === c);
+          const to = d ? city.nodes[d.lane.to] : null;
+          const why = d ? `${d.waiting}/${d.mood}, ${d.distToStopLine().toFixed(0)} m to the line of ${to!.gi},${to!.gj} (${to!.control}), ${d.next.turn}` : 'no driver';
+          // The bot drives the player car, and peds are pushed clear of the player's body (PedestrianDodge), so
+          // a ped can't squeeze past the bot the way it does past traffic: the bot can wait on it forever. A
+          // human player never waits on peds like that, so a queue behind the stuck bot is logged, not counted.
+          const bot = to ? Math.hypot(player.pos.x - to.pos.x, player.pos.z - to.pos.z) < 25 && Math.abs(player.speed) < 0.3 : false;
+          if (!bot) res.stalls++;
+          res.collisionLog.push(`t=${world.time.toFixed(0)} ${c.kind} #${c.id} stalled ${STALL_S} s: ${why}${bot ? ' [behind the stuck bot: not counted]' : ''}`);
+        }
         const s = surfaceAt(city, c.pos);
         if (s !== 'road') off++;
       }

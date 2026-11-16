@@ -90,6 +90,7 @@ import { buildRoads } from "./world/RoadMesh";
 import { buildStreetLamps } from "./world/StreetLamps";
 import { buildStreetProps } from "./world/StreetProps";
 import { buildRoadSigns } from "./world/RoadSigns";
+import { buildStreetSigns } from "./world/StreetSigns";
 import { SteamVents } from "./world/SteamVents";
 import { TrafficLights } from "./world/TrafficLights";
 import { TrafficLightView } from "./world/TrafficLightView";
@@ -114,9 +115,11 @@ buildPoliceStation(city, r.scene);
 const propColliders = buildStreetProps(city, r.scene);
 // Street lamps break away (and still hit the car), so their meshes are edited per instance and stay out of the tiling
 const streetLamps = buildStreetLamps(city);
-// Phase 1 pass: posted speed limits painted on the lanes and on round signs at the curb (breakaway posts:
-// edited per instance, so their group joins the scene after the tiling below)
-const signPosts = buildRoadSigns(city, r.scene);
+// Speed plates and ARRÊT signs at the curb (breakaway posts: edited per instance, so their group joins the
+// scene after the tiling below)
+const signPosts = buildRoadSigns(city);
+// Street blades at the boulevard corners and parking plates on the residential curbs (static)
+const streetSignColliders = buildStreetSigns(city, r.scene);
 const canal = buildCanal(city, r.scene);
 buildAlleys(city, r.scene);
 // IMPROVEMENTS #20: garages (pit stops)
@@ -147,6 +150,7 @@ const statics = new SpatialHash([
   ...city.buildings.flatMap(solidParts),
   ...city.walls,
   ...propColliders,
+  ...streetSignColliders,
   ...streetLamps.colliders,
   ...signPosts.colliders,
   ...lightView.colliders,
@@ -734,4 +738,6 @@ function viewHeading(cam: THREE.Camera): number {
   builds,
   steam,
   parked,
+  signPosts,
+  streetSignColliders,
 };

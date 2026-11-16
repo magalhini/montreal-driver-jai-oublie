@@ -65,6 +65,33 @@ export const DRIVER_TUNING = {
 /** The driver of each AI car, so opposing turners can settle who goes first (see `passesOpposingTurner`). */
 const DRIVER_OF = new WeakMap<Car, LaneDriver>();
 
+/** All-way stops (ARRÊT at every approach): stop at the line, then first stopped, first through. */
+export const STOP_TUNING = {
+  /** Counts as stopped below this (m/s): calm drivers. The pushiest roll it at `rollSpeed`, a Montreal stop. */
+  stopSpeed: 0.6,
+  rollSpeed: 1.8,
+  /** Seconds at the line before going, calm .. pushy. */
+  dwellMax: 0.9,
+  dwellMin: 0.3,
+  /** At the line: within this of where the car settles behind the stop line (m). */
+  reach: 1.6,
+  /** A car let through that has not got into the junction after this long goes back to waiting (s). */
+  goneTimeout: 6,
+};
+
+/** One car at an all-way stop: waiting since `since`, or let through (`going`) at `goneAt`. */
+interface StopEntry {
+  driver: LaneDriver;
+  /** The approach lane it stopped in. */
+  lane: number;
+  since: number;
+  going: boolean;
+  goneAt: number;
+}
+
+/** Who is at each stop junction, per world (the soak builds several worlds in one process). */
+const STOP_QUEUES = new WeakMap<World, Map<number, StopEntry[]>>();
+
 /** Look into the junction for a stranded car this far before the stop line (m), and what counts as stranded (m/s). */
 const BOX_LOOK = 14;
 const BOX_STUCK_SPEED = 2.5;
@@ -169,8 +196,10 @@ export class LaneDriver {
   prefer: ((opts: NextLeg[]) => NextLeg | null) | null = null;
   /** Extra speed cap (m/s), e.g. slowing to turn into a car park. */
   speedCap = Infinity;
-  /** Run the lights. A speeder still brakes for the car in front. */
+  /** Run the lights (and the ARRÊT signs). A speeder still brakes for the car in front. */
   ignoreLights = false;
+  /** Lane id this car was let through an all-way stop from (-1: none). */
+  private clearedLane = -1;
   /** Blinker held on regardless of the route (pulling over). */
   forceBlinker: Blinker | null = null;
 
@@ -198,6 +227,7 @@ export class LaneDriver {
     this.evadeT = 0;
     this.held = false;
     this.launchT = 0;
+    this.clearedLane = -1;
     this.car.blinker = null;
     this.chooseNext();
     this.buildPath();
@@ -331,6 +361,8 @@ export class LaneDriver {
     }
     if (this.seg >= this.nextLaneSeg) {
       this.lane = this.next.lane;
+      // A turn at a stop is for this pass only: a car looping the block meets the same lane again
+      this.clearedLane = -1;
       this.chooseNext();
       this.buildPath();
       this.seg = 0;
@@ -372,10 +404,16 @@ export class LaneDriver {
     return along + this.lane.cum[this.laneSegs] - this.lane.cum[i + 1];
   }
 
+  /** Took its turn at the all-way stop it is driving through (soak: a crossing without it is a stop run). */
+  get stopCleared(): boolean {
+    return this.clearedLane === this.lane.id;
+  }
+
   private mustStopForSignal(dStop: number, v: number): boolean {
     if (this.ignoreLights || dStop < 0) return false;
     const city = this.world.city;
     const node = city.nodes[this.lane.to];
+    if (node.control === 'stop' && this.clearedLane !== this.lane.id && this.holdAtStop(node, dStop, v)) return true;
     const st = this.world.lights.state(node.id, this.lane.edgeId);
     if (st === 'red') return dStop > -0.5;
     // Amber: stop if it can be done braking at this driver's comfort level (pushy drivers go through later),
@@ -383,6 +421,94 @@ export class LaneDriver {
     if (st === 'yellow') return dStop > (v * v) / (2 * (4.5 - 1.2 * this.temper)) + 1 || dStop > v * AMBER_REACH;
     if (dStop < BOX_LOOK && this.boxBlocked(node)) return true;
     if (this.next.turn === HARD_TURN && dStop < 30) return this.oncomingTraffic(node.pos);
+    return false;
+  }
+
+  /**
+   * All-way stop: come to a stop at the line, wait a moment, then go in the order cars stopped. Cars from the
+   * opposite approach that both go straight or turn to the curb may go together; anything crossing waits for
+   * the junction to clear. Returns true while this car must hold at the line.
+   */
+  private holdAtStop(node: RoadNode, dStop: number, v: number): boolean {
+    const T = STOP_TUNING;
+    const settle = this.car.halfL + 0.5 + 2.2; // where the IDM parks the car behind the virtual leader at the line
+    const pushy = this.temper ** 3;
+    if (dStop > settle + T.reach || v > T.stopSpeed + (T.rollSpeed - T.stopSpeed) * pushy) return true;
+    const now = this.world.time;
+    const q = this.stopQueue(node.id);
+    let me = q.find((e) => e.driver === this);
+    if (!me) {
+      me = { driver: this, lane: this.lane.id, since: now, going: false, goneAt: 0 };
+      q.push(me);
+    }
+    if (now - me.since < T.dwellMax - (T.dwellMax - T.dwellMin) * this.temper) return true;
+    for (const e of q) {
+      if (e === me) continue;
+      if (e.going ? !this.stopsCompatible(e.driver) : e.since < me.since || (e.since === me.since && e.driver.car.id < this.car.id)) return true;
+    }
+    if (this.stopBoxBusy(node, q)) return true;
+    me.going = true;
+    me.goneAt = now;
+    this.clearedLane = this.lane.id;
+    return false;
+  }
+
+  /** The queue at a stop junction, with cars gone through, despawned or stalled after their turn sorted out. */
+  private stopQueue(nodeId: number): StopEntry[] {
+    let byNode = STOP_QUEUES.get(this.world);
+    if (!byNode) STOP_QUEUES.set(this.world, (byNode = new Map()));
+    let q = byNode.get(nodeId);
+    if (!q) byNode.set(nodeId, (q = []));
+    const now = this.world.time;
+    for (let i = q.length - 1; i >= 0; i--) {
+      const e = q[i];
+      const d = e.driver;
+      if (d.car.removed || DRIVER_OF.get(d.car) !== d || d.lane.id !== e.lane || d.ignoreLights) {
+        q.splice(i, 1);
+      } else if (e.going && !d.pastLane && d.car.speed < 0.5 && now - e.goneAt > STOP_TUNING.goneTimeout) {
+        // Let through but stuck behind traffic on the far side: back in line, so the cross street can move
+        e.going = false;
+        e.since = now;
+        d.clearedLane = -1;
+      }
+    }
+    return q;
+  }
+
+  /**
+   * Taking our turn at a stop, a car standing at another line of the same junction is waiting for us to clear:
+   * it is behind its own line, not in our way, even when the turn briefly points our nose at it (on a narrow
+   * street the car at the far line sits right beside the lane we turn into).
+   */
+  private waitsForMyTurn(o: Car): boolean {
+    if (this.clearedLane !== this.lane.id || o.speed > 0.5) return false;
+    const od = DRIVER_OF.get(o);
+    if (!od || od.car !== o) return false;
+    const q = STOP_QUEUES.get(this.world)?.get(this.lane.to);
+    return !!q?.some((e) => e.driver === od && !e.going);
+  }
+
+  /** Both cars can be in the junction at once: opposite approaches, neither turning across the other. */
+  private stopsCompatible(o: LaneDriver): boolean {
+    if (this.next.turn === HARD_TURN || o.next.turn === HARD_TURN) return false;
+    return dot(o.lane.endDir, this.lane.endDir) < -0.7;
+  }
+
+  /**
+   * Any car in the junction that is not a compatible car taking its turn: the player, a chase, or someone
+   * stopped half way across (for a ped, say). Going in beside a stopped one is how two cars end up nose to
+   * nose in the box, each waiting for the other.
+   */
+  private stopBoxBusy(node: RoadNode, q: StopEntry[]): boolean {
+    const city = this.world.city;
+    for (const o of this.world.cars) {
+      if (o === this.car || o.removed || o.kind === 'parked') continue;
+      if (Math.abs(o.pos.x - node.pos.x) > node.hx + 2 || Math.abs(o.pos.z - node.pos.z) > node.hz + 2) continue;
+      if (city.nodeBoxAt(o.pos, 1) !== node) continue;
+      const od = DRIVER_OF.get(o);
+      if (od && q.some((e) => e.driver === od && e.going) && this.stopsCompatible(od)) continue;
+      return true;
+    }
     return false;
   }
 
@@ -659,6 +785,7 @@ export class LaneDriver {
       const ahead = dot(r, f);
       if (ahead <= 0 || ahead > 45) continue;
       if (inTurn && this.passesOpposingTurner(o)) continue;
+      if (this.waitsForMyTurn(o)) continue;
       // Its footprint in our frame (a car turning away still has its tail in our lane): half extents across / along
       const c = Math.abs(dot(fwd(o.yaw), f));
       const sn = Math.sqrt(Math.max(0, 1 - c * c));

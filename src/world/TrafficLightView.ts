@@ -127,7 +127,8 @@ export class TrafficLightView implements ViewSystem {
           housings.push(new THREE.Matrix4().makeScale(0.36, 1.08, 0.3).premultiply(rot).setPosition(head.x, top, head.z));
         }
         const poleY = city.terrain.surfaceY(pole.x, pole.z);
-        poles.push(new THREE.Matrix4().makeScale(0.24, top + 0.4 - poleY, 0.24).setPosition(pole.x, poleY, pole.z));
+        const thick = style === 'pole' ? 0.16 : 0.24;
+        poles.push(new THREE.Matrix4().makeScale(thick, top + 0.4 - poleY, thick).setPosition(pole.x, poleY, pole.z));
         const front = 0.17;
         // Lamp positions: across the head (overhead: green on the left) or stacked (pole: red on top)
         const at = (k: number, ahead: number) =>
@@ -149,8 +150,10 @@ export class TrafficLightView implements ViewSystem {
     }
 
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    const baseBox = boxGeo.clone().translate(0, 0.5, 0);
-    const metal = new THREE.MeshStandardMaterial({ color: 0x55565e, metalness: 0.6, roughness: 0.4 });
+    // Pole heads (Montreal): slim dark round posts and black housings; overhead arms keep the grey box kit
+    const poleStyle = style === 'pole';
+    const baseBox = (poleStyle ? new THREE.CylinderGeometry(0.5, 0.5, 1, 10) : boxGeo.clone()).translate(0, 0.5, 0);
+    const metal = new THREE.MeshStandardMaterial({ color: poleStyle ? 0x2a2c30 : 0x55565e, metalness: 0.6, roughness: 0.4 });
     const mk = (geo: THREE.BufferGeometry, mat: THREE.Material, ms: THREE.Matrix4[]) => {
       const im = new THREE.InstancedMesh(geo, mat, ms.length);
       ms.forEach((m, i) => im.setMatrixAt(i, m));
@@ -159,7 +162,7 @@ export class TrafficLightView implements ViewSystem {
     };
     mk(baseBox, metal, poles);
     mk(boxGeo, metal, arms);
-    mk(boxGeo, new THREE.MeshStandardMaterial({ color: 0x8a8c94, metalness: 0.5, roughness: 0.4 }), housings);
+    mk(boxGeo, new THREE.MeshStandardMaterial({ color: poleStyle ? 0x18191c : 0x8a8c94, metalness: 0.5, roughness: 0.45 }), housings);
     const disc = new THREE.CircleGeometry(0.18, 16);
     const lampMat = () => new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false });
     this.lamps = {

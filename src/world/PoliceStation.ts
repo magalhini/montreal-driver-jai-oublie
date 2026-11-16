@@ -143,8 +143,9 @@ function layout(city: CityModel, bl: Block, rng: Rng): PoliceStation {
   return {
     block: bl.id,
     name: 'NEO POLICE',
-    jp: 'ネオ警察署',
-    glyph: '警',
+    // Map label and sign glyph until the SPVM pass dresses the station (PRD Phase 9)
+    jp: 'SPVM',
+    glyph: '★',
     color: '#6aa6ff',
     lot,
     building,

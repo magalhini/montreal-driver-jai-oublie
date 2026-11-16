@@ -180,3 +180,88 @@ export function copColor(pursuit: boolean, timeMs: number): string {
 export function formatDistance(m: number): string {
   return m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)} m` : `${(m / 1000).toFixed(1)} km`;
 }
+
+/** Screen box of a placed label (canvas pixels), for overlap tests. */
+export interface LabelBox {
+  x0: number;
+  y0: number;
+  x1: number;
+  y1: number;
+}
+
+/**
+ * Boulevard names drawn along their roads, kept upright, with a dark halo. Labels go at `spacing` pixel
+ * intervals along each run (or, with `near`, once per run at the point closest to it, within `range` px), and
+ * skip any spot whose box overlaps one in `placed` (which they add to). `size` in canvas pixels.
+ */
+export function drawStreetLabels(
+  ctx: CanvasRenderingContext2D,
+  t: MapTransform,
+  labels: { text: string; a: Vec2; b: Vec2 }[],
+  opts: { size: number; spacing?: number; near?: { x: number; y: number }; range?: number; placed: LabelBox[] },
+): void {
+  const a = { x: 0, y: 0 };
+  const b = { x: 0, y: 0 };
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.font = `${Math.round(opts.size)}px 'VT323', monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = Math.max(2, opts.size * 0.22);
+  for (const l of labels) {
+    t.toScreen(l.a, a);
+    t.toScreen(l.b, b);
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const len = Math.hypot(dx, dy);
+    const w = ctx.measureText(l.text).width;
+    if (len < w * 1.3) continue;
+    let ang = Math.atan2(dy, dx);
+    if (ang > Math.PI / 2) ang -= Math.PI;
+    else if (ang < -Math.PI / 2) ang += Math.PI;
+    const spots: number[] = [];
+    if (opts.near) {
+      // The point of the run closest to `near`, kept off the run's ends
+      const k = ((opts.near.x - a.x) * dx + (opts.near.y - a.y) * dy) / (len * len);
+      const s = Math.min(Math.max(k, w / 2 / len), 1 - w / 2 / len);
+      const px = a.x + dx * s - opts.near.x;
+      const py = a.y + dy * s - opts.near.y;
+      if (Math.hypot(px, py) <= (opts.range ?? Infinity)) spots.push(s);
+    } else {
+      const n = Math.max(1, Math.floor(len / (opts.spacing ?? 400)));
+      for (let i = 0; i < n; i++) spots.push((i + 0.5) / n);
+    }
+    const hw = (Math.abs(Math.cos(ang)) * w + Math.abs(Math.sin(ang)) * opts.size) / 2 + 3;
+    const hh = (Math.abs(Math.sin(ang)) * w + Math.abs(Math.cos(ang)) * opts.size) / 2 + 3;
+    const lo = w / 2 / len;
+    // Each spot slides along the run (up to a fifth of the spacing either way) to find a free place
+    const slide = opts.near ? [0] : [0, 0.08, -0.08, 0.16, -0.16].map((k) => k / spots.length);
+    for (const s0 of spots) {
+      let box: LabelBox | null = null;
+      let x = 0;
+      let y = 0;
+      for (const ds of slide) {
+        const s = Math.min(Math.max(s0 + ds, lo), 1 - lo);
+        x = a.x + dx * s;
+        y = a.y + dy * s;
+        const b0 = { x0: x - hw, y0: y - hh, x1: x + hw, y1: y + hh };
+        if (!opts.placed.some((p) => p.x0 < b0.x1 && b0.x0 < p.x1 && p.y0 < b0.y1 && b0.y0 < p.y1)) {
+          box = b0;
+          break;
+        }
+      }
+      if (!box) continue;
+      opts.placed.push(box);
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(ang);
+      ctx.strokeStyle = 'rgba(5, 3, 12, 0.85)';
+      ctx.strokeText(l.text, 0, 0);
+      ctx.fillStyle = 'rgba(255, 236, 200, 0.92)';
+      ctx.fillText(l.text, 0, 0);
+      ctx.restore();
+    }
+  }
+  ctx.restore();
+}

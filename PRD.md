@@ -352,6 +352,8 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 2. Push brick warehouse masses along the canal and the port, using the heights already in `Massing.ts` and `Harbor.ts`. The clock tower stays a landmark, dressed so it reads as stone and a spire in daylight.
 3. Cobble streets from Phase 2 get trees, a few terraces, and bike-shaped props on the sidewalk. Pedestrian density up on those blocks only.
 4. Globe lamps on the cobbles, black poles, warm bulbs at low intensity.
+5. No more "Dispatch" locations, replace them with other relevant buildings or parks. Montreal has pedestrianizes parks with fountains surrounded by streets, for example
+6. Pedestrians should be wearing jackets because it's winter
 
 **Done when:** From a block north of Notre-Dame the towers are the skyline of that street, and the port edge is brick, water, and the clock, in daylight.
 
@@ -432,6 +434,16 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 4. The destination garage still offers a paid repair before the free mount if the car is damaged.
 
 **Done when:** From a cold start you can be sent across the grid, lose the GPS route to a fence, pay or avoid a repair, pick up the police or slip them, and finish in the bay with the winter tires on. Quitting to free roam does not leave the mission destination stuck on the map.
+
+### Phase 11 B: — Cars and City signs
+
+**Goal: No more Japanese traffic cars, all cars should look westernized.**
+
+**Steps**
+
+1. No more Kei trucks and small cars. Sedans should look more modern, and Kei Trucks should be replaced with pick-up trucks.
+2. Taxis shouldn't be yellow, but green and white.
+3. Some of the signs displayed on buildings should be Montreal/Canada specific: IGA, Provigo, Starbucks, Tim Hortons, Poutine.
 
 ### Phase 12 — Pass and credits
 

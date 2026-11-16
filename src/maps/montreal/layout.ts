@@ -1,4 +1,4 @@
-import type { DistrictType, StreetClass } from '../../types';
+import type { DistrictType, StreetClass, StreetName } from '../../types';
 
 /**
  * The street grid, rotated so it lies on the game's axes.
@@ -52,6 +52,50 @@ export const Z_RAW = [
   900, // last quay, then the St. Lawrence
 ];
 
+/** Names on the blades and the map, one per entry of `X_RAW`. */
+const X_NAMES: StreetName[] = [
+  { generic: 'Rue', name: 'Guy' },
+  { generic: 'Rue', name: "Lucien-L'Allier" },
+  { generic: 'Rue', name: 'de la Montagne' },
+  { generic: 'Rue', name: 'Drummond' },
+  { generic: 'Rue', name: 'Peel' },
+  { generic: 'Rue', name: 'Metcalfe' },
+  { generic: 'Avenue', name: 'McGill College' },
+  { generic: 'Boulevard', name: 'Robert-Bourassa' },
+  { generic: 'Rue', name: 'University' },
+  { generic: 'Rue', name: 'McGill' },
+  { generic: 'Rue', name: 'Saint-Pierre' },
+  { generic: 'Rue', name: 'Saint-François-Xavier' },
+  { generic: 'Rue', name: 'Saint-Urbain' },
+  { generic: 'Boulevard', name: 'Saint-Laurent' },
+  { generic: 'Rue', name: 'De Bullion' },
+  { generic: 'Rue', name: 'Sanguinet' },
+  { generic: 'Rue', name: 'Saint-Denis' },
+  { generic: 'Rue', name: 'Berri' },
+  { generic: 'Rue', name: 'Saint-Hubert' },
+];
+
+/** One per entry of `Z_RAW`; the quay roads south of the canal have no posted name. */
+const Z_NAMES: (StreetName | null)[] = [
+  { generic: 'Rue', name: 'Sherbrooke' },
+  { generic: 'Boulevard', name: 'De Maisonneuve' },
+  { generic: 'Rue', name: 'Sainte-Catherine' },
+  { generic: 'Rue', name: 'Cathcart' },
+  { generic: 'Boulevard', name: 'René-Lévesque' },
+  { generic: 'Rue', name: 'De La Gauchetière' },
+  { generic: 'Rue', name: 'Saint-Antoine' },
+  { generic: 'Rue', name: 'Saint-Jacques' },
+  { generic: 'Rue', name: 'Notre-Dame' },
+  { generic: 'Rue', name: 'Saint-Paul' },
+  { generic: 'Rue', name: 'William' },
+  { generic: 'Rue', name: 'Ottawa' },
+  { generic: 'Rue', name: 'Wellington' },
+  { generic: 'Rue', name: 'Saint-Patrick' },
+  null,
+  null,
+];
+const COMMUNE_NAME: StreetName = { generic: 'Rue', name: 'de la Commune' };
+
 export const COLS = X_RAW.length - 1;
 export const ROWS = Z_RAW.length - 1;
 
@@ -91,6 +135,27 @@ export function rowClass(i: number, j: number): StreetClass {
   if ((j === SAINT_PAUL || j === COMMUNE) && i >= OLD_CITY_I) return 'cobble';
   if (j === SAINTE_CATHERINE && i >= LATIN_I0 && i < LATIN_I1) return 'cobble';
   return avenueZ(j) ? 'boulevard' : 'street';
+}
+
+/** Name of the east-west road on row j between columns i and i + 1 (William is de la Commune in the old city). */
+export function rowName(i: number, j: number): StreetName | null {
+  if (j === COMMUNE && i >= OLD_CITY_I) return COMMUNE_NAME;
+  return Z_NAMES[j] ?? null;
+}
+
+/** Name of the north-south road on column i. */
+export function colName(i: number): StreetName | null {
+  return X_NAMES[i] ?? null;
+}
+
+/**
+ * Junction control (PRD 5.8): lights where a boulevard crosses, all-way ARRÊT where only streets and cobbles
+ * meet, with about one such crossing in four keeping its lights. `h` is a stable hash of the junction, 0..1.
+ */
+export function junctionControl(classes: StreetClass[], h: number): 'signal' | 'stop' | 'none' {
+  if (classes.length < 3) return 'none';
+  if (classes.includes('boulevard')) return 'signal';
+  return h < 0.25 ? 'signal' : 'stop';
 }
 
 /** Class of the north-south road on column i between rows j and j + 1. */

@@ -162,7 +162,7 @@ export function buildMarkings(city: CityModel, style: MarkingStyle = MONTREAL_MA
       /** Arc length `d` in from this end. */
       const sIn = (d: number) => (end === 0 ? d : L - d);
       crosswalk(sIn(0.6), sIn(0.6 + cw.depth));
-      if (n.signalized) stopLine(e, n.id, sIn(SO - 0.1));
+      if (n.signalized || n.control === 'stop') stopLine(e, n.id, sIn(SO - 0.1));
     }
 
     /** Crosswalk bars across the road between arc lengths a and b. */

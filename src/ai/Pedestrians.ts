@@ -65,6 +65,11 @@ const CAR_CLEAR = 0.45;
 const CAR_LOOK = 0.9;
 /** ...but not for longer than this (s): then they squeeze past as before (no standoffs with a stopped car). */
 const CAR_WAIT_MAX = 2.5;
+/**
+ * At an all-way stop a ped doesn't step off the curb while a car is this close to the crosswalk (m beyond the
+ * car's half length): the car that took its turn gets across first. Cars waiting at the line sit further back.
+ */
+const STOP_CROSS_CLEAR = 2;
 
 /** Sidewalk loops around blocks joined by signal-controlled crosswalks. */
 export class WalkGraph {
@@ -275,6 +280,7 @@ export class Pedestrians implements SimSystem {
   /** Can a ped start crossing now, and at what speed? Returns 0 if it must wait. */
   private crossSpeed(p: Ped, e: WalkEdge): number {
     const c = e.crossing!;
+    if (this.world.city.nodes[c.node].control === 'stop' && this.carOnCrossing(e)) return 0;
     // Cross while this approach is red and another one is in its green
     const greenLeft = this.world.lights.walkLeft(c.node, c.edge);
     if (greenLeft <= 0) return 0;
@@ -306,6 +312,24 @@ export class Pedestrians implements SimSystem {
     p.waiting = !!e.crossing;
     p.waitTime = 0;
     p.speed = p.baseSpeed;
+  }
+
+  /** A car on or right at this crosswalk (all-way stops: wait for it to get through). */
+  private carOnCrossing(e: WalkEdge): boolean {
+    const a = this.graph.nodes[e.a].pos;
+    const b = this.graph.nodes[e.b].pos;
+    const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+    const ux = (b.x - a.x) / len;
+    const uz = (b.z - a.z) / len;
+    for (const c of this.world.cars) {
+      if (c.removed) continue;
+      const rx = c.pos.x - a.x;
+      const rz = c.pos.z - a.z;
+      const along = rx * ux + rz * uz;
+      if (along < -1 || along > len + 1) continue;
+      if (Math.abs(rx * uz - rz * ux) < c.halfL + STOP_CROSS_CLEAR) return true;
+    }
+    return false;
   }
 
   /** A car's body (any car) right where this ped is about to step. */

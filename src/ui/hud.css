@@ -486,33 +486,44 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.35);
 }
 
-/* Posted speed limit: a Japanese round sign beside the speed; it flashes while you're over the speeding line */
+/* Posted speed limit: the Quebec plate (black on white, km/h under the number) beside the speed; its border
+   flashes red while you're over the speeding line */
 .hud-speedo {
   padding-left: 72px;
 }
 .hud-limit {
   position: absolute;
-  left: 12px;
+  left: 14px;
   top: 50%;
   transform: translateY(-50%);
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 50px;
   box-sizing: border-box;
-  border-radius: 50%;
-  border: 6px solid #d8262e;
-  background: #f4f4f2;
-  color: #1a3a9a;
+  border: 3px solid #141414;
+  outline: 2px solid #f4f4f0;
+  background: #f4f4f0;
+  color: #141414;
   font-family: 'Helvetica Neue', Arial, sans-serif;
   font-weight: bold;
-  font-size: 17px;
+  font-size: 19px;
   line-height: 32px;
   text-align: center;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+}
+.hud-limit::after {
+  content: 'km/h';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 3px;
+  font-size: 8px;
+  line-height: 8px;
+  font-weight: normal;
 }
 .hud-limit.over {
   animation: limit-flash 0.5s steps(1) infinite;
 }
 @keyframes limit-flash {
   0% { box-shadow: 0 0 14px 4px rgba(255, 46, 74, 0.9); border-color: #ff2e4a; }
-  50% { box-shadow: 0 0 6px rgba(0, 0, 0, 0.6); border-color: #d8262e; }
+  50% { box-shadow: 0 0 6px rgba(0, 0, 0, 0.6); border-color: #141414; }
 }

@@ -1,5 +1,5 @@
 import { CONFIG } from '../config';
-import type { Block, DistrictType, Vec2 } from '../types';
+import type { Block, DistrictType, RoadEdge, Vec2 } from '../types';
 import { inner } from '../world/Features';
 import type { CityModel } from '../world/RoadGraph';
 
@@ -254,13 +254,62 @@ function drawElevation(ctx: CanvasRenderingContext2D, city: CityModel): void {
   ctx.restore();
 }
 
-const DISTRICT_NAMES: Record<DistrictType, [string, string]> = {
-  downtown: ['DOWNTOWN', '中心街'],
-  shotengai: ['SHOTENGAI', '商店街'],
-  harbor: ['HARBOR', '港湾地区'],
-  residential: ['RESIDENTIAL', '住宅街'],
-  depot: ['DISPATCH', '配送センター'],
-};
+/**
+ * Player-facing neighbourhood names (PRD 4.3). The sim's district ids stay; one id can be two places: the
+ * old-city shops south of Notre-Dame vs the latin quarter band, the homes west of downtown vs Griffintown.
+ * `gi` / `gj` are the area's centroid in blocks.
+ */
+function districtName(d: DistrictType, gi: number, gj: number, gx: number): string {
+  const southOfNotreDame = gj >= 8;
+  switch (d) {
+    case 'downtown':
+      return 'CENTRE-VILLE';
+    case 'shotengai':
+      return southOfNotreDame ? 'VIEUX-MONTRÉAL' : 'QUARTIER LATIN';
+    case 'residential':
+      return southOfNotreDame ? 'GRIFFINTOWN' : gi < gx / 2 ? 'SHAUGHNESSY' : 'QUARTIER DES SPECTACLES';
+    case 'harbor':
+      return 'VIEUX-PORT';
+    case 'depot':
+      return 'GARAGE';
+  }
+}
+
+/** A straight run of one named boulevard, junction to junction, labelled on the minimap and the full map. */
+export interface StreetLabel {
+  text: string;
+  a: Vec2;
+  b: Vec2;
+}
+
+/** The long boulevards by name (PRD Phase 4): one run per stretch of a row or column that is boulevard. */
+export function streetLabels(city: CityModel): StreetLabel[] {
+  const groups = new Map<string, RoadEdge[]>();
+  for (const e of city.edges) {
+    if (!e.avenue || !e.name) continue;
+    const key = `${e.axis}|${e.name.name}`;
+    let g = groups.get(key);
+    if (!g) groups.set(key, (g = []));
+    g.push(e);
+  }
+  const out: StreetLabel[] = [];
+  for (const edges of groups.values()) {
+    const coord = (e: RoadEdge) => (e.axis === 'x' ? city.nodes[e.a].pos.x : city.nodes[e.a].pos.z);
+    edges.sort((p, q) => coord(p) - coord(q));
+    let run: RoadEdge[] = [];
+    const flush = () => {
+      if (!run.length) return;
+      out.push({ text: run[0].name!.name.toUpperCase(), a: city.nodes[run[0].a].pos, b: city.nodes[run[run.length - 1].b].pos });
+      run = [];
+    };
+    for (const e of edges) {
+      if (run.length && run[run.length - 1].b !== e.a) flush();
+      run.push(e);
+    }
+    flush();
+  }
+  return out;
+}
 
 const center = (b: Block): Vec2 => ({ x: (b.min.x + b.max.x) / 2, z: (b.min.z + b.max.z) / 2 });
 
@@ -304,8 +353,9 @@ export function mapLabels(city: CityModel): MapLabel[] {
       const cz = cs.reduce((s, c) => s + c.z, 0) / cs.length;
       let best = cs[0];
       for (const c of cs) if (Math.hypot(c.x - cx, c.z - cz) < Math.hypot(best.x - cx, best.z - cz)) best = c;
-      const [text, sub] = DISTRICT_NAMES[start.district];
-      out.push({ text, sub, pos: best, kind: 'district' });
+      const gi = part.reduce((s, b) => s + b.gi, 0) / part.length;
+      const gj = part.reduce((s, b) => s + b.gj, 0) / part.length;
+      out.push({ text: districtName(start.district, gi, gj, gx), pos: best, kind: 'district' });
     }
   }
 

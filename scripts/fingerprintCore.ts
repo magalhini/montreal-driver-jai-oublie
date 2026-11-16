@@ -42,7 +42,7 @@ export function fingerprint(id: string): string[] {
   const groups: Record<string, Hash> = {};
   const g = (name: string) => (groups[name] ??= new Hash());
 
-  for (const n of city.nodes) g('nodes').add([n.pos.x, n.pos.z, n.edges, n.signalized]);
+  for (const n of city.nodes) g('nodes').add([n.pos.x, n.pos.z, n.edges, n.signalized, n.control]);
   for (const e of city.edges) g('edges').add([e.a, e.b, e.lanesPerDir, e.width, e.speedLimit, e.length, e.avenue, e.lanesAB, e.lanesBA]);
   // Edge centerlines (T37), every 2 m
   for (const e of city.edges) {

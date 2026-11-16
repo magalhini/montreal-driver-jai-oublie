@@ -4,8 +4,8 @@ import type { Gps } from '../gameplay/Gps';
 import type { ViewSystem, Vec2 } from '../types';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
-import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawPin, formatDistance, strokeRoute, type Px } from './MapDraw';
-import type { MapImage } from './MapImage';
+import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { streetLabels, type MapImage, type StreetLabel } from './MapImage';
 import './map.css';
 
 /** Meters from the view center to the rim: stopped, and at `RANGE_SPEED` and above. */
@@ -33,6 +33,7 @@ export class Minimap implements ViewSystem {
   private size = 0;
   private shownDist = '';
   private readonly q: Px = { x: 0, y: 0 };
+  private readonly streets: StreetLabel[];
 
 
   constructor(
@@ -54,6 +55,7 @@ export class Minimap implements ViewSystem {
     this.root.appendChild(this.distEl);
     parent.appendChild(this.root);
     this.ctx = this.canvas.getContext('2d')!;
+    this.streets = streetLabels(city);
   }
 
   sync(alpha: number, frameDt: number): void {
@@ -84,6 +86,8 @@ export class Minimap implements ViewSystem {
     drawBase(ctx, t, this.img);
     const route = this.gps.route;
     if (route) strokeRoute(ctx, t, route.points, 3.2 * dpr);
+    // The boulevards in reach, named once each where they pass closest to the middle
+    drawStreetLabels(ctx, t, this.streets, { size: 13 * dpr, near: { x: R, y: R }, range: R * 0.72, placed: [] });
     ctx.restore();
 
     const now = performance.now();

@@ -4,8 +4,8 @@ import type { Input } from '../core/Input';
 import type { Gps } from '../gameplay/Gps';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
-import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawPin, formatDistance, strokeRoute, type Px } from './MapDraw';
-import { mapLabels, type MapImage, type MapLabel } from './MapImage';
+import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { mapLabels, streetLabels, type MapImage, type MapLabel, type StreetLabel } from './MapImage';
 import './map.css';
 
 /** Max zoom (CSS px per meter); min is "whole city fits". */
@@ -44,6 +44,7 @@ export class FullMap {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly infoEl: HTMLElement;
   private readonly labels: MapLabel[];
+  private readonly streets: StreetLabel[];
   private readonly landmarksFirst: MapLabel[];
   private readonly t = new MapTransform();
   private readonly q: Px = { x: 0, y: 0 };
@@ -64,6 +65,7 @@ export class FullMap {
     private readonly input: Input,
   ) {
     this.labels = mapLabels(city);
+    this.streets = streetLabels(city);
     this.landmarksFirst = [...this.labels.filter((l) => l.kind === 'landmark'), ...this.labels.filter((l) => l.kind === 'district')];
     this.root = document.createElement('div');
     this.root.className = 'fullmap';
@@ -71,7 +73,7 @@ export class FullMap {
     this.root.appendChild(this.canvas);
     const head = document.createElement('div');
     head.className = 'fullmap-head';
-    head.innerHTML = '<span class="title">MAP <small>地図</small></span>';
+    head.innerHTML = '<span class="title">MAP <small>CARTE</small></span>';
     this.infoEl = document.createElement('span');
     this.infoEl.className = 'info';
     head.appendChild(this.infoEl);
@@ -210,6 +212,8 @@ export class FullMap {
       placed.push(box);
       this.text(l.text, q.x, q.y, size, district ? 'rgba(255, 255, 255, 0.82)' : 'rgba(62, 242, 255, 0.85)', l.sub);
     }
+    // Boulevard names along their roads, in the gaps the place names left
+    drawStreetLabels(this.ctx, t, this.streets, { size: clamp(11 * zoom, 14, 22) * dpr, spacing: 520 * dpr, placed });
   }
 
   private labelBox(s: string, sub: string | undefined, x: number, y: number, size: number): Box {

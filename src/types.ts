@@ -18,11 +18,19 @@ export interface RoadNode {
   signalized: boolean;
   /** Junction area (T38): a convex polygon; on the grid, the hx / hz box. */
   poly: Vec2[];
-  /** How traffic is controlled here (T38; `signalized` is `control === 'signal'`). Give-way logic arrives in T54. */
+  /** How traffic is controlled here (T38; `signalized` is `control === 'signal'`). `stop`: all-way ARRÊT. */
   control: JunctionControl;
+  /** Stop junction with the all-way plaque under its ARRÊT signs (dressing only: every stop is all-way). */
+  allWayPlaque?: boolean;
 }
 
-export type JunctionControl = 'signal' | 'yield' | 'none';
+export type JunctionControl = 'signal' | 'stop' | 'yield' | 'none';
+
+/** A street's posted name: the generic word on the blade's small line, and the name itself. */
+export interface StreetName {
+  generic: 'Rue' | 'Boulevard' | 'Avenue';
+  name: string;
+}
 
 export interface Lane {
   id: number;
@@ -74,6 +82,8 @@ export interface RoadEdge {
   lanesBA: number[];
   /** `cls === 'boulevard'`: the wide roads (map colour, signs, the markings' double center line). */
   avenue: boolean;
+  /** Street blades and map labels; unnamed service roads (quays) have none. */
+  name?: StreetName;
 }
 
 export interface Block {

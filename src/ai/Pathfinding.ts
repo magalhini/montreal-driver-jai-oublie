@@ -40,11 +40,13 @@ export interface PathCosts {
   hardTurn: number;
   /** Passing through a signalized node (average wait). */
   signal: number;
+  /** Passing an all-way stop (stopping, waiting a turn). */
+  stop: number;
   /** Starting against the current heading. */
   uTurn: number;
 }
 
-export const DEFAULT_COSTS: PathCosts = { easyTurn: 1.5, hardTurn: 3, signal: 1.5, uTurn: 8 };
+export const DEFAULT_COSTS: PathCosts = { easyTurn: 1.5, hardTurn: 3, signal: 1.5, stop: 2.5, uTurn: 8 };
 
 /** A turn sharper than this (between arrival and departure directions) is priced as a turn. */
 const STRAIGHT_COS = Math.cos((35 * Math.PI) / 180);
@@ -199,7 +201,7 @@ export class Pathfinder {
       const arrive = s - this.base[node];
       const n = city.nodes[node];
       const gs = this.g[s];
-      const pass = n.signalized ? costs.signal : 0;
+      const pass = n.signalized ? costs.signal : n.control === 'stop' ? costs.stop : 0;
 
       for (let k = 0; k < n.edges.length; k++) {
         const e = city.edges[n.edges[k]];
