@@ -3,7 +3,7 @@ import { clamp, dot, fwd, leftOf, leftVec } from '../core/math';
 import type { Walker, World } from '../core/World';
 import type { Lane, RoadNode, TurnType, Vec2 } from '../types';
 import type { Blinker, Car } from '../vehicles/Car';
-import { pointAt } from '../world/Polyline';
+import { pointAt, project } from '../world/Polyline';
 import { RIDER_HALF_L, RIDER_HALF_W } from './Rider';
 
 /** Turn across oncoming traffic, and the one that keeps to the curb side. */
@@ -60,7 +60,18 @@ export const DRIVER_TUNING = {
   /** Reaction time before pulling away from a standstill (s), for the calmest drivers (pushy ones are ~40% quicker). */
   launchMin: 0.25,
   launchMax: 0.85,
+  /**
+   * Lane merges: start looking for a gap this far before the taper (m), signal at least this long before moving
+   * over (s), and take about this long to cross (s); the offset eases at `mergeRate` per second.
+   */
+  mergeLook: 70,
+  mergeSignal: 0.8,
+  mergeTime: 2.4,
+  mergeRate: 1.3,
 };
+
+/** Lane merges done by AI drivers since load (debug, soak). */
+export const MERGE_STATS = { merges: 0 };
 
 /** The driver of each AI car, so opposing turners can settle who goes first (see `passesOpposingTurner`). */
 const DRIVER_OF = new WeakMap<Car, LaneDriver>();
@@ -202,6 +213,11 @@ export class LaneDriver {
   private clearedLane = -1;
   /** Blinker held on regardless of the route (pulling over). */
   forceBlinker: Blinker | null = null;
+  /** Lane ends ahead (a merge before road works): the side to move over to, and seconds left of the move. */
+  mergeSide: Blinker | null = null;
+  private mergeT = 0;
+  /** Seconds signalling for the merge so far. */
+  private mergeWait = 0;
 
   constructor(
     private world: World,
@@ -715,9 +731,65 @@ export class LaneDriver {
     this.car.blinkT = 0;
   }
 
+  /**
+   * Room to move into `into` beside the car: nobody in that lane too close ahead, and nobody behind who would
+   * have to brake hard for us (the faster they come, the bigger the gap we wait for).
+   */
+  private mergeClear(into: Lane, v: number): boolean {
+    const car = this.car;
+    const p = car.pos;
+    const half = this.world.city.edges[into.edgeId].laneWidth * 0.65;
+    const lx = into.dir.z;
+    const lz = -into.dir.x;
+    for (const o of this.world.cars) {
+      if (o === car || o.removed) continue;
+      const rx = o.pos.x - p.x;
+      const rz = o.pos.z - p.z;
+      const along = rx * into.dir.x + rz * into.dir.z;
+      if (along < -60 || along > 35) continue;
+      const lat = (o.pos.x - into.start.x) * lx + (o.pos.z - into.start.z) * lz;
+      if (Math.abs(lat) > half) continue;
+      const vo = o.vel.x * into.dir.x + o.vel.z * into.dir.z;
+      const room = Math.abs(along) - car.halfL - o.halfL;
+      if (along >= 0 ? room < 3 + v * 0.5 + Math.max(0, v - vo) * 1.2 : room < 4 + Math.max(0, vo - v) * 1.8 + vo * 0.4) return false;
+    }
+    return true;
+  }
+
+  /** Move over into the next lane mid-block: the target line jumps, the offset eases the car across. */
+  private changeLane(into: Lane): void {
+    const pr = project(into.pts, into.cum, this.car.pos);
+    this.lane = into;
+    this.offset = pr.lateral;
+    this.mergeT = DRIVER_TUNING.mergeTime;
+    MERGE_STATS.merges++;
+    this.clearedLane = -1;
+    this.chooseNext();
+    this.buildPath();
+    this.seg = 0;
+  }
+
   /** Compute inputs for this step. */
   drive(): void {
     this.advance();
+    // A lane that ends ahead (PRD Phase 7 merges): signal, look for a gap, move over; at the taper, wait for one
+    const works = this.world.roadworks;
+    let mergeStop = Infinity;
+    const merge = works && !this.pastLane ? works.mergeAhead(this.lane, this.car.pos) : null;
+    if (merge && merge.dist < DRIVER_TUNING.mergeLook) {
+      const into = this.world.city.lanes[merge.into];
+      this.mergeSide = dot({ x: into.start.x - this.lane.start.x, z: into.start.z - this.lane.start.z }, leftVec(this.lane.dir)) > 0 ? 'left' : 'right';
+      // A moment with the blinker on before moving over
+      this.mergeWait += 1 / 60;
+      if (this.mergeWait > DRIVER_TUNING.mergeSignal && this.mergeClear(into, Math.max(0, this.car.phys.state.speed))) {
+        this.changeLane(into);
+        this.mergeWait = 0;
+      } else mergeStop = merge.dist - this.car.halfL - 1;
+    } else if (this.mergeT <= 0) {
+      this.mergeSide = null;
+      this.mergeWait = 0;
+    }
+    if (this.mergeT > 0) this.mergeT -= 1 / 60;
     const car = this.car;
     const s = car.phys.state;
     const v = Math.max(0, s.speed);
@@ -735,7 +807,8 @@ export class LaneDriver {
     else this.yieldT = Math.max(0, this.yieldT - 1 / 60);
     const curbLane = this.lane.index === this.world.city.edges[this.lane.edgeId].lanesPerDir - 1;
     let want = riders.nudge;
-    let rate = 2.5;
+    // Moving over after a merge: a slower ease than the rider nudges
+    let rate = this.mergeT > 0 ? DRIVER_TUNING.mergeRate : 2.5;
     this.mood = 'cruise';
     if (this.evadeT > 0) {
       this.mood = 'evade';
@@ -775,13 +848,15 @@ export class LaneDriver {
     // Curb-side turns are tighter than turns across the junction: take them slower
     if (turning && (this.pastLane || dStop < 25)) v0 = Math.min(v0, this.next.turn === EASY_TURN ? this.turnSpeed * 0.75 : this.turnSpeed);
     if (this.yieldT > 0) v0 = Math.min(v0, limit * T.yieldSpeed);
-    const works = this.world.roadworks;
+    // Looking for a gap to merge: ease off
+    if (mergeStop < Infinity) v0 = Math.min(v0, limit * 0.6);
     // Something coming head-on: stand on the brakes while swerving
     if (this.evadeT > 0) v0 = Math.min(v0, 3);
     v0 = Math.min(v0, this.speedCap);
 
     // Turn signals: on approaching the junction, off once on the new road; toward the curb while pulling over
     if (this.forceBlinker) this.signal(this.forceBlinker);
+    else if (this.mergeSide) this.signal(this.mergeSide);
     else if (turning && (this.pastLane || (dStop >= 0 && dStop < T.signalAt))) this.signal(this.next.turn as Blinker);
     else if (this.yieldT > 0 && curbLane) this.signal(CURB_BLINKER);
     else this.signal(null);
@@ -828,6 +903,12 @@ export class LaneDriver {
       gap = fenceD - car.halfL - 1.5;
       vLead = 0;
       this.waiting = 'none';
+    }
+    // Waiting at the taper for a gap
+    if (mergeStop < gap) {
+      gap = mergeStop;
+      vLead = 0;
+      this.waiting = 'traffic';
     }
     const pedGap = this.scanPeds();
     if (pedGap < gap) {

@@ -17,6 +17,9 @@ export const MEDIAN_TUNING = {
   /** Chance that a block of René-Lévesque, or of another east-west boulevard, gets an island. */
   boulevardShare: 0.7,
   otherShare: 0.35,
+  /** The same for the north-south boulevards: Saint-Laurent, and the others (Peel, Robert-Bourassa, Berri...). */
+  mainShare: 0.7,
+  northSouthShare: 0.3,
   /** Island width (the double line's gap is 0.5 m: this eats a little into each inner lane) and curb height. */
   width: 1.1,
   height: 0.22,
@@ -28,58 +31,72 @@ export const MEDIAN_TUNING = {
 };
 
 /** Builds the islands and returns their colliders. Pits in the middle of the road push an island elsewhere. */
-export function buildMedians(city: CityModel, scene: THREE.Scene, pits: readonly Pothole[], closed: ReadonlySet<number> = new Set()): AABB[] {
+export function buildMedians(city: CityModel, scene: THREE.Scene, pits: readonly Pothole[], busy: ReadonlySet<number> = new Set()): AABB[] {
   const T = MEDIAN_TUNING;
-  const rng = new Rng(CONFIG.SEED ^ 0x3ed1a);
   const colliders: AABB[] = [];
   const kit = new Kit();
   const half = T.width / 2;
-  for (const e of city.edges) {
-    if (e.cls !== 'boulevard' || e.axis !== 'x' || e.oneWay || e.name?.name === 'Sainte-Catherine') continue;
-    const share = e.name?.generic === 'Boulevard' ? T.boulevardShare : T.otherShare;
-    // Rolled for every edge, so one edge's outcome does not reshuffle the rest
-    const take = rng.chance(share);
-    const len = rng.range(T.length[0], T.length[1]);
-    const where = rng.next();
-    const second = rng.chance(0.4);
-    // A work zone takes the middle of the block (PRD Phase 7)
-    if (!take || closed.has(e.id)) continue;
-    const a = city.nodes[e.a];
-    const b = city.nodes[e.b];
-    const x0 = Math.min(a.pos.x, b.pos.x) + (a.pos.x < b.pos.x ? a.hx : b.hx) + T.endGap;
-    const x1 = Math.max(a.pos.x, b.pos.x) - (a.pos.x < b.pos.x ? b.hx : a.hx) - T.endGap;
-    const z = a.pos.z;
-    const room = x1 - x0;
-    if (room < T.length[0]) continue;
-    // One island on a normal block, two on a long one (with a gap for the left turns into the middle of it)
-    const spans: [number, number][] = [];
-    if (second && room > 2 * T.length[0] + 30) {
-      const l = Math.min(len, (room - 30) / 2);
-      spans.push([x0, x0 + l], [x1 - l, x1]);
-    } else {
-      const l = Math.min(len, room);
-      const s = x0 + where * (room - l);
-      spans.push([s, s + l]);
-    }
-    for (const [s0, s1] of spans) {
-      if (!clear(city, e, pits, s0, s1, z, half)) continue;
-      kit.island(city, s0, s1, z, half, T.height, rng);
-      colliders.push({ minX: s0, maxX: s1, minZ: z - half, maxZ: z + half });
+  // East-west first, then north-south (Saint-Laurent and the like) from a stream of their own, so adding those
+  // moved none of René-Lévesque's islands
+  for (const axis of ['x', 'z'] as const) {
+    const rng = new Rng(CONFIG.SEED ^ (axis === 'x' ? 0x3ed1a : 0x3ed1b));
+    for (const e of city.edges) {
+      if (e.cls !== 'boulevard' || e.axis !== axis || e.oneWay || e.name?.name === 'Sainte-Catherine') continue;
+      const share = axis === 'x' ? (e.name?.generic === 'Boulevard' ? T.boulevardShare : T.otherShare) : e.name?.name === 'Saint-Laurent' ? T.mainShare : T.northSouthShare;
+      // Rolled for every edge, so one edge's outcome does not reshuffle the rest
+      const take = rng.chance(share);
+      const len = rng.range(T.length[0], T.length[1]);
+      const where = rng.next();
+      const second = rng.chance(0.4);
+      // Road works take the middle of the block (PRD Phase 7)
+      if (!take || busy.has(e.id)) continue;
+      const a = city.nodes[e.a];
+      const b = city.nodes[e.b];
+      // Along the road (u) and across it (the road's fixed coordinate)
+      const ua = axis === 'x' ? a.pos.x : a.pos.z;
+      const ub = axis === 'x' ? b.pos.x : b.pos.z;
+      const ea = axis === 'x' ? a.hx : a.hz;
+      const eb = axis === 'x' ? b.hx : b.hz;
+      const u0 = Math.min(ua, ub) + (ua < ub ? ea : eb) + T.endGap;
+      const u1 = Math.max(ua, ub) - (ua < ub ? eb : ea) - T.endGap;
+      const fixed = axis === 'x' ? a.pos.z : a.pos.x;
+      const room = u1 - u0;
+      if (room < T.length[0]) continue;
+      // One island on a normal block, two on a long one (with a gap for the left turns into the middle of it)
+      const spans: [number, number][] = [];
+      if (second && room > 2 * T.length[0] + 30) {
+        const l = Math.min(len, (room - 30) / 2);
+        spans.push([u0, u0 + l], [u1 - l, u1]);
+      } else {
+        const l = Math.min(len, room);
+        const st = u0 + where * (room - l);
+        spans.push([st, st + l]);
+      }
+      for (const [s0, s1] of spans) {
+        if (!clear(city, e, pits, s0, s1, fixed, half, axis)) continue;
+        kit.island(city, s0, s1, fixed, half, T.height, rng, axis);
+        colliders.push(axis === 'x' ? { minX: s0, maxX: s1, minZ: fixed - half, maxZ: fixed + half } : { minX: fixed - half, maxX: fixed + half, minZ: s0, maxZ: s1 });
+      }
     }
   }
   kit.build(scene);
   return colliders;
 }
 
+/** World point at `u` along a road on `axis` whose fixed coordinate is `fixed`, `c` across it. */
+const P = (axis: 'x' | 'z', u: number, fixed: number, c = 0) => (axis === 'x' ? { x: u, z: fixed + c } : { x: fixed + c, z: u });
+
 /** No driveway opening across from the island on either curb (left turns in) and no pothole under it. */
-function clear(city: CityModel, e: RoadEdge, pits: readonly Pothole[], s0: number, s1: number, z: number, half: number): boolean {
+function clear(city: CityModel, e: RoadEdge, pits: readonly Pothole[], s0: number, s1: number, fixed: number, half: number, axis: 'x' | 'z'): boolean {
   const curb = e.width / 2 + 1;
-  for (let x = s0 - 6; x <= s1 + 6; x += 2) {
-    if (inDriveway(city, { x, z: z - curb }, 1) || inDriveway(city, { x, z: z + curb }, 1)) return false;
+  for (let u = s0 - 6; u <= s1 + 6; u += 2) {
+    if (inDriveway(city, P(axis, u, fixed, -curb), 1) || inDriveway(city, P(axis, u, fixed, curb), 1)) return false;
   }
   for (const p of pits) {
     if (p.edge !== e.id) continue;
-    if (Math.abs(p.pos.z - z) - p.r < half + 0.2 && p.pos.x + p.r > s0 - 1 && p.pos.x - p.r < s1 + 1) return false;
+    const pu = axis === 'x' ? p.pos.x : p.pos.z;
+    const pc = axis === 'x' ? p.pos.z : p.pos.x;
+    if (Math.abs(pc - fixed) - p.r < half + 0.2 && pu + p.r > s0 - 1 && pu - p.r < s1 + 1) return false;
   }
   return true;
 }
@@ -96,11 +113,32 @@ class Kit {
   private markers: THREE.Matrix4[] = [];
   private stripes: THREE.Matrix4[] = [];
 
-  /** One island from x = s0 to s1 along a road at z: curb, rounded noses, snow, trees, markers. */
-  island(city: CityModel, s0: number, s1: number, z: number, half: number, h: number, rng: Rng): void {
+  private lists(): THREE.Matrix4[][] {
+    return [this.concrete, this.noses, this.snow, this.snowNoses, this.trunks, this.limbs, this.crowns, this.markers, this.stripes];
+  }
+
+  /**
+   * One island from s0 to s1 along a road (x = s on east-west roads, z = s on north-south ones) whose fixed
+   * coordinate is `z`: curb, rounded noses, snow, trees, markers. Built in the east-west frame; a north-south
+   * island is then turned a quarter round onto its road.
+   */
+  island(city: CityModel, s0: number, s1: number, z: number, half: number, h: number, rng: Rng, axis: 'x' | 'z' = 'x'): void {
+    if (axis === 'z') {
+      // Local (u, y, -fixed) -> world (fixed, y, u): a quarter turn about Y (local +x to world +z)
+      const marks = this.lists().map((l) => l.length);
+      this.islandX(s0, s1, -z, half, h, rng, city.terrain.heightAt(z, (s0 + s1) / 2));
+      const R = new THREE.Matrix4().makeRotationY(-Math.PI / 2);
+      this.lists().forEach((l, k) => {
+        for (let i = marks[k]; i < l.length; i++) l[i].premultiply(R);
+      });
+      return;
+    }
+    this.islandX(s0, s1, z, half, h, rng, city.terrain.heightAt((s0 + s1) / 2, z));
+  }
+
+  private islandX(s0: number, s1: number, z: number, half: number, h: number, rng: Rng, y: number): void {
     const mid = (s0 + s1) / 2;
     const len = s1 - s0;
-    const y = city.terrain.heightAt(mid, z);
     // The straight body stops a half width short of each end, where the rounded nose takes over
     this.concrete.push(new THREE.Matrix4().makeScale(len - 2 * half, h, 2 * half).setPosition(mid, y + h / 2, z));
     this.snow.push(new THREE.Matrix4().makeScale(len - 2 * half - 0.2, 0.08, 2 * half - 0.22).setPosition(mid, y + h + 0.03, z));

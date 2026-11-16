@@ -148,7 +148,7 @@ const medianColliders = buildMedians(
   city,
   r.scene,
   potholes.pits,
-  closures.closed,
+  closures.busyEdges,
 );
 // Work zones: barricades, boards, fences and the machines behind them (colliders are the roll's)
 buildClosures(city, closures, r.scene);

@@ -30,6 +30,12 @@ export interface Roadworks {
   conesAhead(lane: Lane, p: Vec2): number;
   /** Inside (or within `margin` of) a fenced work zone. */
   inWorkZone(p: Vec2, margin?: number): boolean;
+  /**
+   * The lane ends ahead (a merge before an obstacle): how far to the taper and the lane to move into; null once
+   * at the taper or in any other lane.
+   */
+  mergeAhead(lane: Lane, p: Vec2): { dist: number; into: number } | null;
+  mergeLane(id: number): boolean;
   /** A curb parking bay with cones standing in it. */
   reservedBay(p: Vec2): boolean;
 }

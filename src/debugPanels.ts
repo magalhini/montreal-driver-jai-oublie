@@ -8,7 +8,7 @@ import { HEAT_TUNING, type Heat } from './ai/Heat';
 import type { Pedestrians } from './ai/Pedestrians';
 import { SIGHT_TUNING, type PoliceSystem } from './ai/PoliceAI';
 import { PURSUIT_TUNING } from './ai/PursuitDriver';
-import { DRIVER_TUNING } from './ai/LaneDriver';
+import { DRIVER_TUNING, MERGE_STATS } from './ai/LaneDriver';
 import type { RiderDodge } from './ai/RiderDodge';
 import { RIDER_TUNING, type Riders } from './ai/Riders';
 import { TRUCK_TUNING, type TrafficSystem } from './ai/TrafficAI';
@@ -450,11 +450,22 @@ function addClosurePanel(sys: DebugSystems): void {
     },
     'go',
   ).name('line up on a cone line');
+  f.add(
+    {
+      go: () => {
+        const m = nearest(closures.merges.map((x) => ({ x, pos: x.taper })));
+        if (m) lineUp([m.x.into], m.x.taper, `Lane ends (${m.x.kind}), taper`);
+      },
+    },
+    'go',
+  ).name('line up on a lane merge');
+  f.add(DRIVER_TUNING, 'mergeLook', 20, 150, 5).name('AI merge look m');
+  f.add(DRIVER_TUNING, 'mergeSignal', 0, 3, 0.1).name('AI signal before merge s');
   f.add({ go: () => police.respond(player.pos) }, 'go').name('call it in (send a patrol)');
   f.add({ go: () => gps.setWaypoint(closures.hard.length ? closures.hard[0].center : null) }, 'go').name('GPS to a work zone');
   const partial = closures.hard.filter((h) => h.side !== 'both').length;
   Debug.watch('closures', () => {
     const route = gps.route && closures.routeHitsFence(gps.route) ? '  GPS route hits a fence' : '';
-    return `salt ${closures.salt}: ${closures.hard.length} fences (${partial} one-way), ${closures.lines.length} cone lines, ${cones.cones.length} cones (${cones.scattered} moved)  breaches ${chantier.breaches}  answering ${police.responding}  test route ${closures.gpsHitsFence ? 'hits' : 'MISSES'} a fence (${closures.dropped} dropped)${route}`;
+    return `salt ${closures.salt}: ${closures.hard.length} fences (${partial} one-way), ${closures.lines.length} cone tapers, ${closures.merges.length} merges (${MERGE_STATS.merges} done), ${cones.cones.length} cones (${cones.scattered} moved)  breaches ${chantier.breaches}  answering ${police.responding}  test route ${closures.gpsHitsFence ? 'hits' : 'MISSES'} a fence (${closures.dropped} dropped)${route}`;
   });
 }

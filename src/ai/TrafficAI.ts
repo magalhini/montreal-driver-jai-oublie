@@ -102,6 +102,8 @@ export class TrafficSystem implements SimSystem {
     if (!hit) return;
     // Nothing spawns on a fenced street or in a coned lane (it would only drive into the fence / the cones)
     if (w.roadworks && (w.roadworks.closedEdge(hit.lane.edgeId) || w.roadworks.conedLane(hit.lane.id))) return;
+    // ...nor in a lane that ends, too late to merge out of it
+    if (w.roadworks?.mergeLane(hit.lane.id) && (w.roadworks.mergeAhead(hit.lane, hit.pos)?.dist ?? 0) < 40) return;
     const d = dist(hit.pos, pp);
     if (!ignoreView && this.inView(hit.pos, d)) return;
     if (!this.clearAt(hit.pos, 14)) return;

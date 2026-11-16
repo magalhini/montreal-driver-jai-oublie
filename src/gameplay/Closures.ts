@@ -86,6 +86,40 @@ export interface ConeLine {
   board: { pos: Vec2; facing: Vec2; left: boolean } | null;
 }
 
+/**
+ * A lane merge (the orange "lane ends" diamond): on a road with more than one lane each way, one lane is coned
+ * off in a taper ahead of a hard obstacle in it (an excavator, or a rue-barrée barricade block), and opens again
+ * a little past it. Traffic in that lane signals and waits for a gap to merge over (`LaneDriver`); the player
+ * just has to get round it.
+ */
+export interface LaneMerge {
+  id: number;
+  edge: number;
+  /** The lane that ends, and the lane it merges into (same road, same way). */
+  lane: number;
+  into: number;
+  /** Which way the traffic moves over, seen from the driver. */
+  side: 'left' | 'right';
+  /** Where the taper starts (on the closed lane's line) and the front of the obstacle. */
+  taper: Vec2;
+  front: Vec2;
+  /** Obstacle box in edge terms: s along the centerline from `pts[0]`, lateral (+ = left of a -> b). */
+  s0: number;
+  s1: number;
+  lat0: number;
+  lat1: number;
+  /** Lateral of the box's side that faces the open lane. */
+  open: number;
+  /** Direction of travel in the closed lane. */
+  dir: Vec2;
+  kind: 'machine' | 'barricade';
+  /** Diamonds at the curb ahead of the taper, facing the traffic. */
+  signs: { pos: Vec2; facing: Vec2 }[];
+  /** Taper, the run along the lane line beside the obstacle, and the short taper where the lane opens again. */
+  cones: Vec2[];
+  colliders: AABB[];
+}
+
 /** Where a session's GPS test runs from and to. */
 export interface ClosureAnchors {
   spawn: Vec2;
@@ -125,6 +159,11 @@ export const CLOSURE_TUNING = {
   bayCones: 0.035,
   parkCones: 0.7,
   fenceCones: [1, 3] as [number, number],
+  /** Lane merges: chance per boulevard (per edge) and most in a session; taper and obstacle lengths (m). */
+  merge: 0.16,
+  maxMerges: 16,
+  mergeTaper: 16,
+  obstacle: [9, 14] as [number, number],
 };
 
 const SALT = 0xc0e5;
@@ -226,7 +265,30 @@ export class Closures {
     this.ensureGpsHitsFence(rng, keep, anchors);
     this.finishHard(rng);
     this.rollLines(rng);
+    // Merges roll from their own stream, so adding them moved nothing else
+    this.rollMerges(new Rng((seed ^ SALT ^ 0x3e46 ^ Math.imul(salt + 1, 0x85ebca6b)) >>> 0));
     this.rollLoose(rng, pits);
+  }
+
+  /** Lane merges (`LaneMerge`), by edge and by the closed lane. */
+  readonly merges: LaneMerge[] = [];
+  private readonly mergeByLane = new Map<number, LaneMerge>();
+
+  /** The lane ends ahead (a merge): distance to the taper and the lane to move into. Null once at the taper. */
+  mergeAhead(lane: Lane, p: Vec2): { dist: number; into: number } | null {
+    const m = this.mergeByLane.get(lane.id);
+    if (!m) return null;
+    const d = (m.taper.x - p.x) * m.dir.x + (m.taper.z - p.z) * m.dir.z;
+    return d > 0 ? { dist: d, into: m.into } : null;
+  }
+
+  mergeLane(id: number): boolean {
+    return this.mergeByLane.has(id);
+  }
+
+  /** Edges with any work on them (fence, cone taper, merge): the boulevard islands keep off them. */
+  get busyEdges(): Set<number> {
+    return new Set([...this.closed, ...this.lines.map((l) => l.edge), ...this.merges.map((m) => m.edge)]);
   }
 
   closedEdge(id: number): boolean {
@@ -251,11 +313,17 @@ export class Closures {
   }
 
   get colliders(): AABB[] {
-    return this.hard.flatMap((h) => h.colliders);
+    return [...this.hard.flatMap((h) => h.colliders), ...this.merges.flatMap((m) => m.colliders)];
   }
 
   /** Meters along `lane` from `p` to the next fence that crosses it (Infinity: none ahead). */
   barrierAhead(lane: Lane, p: Vec2): number {
+    // Past the start of a merge taper still in the closed lane: the obstacle is the wall
+    const m = this.mergeByLane.get(lane.id);
+    if (m && !this.mergeAhead(lane, p)) {
+      const d = (m.front.x - p.x) * m.dir.x + (m.front.z - p.z) * m.dir.z;
+      if (d > 0) return d;
+    }
     const h = this.byEdge.get(lane.edgeId);
     if (!h || !h.lanes.includes(lane.id)) return Infinity;
     return this.aheadOf(lane, p, h.fences.map((f) => mid(f.a, f.b)));
@@ -277,7 +345,100 @@ export class Closures {
       const lat = (p.x - f.at(0, 0).x) * f.t.z - (p.z - f.at(0, 0).z) * f.t.x;
       if (lat >= h.lat0 - margin && lat <= h.lat1 + margin) return true;
     }
+    for (const m of this.merges) {
+      const f = frame(this.city.edges[m.edge]);
+      const o = f.at(0, 0);
+      const s = (p.x - o.x) * f.t.x + (p.z - o.z) * f.t.z;
+      if (s < m.s0 - margin || s > m.s1 + margin) continue;
+      const lat = (p.x - o.x) * f.t.z - (p.z - o.z) * f.t.x;
+      if (lat >= m.lat0 - margin && lat <= m.lat1 + margin) return true;
+    }
     return false;
+  }
+
+  // ---- lane merges ---------------------------------------------------------------------------------------
+
+  private rollMerges(rng: Rng): void {
+    const T = CLOSURE_TUNING;
+    for (const e of this.city.edges) {
+      // Rolled for every boulevard, so one outcome does not reshuffle the rest
+      if (e.lanesPerDir < 2) continue;
+      const take = rng.chance(T.merge);
+      const ab = rng.chance(0.5);
+      const curb = rng.chance(0.7);
+      const where = rng.next();
+      const obsLen = rng.range(T.obstacle[0], T.obstacle[1]);
+      const kind: LaneMerge['kind'] = rng.chance(0.55) ? 'machine' : 'barricade';
+      if (!take || this.merges.length >= T.maxMerges || this.closed.has(e.id) || this.linesByEdge.has(e.id)) continue;
+      const f = frame(e);
+      const ids = ab ? e.lanesAB : e.lanesBA;
+      if (ids.length < 2) continue;
+      // Room: 55 m to see the signs and merge, the taper, the obstacle, 8 m to open again, 15 m to the junction
+      const need = 55 + T.mergeTaper + 3 + obsLen + 8 + 15;
+      if (f.L < need) continue;
+      const lanes = ids.map((id) => this.city.lanes[id]).sort((x, y) => x.index - y.index);
+      const closed = curb ? lanes[lanes.length - 1] : lanes[0];
+      const into = curb ? lanes[lanes.length - 2] : lanes[1];
+      const sgn = ab ? AB_SIDE : -AB_SIDE;
+      // Travel distance u from where the lane enters the edge, to the edge's s
+      const S = (u: number) => (ab ? u : f.L - u);
+      const dir = ab ? f.t : { x: -f.t.x, z: -f.t.z };
+      const outer = sgn * (curb ? e.median + e.laneWidth * lanes.length : e.median);
+      const boundary = sgn * (e.median + e.laneWidth * (curb ? lanes.length - 1 : 1));
+      const toward = Math.sign(boundary - outer);
+      const centre = sgn * laneOffset(e, closed.index);
+      const u0 = 55 + where * (f.L - need);
+      const u1 = u0 + T.mergeTaper;
+      const o0 = u1 + 3;
+      const o1 = o0 + obsLen;
+      // The obstacle box: from just off the lane line out to the curb (the parking band too), or in to the centre
+      // (the cones beside it stand between the box and the open lane)
+      const edgeLat = boundary - toward * 0.9;
+      const farLat = curb ? sgn * (e.width / 2 - 0.1) : sgn * 0.05;
+      const lat0 = Math.min(edgeLat, farLat);
+      const lat1 = Math.max(edgeLat, farLat);
+      const s0 = Math.min(S(o0), S(o1));
+      const s1 = Math.max(S(o0), S(o1));
+      // Cones: the taper from the outer edge in to the lane line, the run beside the obstacle, the opening taper
+      const cones: Vec2[] = [];
+      const coneLat = boundary - toward * 0.45;
+      const n = 6;
+      for (let i = 0; i <= n; i++) {
+        const k = i / n;
+        cones.push(f.at(S(u0 + k * T.mergeTaper), outer + (coneLat - outer) * k + toward * 0.3 * (1 - k)));
+      }
+      for (let u = u1 + 3; u < o1 + 0.5; u += 3.2) cones.push(f.at(S(u), coneLat));
+      for (let i = 1; i <= 3; i++) cones.push(f.at(S(o1 + 2 + i * 2.2), coneLat + (outer + toward * 0.3 - coneLat) * (i / 3)));
+      // Which way traffic moves over, as the driver sees it: left of the travel direction is +lat when a -> b
+      const leftLat = ab ? 1 : -1;
+      const side = (boundary - outer) * leftLat > 0 ? 'left' : 'right';
+      const curbLat = sgn * (e.width / 2 + 0.5);
+      const facing = { x: -dir.x, z: -dir.z };
+      const m: LaneMerge = {
+        id: this.merges.length,
+        edge: e.id,
+        lane: closed.id,
+        into: into.id,
+        side,
+        taper: f.at(S(u0), centre),
+        front: f.at(S(o0), centre),
+        s0,
+        s1,
+        lat0,
+        lat1,
+        open: edgeLat,
+        dir,
+        kind,
+        signs: [
+          { pos: f.at(S(u0 - 45), curbLat), facing },
+          { pos: f.at(S(u0 - 12), curbLat), facing },
+        ],
+        cones,
+        colliders: [strip(e, s0, s1, lat0, lat1)],
+      };
+      this.merges.push(m);
+      this.mergeByLane.set(closed.id, m);
+    }
   }
 
   private aheadOf(lane: Lane, p: Vec2, pts: Vec2[]): number {

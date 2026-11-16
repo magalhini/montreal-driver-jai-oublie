@@ -86,6 +86,7 @@ export function fingerprint(id: string): string[] {
   for (const h of works.hard) g('closures').add([h.edge, h.side, h.s0, h.s1, h.lat0, h.lat1, h.dressing, h.fences.map((f) => f.signs)]);
   for (const l of works.lines) g('closures').add([l.edge, l.a, l.b, l.cones.length]);
   g('closures').add(works.loose);
+  for (const m of works.merges) g('closures').add([m.edge, m.lane, m.into, m.s0, m.s1, m.lat0, m.lat1, m.kind, m.cones.length]);
 
   return [`map ${map} seed ${def.seed}`, ...Object.entries(groups).map(([k, h]) => `${k.padEnd(10)} ${String(h.count).padStart(8)} ${h.hex}`)];
 }

@@ -10,7 +10,7 @@ import { Rng } from '../src/core/Rng';
 import { World } from '../src/core/World';
 import { DogWalkers } from '../src/ai/DogWalkers';
 import { Heat } from '../src/ai/Heat';
-import { LaneDriver } from '../src/ai/LaneDriver';
+import { LaneDriver, MERGE_STATS } from '../src/ai/LaneDriver';
 import { ParkedCars } from '../src/ai/ParkedCars';
 import { Pathfinder } from '../src/ai/Pathfinding';
 import { Pedestrians } from '../src/ai/Pedestrians';
@@ -54,9 +54,10 @@ export interface SoakResult {
   /** AI cars that sat still for `STALL_S` or longer (a locked junction, a queue that never moves), not counting queues behind the stuck bot. */
   stalls: number;
   msPerStep: number;
-  /** With `--closures`: AI cars that hit a work-zone fence (must stay 0), and cones knocked about. */
+  /** With `--closures`: AI cars that hit a work-zone fence (must stay 0), cones knocked about, lane merges done. */
   fenceHits?: number;
   conesMoved?: number;
+  merges?: number;
   /** One line per AI-vs-AI collision. */
   collisionLog: string[];
 }
@@ -181,6 +182,7 @@ export function soak(id: string, seed: number, seconds: number, withClosures = f
   let carSum = 0;
   const steps = Math.round(seconds / CONFIG.STEP);
   const t0 = performance.now();
+  const merges0 = MERGE_STATS.merges;
   for (let k = 0; k < steps; k++) {
     for (const s of sims) s.update(CONFIG.STEP);
     for (const d of drivers()) {
@@ -231,6 +233,7 @@ export function soak(id: string, seed: number, seconds: number, withClosures = f
   }
   res.msPerStep = (performance.now() - t0) / steps;
   if (cones) res.conesMoved = cones.scattered;
+  if (closures) res.merges = MERGE_STATS.merges - merges0;
   res.offRoad = samples ? off / samples : 0;
   res.cars = carSum / Math.max(1, Math.round(steps / 60));
   return res;

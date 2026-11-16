@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { Rng } from '../core/Rng';
-import type { ClosureSign, Closures, Fence, HardClosure } from '../gameplay/Closures';
+import type { ClosureSign, Closures, Fence, HardClosure, LaneMerge } from '../gameplay/Closures';
 import type { Vec2 } from '../types';
 import { coneGeometry } from './ConeView';
 import type { CityModel } from './RoadGraph';
@@ -112,6 +112,56 @@ export function detourTabTexture(name: string): THREE.CanvasTexture {
   return canvasTex(512, 176, (g) => {
     board(g, 512, 176);
     text(g, short, 256, 92, 92, 420);
+  });
+}
+
+/**
+ * The orange "lane ends" diamond (MUTCD W4-2 style, as Quebec uses it): a solid line on the side that stays,
+ * the closing edge bending in from the other side with a dashed lane line ending where it meets. `side`: the
+ * way traffic moves over ('left' = the right lane ends). 512 px square, transparent outside the diamond.
+ */
+export function laneEndsTexture(side: 'left' | 'right'): THREE.CanvasTexture {
+  return canvasTex(512, 512, (g) => {
+    if (side === 'right') {
+      g.translate(512, 0);
+      g.scale(-1, 1);
+    }
+    const dia = (r: number) => {
+      g.beginPath();
+      g.moveTo(256, 256 - r);
+      g.lineTo(256 + r, 256);
+      g.lineTo(256, 256 + r);
+      g.lineTo(256 - r, 256);
+      g.closePath();
+    };
+    g.fillStyle = INK;
+    dia(250);
+    g.fill();
+    g.fillStyle = ORANGE;
+    dia(236);
+    g.fill();
+    g.strokeStyle = INK;
+    g.lineWidth = 9;
+    g.lineJoin = 'round';
+    dia(214);
+    g.stroke();
+    g.fillStyle = INK;
+    // The line that stays (left)
+    g.fillRect(182, 140, 30, 236);
+    // The closing edge (right): straight at the bottom, bending in to the left, straight on up
+    g.beginPath();
+    g.moveTo(306, 376);
+    g.lineTo(336, 376);
+    g.lineTo(336, 262);
+    g.lineTo(292, 210);
+    g.lineTo(292, 140);
+    g.lineTo(262, 140);
+    g.lineTo(262, 222);
+    g.lineTo(306, 274);
+    g.closePath();
+    g.fill();
+    // The dashed lane line between them, ending at the bend
+    for (const y of [258, 300, 342]) g.fillRect(250, y, 16, 26);
   });
 }
 
@@ -378,6 +428,75 @@ export function buildClosures(city: CityModel, closures: Closures, scene: THREE.
     const stickL = 3.4;
     b.add('yellow', unitBox, M.yellow, local(tip, 0, 0, stickL / 2, 0.3, 0.42, stickL));
     b.add('dark', unitBox, M.dark, local(tip, 0, -0.1, stickL + 0.25, 0.95, 0.65, 0.7));
+  }
+
+  // Lane merges: the diamonds ahead, then the obstacle in the closed lane
+  const diamonds = new Map<string, THREE.Material>();
+  const diamondMat = (side: 'left' | 'right') => {
+    let m = diamonds.get(side);
+    if (!m) diamonds.set(side, (m = new THREE.MeshStandardMaterial({ map: laneEndsTexture(side), roughness: 0.5, alphaTest: 0.5 })));
+    return m;
+  };
+  const diamondBack = new THREE.MeshStandardMaterial({ color: 0x8a8d90, roughness: 0.6, metalness: 0.3, alphaTest: 0.5, map: laneEndsTexture('left') });
+  diamondBack.color.setScalar(0.25);
+  for (const m of closures.merges) {
+    for (const sg of m.signs) {
+      const base = frameMatrix(sg.pos, Y(sg.pos), { x: sg.facing.z, z: -sg.facing.x }, sg.facing);
+      // A 0.9 m square turned on its corner, on a post with a rubber foot
+      const D = 1.25;
+      b.add(`diamond:${m.side}`, plane, diamondMat(m.side), local(base, 0, 2.0, 0.05, D, D, 1));
+      b.add('diamondBack', plane, diamondBack, local(base, 0, 2.0, 0.035, D, D, 1, 0, Math.PI));
+      b.add('post', unitBox, M.post, local(base, 0, 1.0, 0, 0.07, 2.0, 0.07));
+      b.add('foot', footBox, M.rubber, local(base, 0, 0, 0, 0.5, 0.12, 0.8));
+    }
+    buildMergeBlock(m);
+  }
+
+  /** The hard obstacle a merge leads up to: a machine behind barriers, or a barricaded block of torn-up road. */
+  function buildMergeBlock(m: LaneMerge): void {
+    const e = city.edges[m.edge];
+    const p0 = e.pts[0];
+    const p1 = e.pts[e.pts.length - 1];
+    const L = Math.hypot(p1.x - p0.x, p1.z - p0.z) || 1;
+    const t = { x: (p1.x - p0.x) / L, z: (p1.z - p0.z) / L };
+    const left = { x: t.z, z: -t.x };
+    const at = (s: number, lat: number): Vec2 => ({ x: p0.x + t.x * s + left.x * lat, z: p0.z + t.z * s + left.z * lat });
+    const len = m.s1 - m.s0;
+    const width = m.lat1 - m.lat0;
+    const c = at((m.s0 + m.s1) / 2, (m.lat0 + m.lat1) / 2);
+    const g = frameMatrix(c, Y(c), left, t);
+    const ab = m.dir.x * t.x + m.dir.z * t.z > 0;
+    // Which side of the box faces the open lane (the merge moves toward it)
+    const openX = m.open - (m.lat0 + m.lat1) / 2;
+    const inward = -Math.sign(openX);
+    b.add('cut', footBox, M.cut, local(g, 0, 0.005, 0, width - 0.3, 0.02, len - 0.6), false);
+    // Barriers along the open side (and across both ends on the machine block)
+    const k = Math.max(1, Math.round(len / 3));
+    for (let i = 0; i < k; i++) b.add('jersey', footBox, M.concrete, local(g, openX + inward * 0.3, 0, -len / 2 + (len * (i + 0.5)) / k, 0.6, 0.82, len / k - 0.08));
+    const frontZ = (ab ? -1 : 1) * (len / 2);
+    if (m.kind === 'machine') {
+      const yaw = ab ? 0 : Math.PI;
+      excavator(local(g, inward * Math.max(0, width / 2 - 1.6), 0, 0, 1, 1, 1, 0, yaw + rng.range(-0.15, 0.15)));
+      const w2 = width - 0.6;
+      for (const z of [frontZ, -frontZ]) b.add('jersey', footBox, M.concrete, local(g, 0, 0, z - Math.sign(z) * 0.3, w2, 0.82, 0.6));
+      for (let i = rng.int(1, 2); i > 0; i--) b.add('drum', drum, M.cone, local(g, rng.range(-width / 2 + 0.5, width / 2 - 0.5), 0, frontZ - Math.sign(frontZ) * 0.9, 1, 1, 1));
+    } else {
+      // Rails across the front and the back, facing out, a board on the front; gravel inside
+      const sFront = ab ? m.s0 : m.s1;
+      const sBack = ab ? m.s1 : m.s0;
+      const dir = m.dir;
+      for (const [sv, facing, signs] of [
+        [sFront, { x: -dir.x, z: -dir.z }, [rng.chance(0.5) ? 'rueBarree' : 'voieBarree'] as ClosureSign[]],
+        [sBack, dir, [] as ClosureSign[]],
+      ] as const) {
+        // Viewer facing the rails looks against `facing`: their left is +lat when looking along +t
+        const looksAlongT = -(facing.x * t.x + facing.z * t.z) > 0;
+        const latA = looksAlongT ? m.lat1 : m.lat0;
+        const latB = looksAlongT ? m.lat0 : m.lat1;
+        buildFence({ a: at(sv, latA), b: at(sv, latB), facing, road: [m.lat0, m.lat1], walks: [], signs: [...signs], detourName: null }, latA, latB);
+      }
+      b.add('gravel', gravelGeo, M.gravel, local(g, 0, 0, 0, Math.min(2.2, width / 2.2), 1.1, Math.min(3, len / 3), 0, rng.range(0, 3)));
+    }
   }
 
   b.build(scene);

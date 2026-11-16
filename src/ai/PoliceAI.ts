@@ -368,6 +368,8 @@ export class PoliceSystem implements SimSystem {
     if (!hit) return null;
     // Nothing spawns on a fenced street or in a coned lane (it would only drive into the fence / the cones)
     if (w.roadworks && (w.roadworks.closedEdge(hit.lane.edgeId) || w.roadworks.conedLane(hit.lane.id))) return null;
+    // ...nor in a lane that ends, too late to merge out of it
+    if (w.roadworks?.mergeLane(hit.lane.id) && (w.roadworks.mergeAhead(hit.lane, hit.pos)?.dist ?? 0) < 40) return null;
     const d = dist(hit.pos, pp);
     if (!ignoreView) {
       const ahead = dot({ x: hit.pos.x - pp.x, z: hit.pos.z - pp.z }, fwd(w.player.yaw));

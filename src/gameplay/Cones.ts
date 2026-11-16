@@ -62,6 +62,8 @@ export class Cones implements SimSystem {
     for (const l of closures.lines) for (const p of l.cones) this.add(p, l.id);
     // Loose cones that would stand in a lamp post, a tree or a bench are left out
     for (const p of closures.loose) if (!this.solid(p.x, p.z)) this.add(p, -1);
+    // The lane merges' tapers: part of the work, but no line (going through them is not an offense)
+    for (const m of closures.merges) for (const p of m.cones) this.add(p, -1);
   }
 
   private add(p: Vec2, line: number): void {
