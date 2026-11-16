@@ -1,0 +1,14 @@
+map montreal seed 20261202
+nodes           304 1bd91c34
+edges           573 23a7bc78
+edgeLines     38868 881a1717
+lanes         96104 7e828439
+blocks          270 c1440a3a
+buildings      9468 b1a89724
+walls            78 ef9bac86
+features          1 5f014baa
+misc              1 d8833dd6
+surfaces     379776 f884379e
+heights       94944 e15318c4
+surfaceY      94944 c4890a7f
+water         94944 ca3d7b95

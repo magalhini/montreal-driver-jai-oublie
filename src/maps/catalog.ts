@@ -1,0 +1,36 @@
+export type DriveSide = 'left' | 'right';
+
+/**
+ * What a city is, without its generator: `config.ts` reads this at load to set the seed and the drive side,
+ * so it must not import anything that reads `CONFIG` (generators live in `maps/index.ts`).
+ */
+export interface MapInfo {
+  id: MapId;
+  /** Menu name. */
+  title: string;
+  /** Title screen tagline. */
+  sub: string;
+  /** Feeds the dressings (buildings, props, parked cars); the street layout is fixed in `maps/montreal/layout.ts`. */
+  seed: number;
+  driveSide: DriveSide;
+}
+
+/** Montreal Driver ships one city. */
+export type MapId = 'montreal';
+
+export const MAPS: Record<MapId, MapInfo> = {
+  montreal: {
+    id: 'montreal',
+    title: 'MONTREAL',
+    sub: '2 décembre. Les pneus d’hiver, c’est hier.',
+    seed: 20261202,
+    driveSide: 'right',
+  },
+};
+
+export const DEFAULT_MAP: MapId = 'montreal';
+
+export function resolveMap(id: string | null | undefined): MapId | null {
+  if (!id) return null;
+  return id in MAPS ? (id as MapId) : null;
+}

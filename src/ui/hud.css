@@ -1,0 +1,518 @@
+:root {
+  --neon-pink: #ff3ea5;
+  --neon-cyan: #3ef2ff;
+  --neon-amber: #ffb43e;
+  --neon-purple: #b45cff;
+  --hud-bg: rgba(10, 4, 24, 0.55);
+}
+
+html,
+body {
+  margin: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+#ui {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  font-family: 'VT323', monospace;
+  color: #fff;
+  user-select: none;
+  z-index: 10;
+}
+
+.hud-panel {
+  position: absolute;
+  background: var(--hud-bg);
+  border: 1px solid rgba(180, 92, 255, 0.45);
+  box-shadow: 0 0 12px rgba(180, 92, 255, 0.25), inset 0 0 18px rgba(62, 242, 255, 0.06);
+  padding: 8px 12px;
+}
+
+.hud-label {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  opacity: 0.75;
+}
+
+/* Speedometer */
+.hud-speedo {
+  right: 24px;
+  bottom: 24px;
+  min-width: 190px;
+  text-align: right;
+}
+.hud-limiter {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 6px;
+}
+.hud-limiter kbd {
+  font-family: inherit;
+  font-size: 8px;
+  padding: 1px 3px;
+  margin-left: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.hud-limiter small {
+  font-size: 8px;
+  margin-left: 3px;
+}
+.hud-limiter.on {
+  display: inline-block;
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px var(--neon-amber);
+  border: 1px solid var(--neon-amber);
+  box-shadow: 0 0 8px rgba(255, 180, 62, 0.45);
+  padding: 3px 6px;
+}
+/* Headlights (K): a quiet hint while on, a cold badge while driving dark */
+.hud-lights {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-bottom: 6px;
+}
+.hud-lights kbd {
+  font-family: inherit;
+  font-size: 8px;
+  padding: 1px 3px;
+  margin-left: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.hud-lights.off {
+  display: inline-block;
+  color: #8fa8ff;
+  text-shadow: 0 0 6px #5b7bff;
+  border: 1px solid #5b7bff;
+  box-shadow: 0 0 8px rgba(91, 123, 255, 0.45);
+  padding: 3px 6px;
+}
+.hud-lights.off kbd {
+  border-color: rgba(143, 168, 255, 0.5);
+}
+.hud-speed {
+  font-size: 64px;
+  line-height: 0.9;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px var(--neon-cyan), 0 0 22px rgba(62, 242, 255, 0.5);
+}
+.hud-speed small {
+  font-size: 22px;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+.hud-gear {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px var(--neon-pink);
+  margin-top: 6px;
+}
+/* Ignition off (IMPROVEMENTS #21): P plus a small amber ENGINE OFF tag */
+.hud-gear small {
+  font-size: 8px;
+  letter-spacing: 1px;
+  margin-left: 6px;
+  vertical-align: middle;
+  color: #ffb347;
+  text-shadow: 0 0 6px #ff8c1a;
+}
+.hud-gear kbd {
+  font-family: inherit;
+  font-size: 8px;
+  padding: 1px 3px;
+  margin-left: 4px;
+  border: 1px solid rgba(255, 179, 71, 0.5);
+}
+
+/* Segmented bars (rpm, damage, felony) */
+.hud-bar {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+}
+.hud-bar i {
+  flex: 1;
+  height: 8px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.hud-bar i.on {
+  background: var(--seg, var(--neon-cyan));
+  box-shadow: 0 0 6px var(--seg, var(--neon-cyan));
+}
+
+/* Status panel: bottom-left, right of the minimap (ui/map.css) */
+.hud-status {
+  left: calc(40px + var(--minimap-size, -16px));
+  bottom: 24px;
+  width: 220px;
+}
+.hud-status .hud-label + .hud-bar {
+  margin-bottom: 10px;
+}
+
+/* Cash */
+.hud-cash {
+  left: 24px;
+  top: 20px;
+  font-size: 36px;
+  color: var(--neon-amber);
+  text-shadow: 0 0 8px var(--neon-amber);
+}
+.hud-cash.flash-good {
+  color: #7dff9a;
+}
+.hud-cash.flash-bad {
+  color: #ff4a4a;
+}
+
+/* Objective */
+.hud-objective {
+  position: absolute;
+  left: 50%;
+  top: 20px;
+  transform: translateX(-50%);
+  font-size: 26px;
+  text-align: center;
+  white-space: nowrap;
+  color: #fff;
+  line-height: 1;
+  text-shadow: 0 0 6px var(--neon-purple);
+}
+.hud-objective:empty {
+  display: none;
+}
+@media (max-width: 860px) {
+  .hud-objective {
+    font-size: 20px;
+  }
+}
+
+/* Debug pause overlay */
+.hud-paused {
+  position: absolute;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 40px;
+  color: var(--neon-pink);
+  text-shadow: 0 0 12px var(--neon-pink);
+  background: rgba(10, 4, 24, 0.35);
+}
+.hud-paused.show {
+  display: flex;
+}
+
+/* Felony bar while pursued but out of sight */
+.hud-bar.evading i.on {
+  animation: hud-blink 0.5s steps(1) infinite;
+}
+@keyframes hud-blink {
+  50% {
+    opacity: 0.2;
+  }
+}
+
+/* Bust progress ring (siren red/blue). */
+.hud-bust {
+  position: absolute;
+  left: 50%;
+  top: 60%;
+  width: 104px;
+  height: 104px;
+  transform: translate(-50%, -50%);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.hud-bust.show {
+  display: flex;
+}
+.hud-bust svg {
+  position: absolute;
+  inset: 0;
+  transform: rotate(-90deg);
+  overflow: visible;
+}
+.hud-bust circle {
+  fill: rgba(10, 4, 24, 0.45);
+  stroke-width: 7;
+}
+.hud-bust .track {
+  stroke: rgba(255, 255, 255, 0.12);
+}
+.hud-bust .fill {
+  fill: none;
+  stroke: #ff2e4a;
+  filter: drop-shadow(0 0 5px #ff2e4a);
+  animation: hud-siren-stroke 0.5s steps(1) infinite;
+}
+@keyframes hud-siren-stroke {
+  50% {
+    stroke: #3e7bff;
+    filter: drop-shadow(0 0 5px #3e7bff);
+  }
+}
+.hud-bust span {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  text-shadow: 0 0 6px #ff2e4a;
+}
+
+/* Busted screen */
+.hud-busted {
+  position: absolute;
+  left: 50%;
+  top: 28%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  display: none;
+}
+.hud-busted.show {
+  display: block;
+  animation: hud-busted-in 0.35s ease-out;
+}
+.hud-busted .title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 64px;
+  color: #ff2e4a;
+  text-shadow: 0 0 14px #ff2e4a, 0 0 40px rgba(255, 46, 74, 0.6);
+  animation: hud-siren-text 0.6s steps(1) infinite;
+}
+.hud-busted .fine {
+  margin-top: 16px;
+  font-size: 36px;
+  color: var(--neon-amber);
+  text-shadow: 0 0 8px var(--neon-amber);
+}
+@keyframes hud-siren-text {
+  50% {
+    color: #3e7bff;
+    text-shadow: 0 0 14px #3e7bff, 0 0 40px rgba(62, 123, 255, 0.6);
+  }
+}
+@keyframes hud-busted-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.6);
+  }
+}
+
+/* Black fade (respawn), drawn under the rest of the HUD */
+.hud-fade {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+}
+
+/* Message feed */
+.msg-feed {
+  position: absolute;
+  left: 50%;
+  top: 76px;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.msg {
+  font-size: 28px;
+  padding: 2px 14px;
+  background: var(--hud-bg);
+  transition: opacity 0.6s ease, transform 0.3s ease;
+  animation: msg-in 0.25s ease-out;
+}
+.msg.fade {
+  opacity: 0;
+}
+.msg.info {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px var(--neon-cyan);
+}
+.msg.good {
+  color: #7dff9a;
+  text-shadow: 0 0 6px #7dff9a;
+}
+.msg.warn {
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px var(--neon-amber);
+}
+.msg.bad {
+  color: #ff4a6a;
+  text-shadow: 0 0 6px #ff4a6a;
+}
+@keyframes msg-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(1.1);
+  }
+}
+
+/* Stunt popup: neon title, detail line and yen reward */
+.hud-stunt {
+  position: absolute;
+  left: 50%;
+  top: 26%;
+  transform: translateX(-50%);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+}
+.hud-stunt.show {
+  animation: stunt-pop 2.4s ease-out forwards;
+}
+.hud-stunt.show.long {
+  animation: stunt-pop-long 5.2s ease-out forwards;
+}
+.hud-stunt .title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 34px;
+  color: #fff;
+  letter-spacing: 2px;
+  text-shadow: 0 0 6px var(--neon-pink), 0 0 18px var(--neon-pink), 0 0 36px rgba(255, 62, 165, 0.6);
+}
+.hud-stunt.fail .title {
+  color: #ff4a6a;
+  text-shadow: 0 0 6px #ff4a6a, 0 0 18px #ff4a6a, 0 0 36px rgba(255, 74, 106, 0.55);
+}
+.hud-stunt .detail {
+  margin-top: 10px;
+  font-family: 'VT323', monospace;
+  font-size: 24px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 8px var(--neon-cyan);
+}
+.hud-stunt .reward {
+  margin-top: 4px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: var(--neon-amber);
+  text-shadow: 0 0 10px var(--neon-amber);
+}
+@keyframes stunt-pop {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.6); }
+  8% { opacity: 1; transform: translateX(-50%) scale(0.94); }
+  14% { transform: translateX(-50%) scale(1); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-24px); }
+}
+@keyframes stunt-pop-long {
+  0% { opacity: 0; transform: translateX(-50%) scale(1.6); }
+  4% { opacity: 1; transform: translateX(-50%) scale(0.94); }
+  7% { transform: translateX(-50%) scale(1); }
+  82% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-24px); }
+}
+
+/* Pit garage intro: letterbox, caption, skip hint; the rest of the HUD steps aside */
+#ui.cinematic > :not(.cine):not(.hud-fade) {
+  display: none !important;
+}
+.cine {
+  position: absolute;
+  inset: 0;
+  display: none;
+}
+.cine.show {
+  display: block;
+}
+.cine-bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 10vh;
+  background: #000;
+}
+.cine-bar.top {
+  top: 0;
+}
+.cine-bar.bottom {
+  bottom: 0;
+}
+.cine-caption {
+  position: absolute;
+  left: 6vw;
+  bottom: calc(10vh + 28px);
+  opacity: 0;
+  color: #fff4e2;
+  text-shadow: 0 0 14px rgba(255, 180, 110, 0.6), 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.cine-caption.show {
+  animation: cine-caption 5s ease-out forwards;
+}
+.cine-caption .name {
+  font-family: Georgia, 'Hiragino Mincho ProN', serif;
+  font-style: italic;
+  font-size: 44px;
+  letter-spacing: 2px;
+}
+.cine-caption .jp {
+  font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif;
+  font-size: 18px;
+  letter-spacing: 6px;
+  opacity: 0.8;
+  margin-top: 4px;
+}
+@keyframes cine-caption {
+  0%, 12% { opacity: 0; transform: translateY(10px); }
+  30% { opacity: 1; transform: translateY(0); }
+  78% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.cine-skip {
+  position: absolute;
+  right: 3vw;
+  bottom: calc(5vh - 9px);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.cine-skip kbd {
+  font-family: inherit;
+  padding: 2px 5px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+/* Posted speed limit: a Japanese round sign beside the speed; it flashes while you're over the speeding line */
+.hud-speedo {
+  padding-left: 72px;
+}
+.hud-limit {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 6px solid #d8262e;
+  background: #f4f4f2;
+  color: #1a3a9a;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-weight: bold;
+  font-size: 17px;
+  line-height: 32px;
+  text-align: center;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.6);
+}
+.hud-limit.over {
+  animation: limit-flash 0.5s steps(1) infinite;
+}
+@keyframes limit-flash {
+  0% { box-shadow: 0 0 14px 4px rgba(255, 46, 74, 0.9); border-color: #ff2e4a; }
+  50% { box-shadow: 0 0 6px rgba(0, 0, 0, 0.6); border-color: #d8262e; }
+}

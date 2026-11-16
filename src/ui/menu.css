@@ -1,0 +1,333 @@
+/* Title screen and pause menu (ui/Menu.ts); colors from hud.css */
+
+/* The title hides the rest of the HUD */
+#ui.on-title > :not(.menu) {
+  display: none !important;
+}
+
+.menu {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 30;
+  text-align: center;
+}
+.menu.show {
+  display: flex;
+  animation: menu-in 0.3s ease-out;
+}
+.menu.pause {
+  background: rgba(10, 4, 24, 0.62);
+}
+.menu.title {
+  background: radial-gradient(ellipse at 50% 42%, rgba(10, 4, 24, 0.15) 0%, rgba(10, 4, 24, 0.55) 55%, rgba(4, 0, 12, 0.9) 100%);
+}
+/* Scanlines over the attract view, when SCANLINES is on */
+.menu.title.scanlines::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
+}
+.menu > * {
+  position: relative;
+}
+@keyframes menu-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Logo (title only) */
+.menu-logo {
+  display: none;
+  margin-bottom: clamp(16px, 4vh, 40px);
+  font-family: 'Press Start 2P', monospace;
+  line-height: 1.15;
+}
+.menu.title .menu-logo {
+  display: block;
+}
+/* Sized by height too: the title list is long, so on short screens the logo gives way */
+.menu-logo .word {
+  font-size: clamp(30px, min(6vw, 8vh), 72px);
+  letter-spacing: 0.08em;
+  color: #f4f6f8;
+  text-shadow: 0 3px 0 rgba(0, 0, 0, 0.45), 0 0 24px rgba(0, 0, 0, 0.35);
+}
+.menu-logo .word.driver {
+  color: #d8e6f5;
+}
+
+.menu-head {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 34px;
+  color: var(--neon-pink);
+  text-shadow: 0 0 12px var(--neon-pink);
+  margin-bottom: 10px;
+}
+.menu-head:empty {
+  display: none;
+}
+.menu-sub {
+  font-size: 26px;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px var(--neon-cyan);
+  margin-bottom: clamp(14px, 3vh, 28px);
+}
+.menu-sub:empty {
+  display: none;
+}
+
+/* Items */
+.menu-list {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.menu-item {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(13px, 1.6vw, 18px);
+  letter-spacing: 2px;
+  padding: clamp(5px, 1.1vh, 12px) 34px;
+  min-width: 280px;
+  color: rgba(255, 255, 255, 0.55);
+  border: 1px solid transparent;
+  cursor: pointer;
+  position: relative;
+}
+.menu-item.sel {
+  color: #fff;
+  text-shadow: 0 0 8px var(--neon-cyan);
+  background: var(--hud-bg);
+  border-color: rgba(62, 242, 255, 0.7);
+  box-shadow: 0 0 14px rgba(62, 242, 255, 0.35), inset 0 0 18px rgba(62, 242, 255, 0.12);
+}
+.menu-item.sel::before,
+.menu-item.sel::after {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px var(--neon-pink);
+  animation: hud-blink 0.9s steps(1) infinite;
+}
+.menu-item.sel::before {
+  content: '▶';
+  left: 10px;
+}
+.menu-item.sel::after {
+  content: '◀';
+  right: 10px;
+}
+
+/* The AUDIO page is tall, and GRAPHICS sits under the logo on the title: no logo above either */
+.menu.vol-page .menu-logo,
+.menu.gfx-page .menu-logo {
+  display: none;
+}
+.menu.gfx-page .menu-item {
+  min-width: min(92vw, 540px);
+  white-space: nowrap;
+}
+.gfx-page .city-name em {
+  font-style: normal;
+  display: inline-block;
+  min-width: 3.2em;
+}
+.gfx-page .city-name em.off {
+  color: rgba(255, 255, 255, 0.38);
+  text-shadow: none;
+}
+.menu-list.vol-list {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  grid-auto-flow: column;
+  grid-template-rows: repeat(7, auto);
+  gap: 4px 10px;
+}
+.vol-list .menu-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  width: min(44vw, 470px);
+  box-sizing: border-box;
+  padding: 7px 30px;
+  font-size: clamp(9px, 0.95vw, 12px);
+}
+.vol-list .menu-item:last-child {
+  grid-column: 1 / -1;
+  grid-row: 8;
+  justify-self: center;
+  width: auto;
+  min-width: 200px;
+  justify-content: center;
+}
+.vol-label {
+  flex: 1;
+  text-align: left;
+}
+.vol-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.vol-bar b {
+  font-weight: normal;
+  color: var(--neon-pink);
+  cursor: pointer;
+  padding: 0 4px;
+}
+.vol-bar i {
+  font-style: normal;
+  letter-spacing: 0;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px var(--neon-cyan);
+}
+.vol-bar s {
+  text-decoration: none;
+  color: rgba(255, 255, 255, 0.15);
+  text-shadow: none;
+}
+.city-name {
+  margin-left: 0.7em;
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px var(--neon-cyan);
+}
+.city-name b {
+  font-weight: normal;
+  color: var(--neon-pink);
+  text-shadow: none;
+  cursor: pointer;
+  padding: 0 0.45em;
+}
+.vol-pct {
+  width: 4.5em;
+  text-align: right;
+}
+
+.menu-hint {
+  min-height: 28px;
+  margin-top: 16px;
+  font-size: 24px;
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px rgba(255, 180, 62, 0.7);
+}
+
+.menu-foot {
+  position: absolute !important;
+  bottom: 22px;
+  display: flex;
+  gap: 28px;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.5);
+}
+/* Build version, bottom right of the title screen */
+.menu-version {
+  display: none;
+  position: absolute !important;
+  right: 24px;
+  bottom: 22px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: rgba(255, 255, 255, 0.4);
+}
+.menu.title .menu-version {
+  display: block;
+}
+.menu kbd {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 3px 5px;
+  margin-right: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+/* Controls help */
+.menu-body:empty {
+  display: none;
+}
+.menu-controls {
+  display: flex;
+  gap: clamp(24px, 5vw, 72px);
+  margin-bottom: 20px;
+  padding: 18px 28px;
+  background: var(--hud-bg);
+  border: 1px solid rgba(180, 92, 255, 0.45);
+  box-shadow: 0 0 12px rgba(180, 92, 255, 0.25);
+  text-align: left;
+}
+.menu-keys > div {
+  display: flex;
+  align-items: center;
+  font-size: 22px;
+  line-height: 1.45;
+}
+.menu-keys kbd {
+  display: inline-block;
+  min-width: 108px;
+  text-align: center;
+  margin-right: 14px;
+  color: var(--neon-cyan);
+  border-color: rgba(62, 242, 255, 0.45);
+}
+.menu-keys .menu-keys-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  color: var(--neon-pink);
+  text-shadow: 0 0 6px var(--neon-pink);
+  margin-bottom: 8px;
+}
+/* Quick tutorial */
+.menu-tutorial {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 14px 22px;
+  width: min(1100px, 92vw);
+  max-height: 68vh;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  text-align: left;
+}
+.menu-tut-card {
+  padding: 14px 20px;
+  background: var(--hud-bg);
+  border: 1px solid rgba(180, 92, 255, 0.45);
+  box-shadow: 0 0 12px rgba(180, 92, 255, 0.25);
+}
+.menu-tut-card ul {
+  margin: 0;
+  padding-left: 20px;
+}
+.menu-tut-card li {
+  font-size: 19px;
+  line-height: 1.25;
+  margin-bottom: 4px;
+}
+.menu-tut-card kbd {
+  color: var(--neon-cyan);
+  border-color: rgba(62, 242, 255, 0.45);
+}
+/* The logo gives way to the tutorial text */
+.menu.title.tut-page .menu-logo {
+  display: none;
+}
+@media (max-height: 640px) {
+  .menu-tut-card li {
+    font-size: 17px;
+  }
+  .menu-keys > div {
+    font-size: 18px;
+    line-height: 1.25;
+  }
+}

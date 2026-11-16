@@ -1,0 +1,336 @@
+/* NEO OIL pit garage menu (ui/PitShop.ts). The workshop and the car are the 3D scene behind this chrome. */
+
+#ui.in-pitshop > :not(.pit-shop):not(.hud-fade) {
+  display: none !important;
+}
+
+.pit-shop {
+  position: absolute;
+  inset: 0;
+  z-index: 28;
+  display: none;
+  pointer-events: none;
+}
+.pit-shop.show {
+  display: block;
+}
+.pit-shop.ready .ps-tabs,
+.pit-shop.ready .ps-panel {
+  pointer-events: auto;
+}
+
+.ps-top {
+  position: absolute;
+  top: 10vh;
+  left: clamp(14px, 3vw, 40px);
+}
+.ps-kicker {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(10px, 1.1vw, 14px);
+  letter-spacing: 3px;
+  color: #ff5a3a;
+  text-shadow: 0 0 12px #ff3a2a;
+}
+.ps-jp {
+  margin-top: 8px;
+  font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+  font-weight: 700;
+  font-size: clamp(13px, 1.4vw, 16px);
+  letter-spacing: 0.4em;
+  color: var(--neon-amber);
+  text-shadow: 0 0 8px var(--neon-amber);
+}
+.ps-station {
+  margin-top: 4px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.ps-cash {
+  position: absolute;
+  top: clamp(14px, 3vh, 32px);
+  right: clamp(14px, 3vw, 40px);
+  padding: 8px 14px;
+  text-align: right;
+  background: var(--hud-bg);
+  border: 1px solid rgba(180, 92, 255, 0.45);
+}
+.ps-cash span {
+  display: block;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: rgba(255, 255, 255, 0.55);
+}
+.ps-cash b {
+  font-weight: normal;
+  font-size: 28px;
+  color: #9dff6a;
+  text-shadow: 0 0 8px rgba(157, 255, 106, 0.6);
+}
+
+/* Tabs down the left */
+.ps-tabs {
+  position: absolute;
+  left: clamp(14px, 3vw, 40px);
+  top: calc(10vh + 78px);
+  width: min(240px, 23vw);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ps-tab {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 12px;
+  background: var(--hud-bg);
+  border: 1px solid rgba(180, 92, 255, 0.25);
+  cursor: pointer;
+}
+.ps-tab .lbl {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.ps-tab .val {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.ps-tab .val .warn {
+  font-weight: normal;
+  color: #ff4a6a;
+}
+.ps-tab.on {
+  border-color: rgba(62, 242, 255, 0.6);
+}
+.ps-tab.on .lbl {
+  color: #fff;
+}
+.ps-tab.focus {
+  background: rgba(62, 242, 255, 0.14);
+  box-shadow: 0 0 12px rgba(62, 242, 255, 0.35);
+}
+.ps-tab.focus .lbl {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px var(--neon-cyan);
+}
+.pip {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1px solid rgba(255, 180, 62, 0.6);
+}
+.pip.on {
+  background: var(--neon-amber);
+  box-shadow: 0 0 6px var(--neon-amber);
+}
+.swatch {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  border-radius: 50%;
+}
+
+/* Items, notes and stats down the right */
+.ps-panel {
+  position: absolute;
+  right: clamp(14px, 3vw, 40px);
+  top: 15vh;
+  bottom: 58px;
+  width: min(390px, 36vw);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 16px;
+  background: var(--hud-bg);
+  border: 1px solid rgba(180, 92, 255, 0.45);
+  box-shadow: 0 0 12px rgba(180, 92, 255, 0.25), inset 0 0 18px rgba(62, 242, 255, 0.06);
+}
+.ps-head {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.ps-title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: var(--neon-pink);
+  text-shadow: 0 0 8px var(--neon-pink);
+}
+.ps-title-jp {
+  font-family: 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', sans-serif;
+  font-size: 14px;
+  color: var(--neon-amber);
+}
+.ps-car {
+  margin-top: 4px;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.ps-note {
+  min-height: 1.2em;
+  margin: 4px 0 8px;
+  font-size: 19px;
+  line-height: 1.1;
+  color: var(--neon-amber);
+}
+.ps-rows {
+  flex: 1 1 auto;
+  min-height: 80px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 92, 255, 0.5) transparent;
+}
+.ps-row {
+  padding: 6px 10px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.ps-row + .ps-row {
+  margin-top: 2px;
+}
+.ps-row .top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 21px;
+  line-height: 1.15;
+}
+.ps-row .nm {
+  flex: 1 1 auto;
+}
+.ps-row .detail {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.5);
+}
+.ps-row.focus {
+  border-color: rgba(62, 242, 255, 0.6);
+  background: rgba(62, 242, 255, 0.12);
+  box-shadow: 0 0 10px rgba(62, 242, 255, 0.25);
+}
+.ps-row.focus .nm {
+  color: var(--neon-cyan);
+  text-shadow: 0 0 6px var(--neon-cyan);
+}
+.tag {
+  flex: none;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+}
+.tag.price {
+  color: var(--neon-amber);
+  text-shadow: 0 0 6px var(--neon-amber);
+}
+.tag.price.short {
+  color: #ff4a6a;
+  text-shadow: none;
+}
+.tag.free,
+.tag.owned {
+  color: rgba(157, 255, 106, 0.85);
+}
+.tag.fitted {
+  color: var(--neon-cyan);
+}
+.tag.refund {
+  color: #9dff6a;
+  text-shadow: 0 0 6px rgba(157, 255, 106, 0.6);
+}
+.tag.locked {
+  color: rgba(255, 255, 255, 0.3);
+}
+.ps-status {
+  min-height: 1.2em;
+  margin: 6px 0;
+  font-size: 20px;
+}
+.ps-status.good {
+  color: #9dff6a;
+  text-shadow: 0 0 6px rgba(157, 255, 106, 0.6);
+}
+.ps-status.warn {
+  color: #ff4a6a;
+}
+.ps-stats {
+  flex: none;
+  padding-top: 8px;
+  border-top: 1px solid rgba(180, 92, 255, 0.3);
+}
+.ps-stat {
+  display: flex;
+  justify-content: space-between;
+  font-size: 18px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.75);
+}
+.ps-stat span:first-child {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  align-self: center;
+  color: rgba(255, 255, 255, 0.5);
+}
+.ps-stat em {
+  font-style: normal;
+  margin-left: 8px;
+}
+.ps-stat em.up {
+  color: #9dff6a;
+}
+.ps-stat em.down {
+  color: #ff4a6a;
+}
+
+.ps-foot {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 18px;
+  display: flex;
+  justify-content: center;
+  gap: clamp(16px, 3vw, 36px);
+  font-size: clamp(16px, 1.8vw, 20px);
+  color: rgba(255, 255, 255, 0.55);
+}
+.ps-foot kbd {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  padding: 3px 5px;
+  margin-right: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  color: #fff;
+}
+
+/* The garage's caption in the intro: workshop sign colors instead of the café's warm script */
+.pit-cine .cine-caption .name {
+  font-family: 'Press Start 2P', monospace;
+  font-style: normal;
+  font-size: 30px;
+  color: #ffe8e0;
+  text-shadow: 0 0 14px #ff3a2a, 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.pit-cine .cine-caption .jp {
+  color: var(--neon-cyan);
+}
+
+@media (max-width: 900px), (max-height: 680px) {
+  .ps-tabs {
+    top: calc(10vh + 70px);
+  }
+  .ps-tab {
+    padding: 4px 8px;
+  }
+  .ps-panel {
+    top: 12vh;
+  }
+}

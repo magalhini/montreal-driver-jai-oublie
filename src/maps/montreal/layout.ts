@@ -1,0 +1,122 @@
+import type { DistrictType } from '../../types';
+
+/**
+ * The street grid, rotated so it lies on the game's axes.
+ * +X runs southwest to northeast along René-Lévesque (toward the clock tower).
+ * +Z runs inland to the river. Curves (the canal, the port shore, de la Commune) are snapped straight.
+ * Positions are meters in that frame, before the generator centers them on the origin.
+ * Heights are [low, high] meters per block, from measured buildings where OSM had them and from the
+ * district otherwise. The skyline step-down toward the river is the part the screenshots show.
+ */
+
+/** Cross streets, west to east. */
+export const X_RAW = [
+  -1397, // Guy
+  -1139, // Lucien-L'Allier
+  -1020, // de la Montagne
+  -905, // Drummond
+  -728, // Peel
+  -617, // Metcalfe
+  -452, // McGill College
+  -346, // Robert-Bourassa
+  -210, // University
+  -36, // McGill
+  99, // Saint-Pierre
+  289, // Saint-François-Xavier
+  444, // Saint-Urbain
+  594, // Saint-Laurent
+  761, // De Bullion
+  972, // Sanguinet
+  1096, // Saint-Denis
+  1222, // Berri
+  1333, // Saint-Hubert
+];
+
+/** Avenues and streets, mountain to river. */
+export const Z_RAW = [
+  -1275, // Sherbrooke
+  -1097, // De Maisonneuve
+  -919, // Sainte-Catherine
+  -833, // Cathcart
+  -687, // René-Lévesque
+  -478, // de La Gauchetière
+  -339, // Saint-Antoine
+  -201, // Saint-Jacques
+  -45, // Notre-Dame
+  80, // Saint-Paul
+  185, // William
+  318, // Ottawa
+  484, // Wellington
+  564, // south bank of the canal
+  720, // basin road
+  900, // last quay, then the St. Lawrence
+];
+
+export const COLS = X_RAW.length - 1;
+export const ROWS = Z_RAW.length - 1;
+
+/** Column index of a cross-street that is a boulevard (two lanes each way). */
+const AVENUE_X = new Set([4, 7, 13, 17]); // Peel, Robert-Bourassa, Saint-Laurent, Berri
+/** Row index of an east-west boulevard. */
+const AVENUE_Z = new Set([0, 2, 4, 8, 12]); // Sherbrooke, Sainte-Catherine, René-Lévesque, Notre-Dame, Wellington
+
+export const avenueX = (i: number): boolean => AVENUE_X.has(i);
+export const avenueZ = (j: number): boolean => AVENUE_Z.has(j);
+
+/** Block row the Lachine Canal cuts through (between Wellington and the south bank). */
+export const CANAL_ROW = 12;
+
+/** Dispatch yard: Griffintown, between Drummond and Peel, William and Ottawa. */
+export const DEPOT = { i: 3, j: 10 };
+/** Centre Bell: the low hall between Lucien-L'Allier and de la Montagne, south of René-Lévesque. */
+export const ARENA = { i: 1, j: 4 };
+/** Farine Five Roses and the Peel basin sheds, south of the canal. */
+export const SILOS = { i: 4, j: 13 };
+/** Clock tower, approximated at the southeast corner where the port meets the river. */
+export const CLOCK = { i: 17, j: 14 };
+
+/**
+ * Parks big enough to be a whole block. Keys are "column,row".
+ * Dorchester and Place du Canada, Phillips, Victoria, Chaboillez, d'Youville,
+ * Champ-de-Mars, Faubourg Sainte-Anne, Jean-Paul-Riopelle, Frères-Charon.
+ */
+export const PARKS = new Set(['4,3', '4,4', '8,2', '8,6', '4,7', '9,9', '14,6', '2,11', '9,5', '8,11']);
+
+export const isPark = (i: number, j: number): boolean => PARKS.has(`${i},${j}`);
+
+export function districtAt(i: number, j: number): DistrictType {
+  if (i === DEPOT.i && j === DEPOT.j) return 'depot';
+  if (j >= CANAL_ROW) return 'harbor';
+  if (j >= 8 && i >= 9) return 'shotengai'; // Vieux-Montréal
+  if (j >= 8) return 'residential'; // Griffintown, Cité du Multimédia
+  if (i >= 13 && j >= 2 && j <= 7) return 'shotengai'; // Chinatown and the latin quarter
+  if (i <= 1) return 'residential'; // west of the arena: Shaughnessy, the station
+  if (i >= 2 && i <= 10 && j >= 1 && j <= 7) return 'downtown';
+  if (j === 0 && i >= 6 && i <= 10) return 'downtown';
+  return 'residential';
+}
+
+/** [low, high] meters for block column i, row j. */
+const HEIGHTS: readonly (readonly [number, number])[][] = [
+  [[10, 28], [10, 28], [14, 30], [14, 30], [14, 30], [14, 30], [24, 70], [24, 70], [66, 70], [54, 102], [24, 70], [14, 30], [14, 30], [10, 19], [6, 10], [14, 30], [14, 30], [14, 30]],
+  [[10, 28], [10, 28], [32, 110], [32, 110], [32, 110], [32, 110], [57, 158], [35, 146], [31, 35], [10, 32], [62, 66], [14, 30], [42, 67], [10, 32], [16, 42], [14, 30], [14, 30], [14, 30]],
+  [[10, 28], [10, 28], [32, 110], [32, 110], [32, 110], [10, 32], [31, 35], [28, 32], [16, 35], [22, 26], [10, 32], [14, 30], [14, 30], [18, 22], [12, 32], [22, 26], [12, 32], [12, 32]],
+  [[10, 16], [10, 16], [32, 110], [22, 36], [32, 110], [68, 122], [184, 188], [44, 48], [32, 45], [22, 36], [36, 64], [14, 30], [14, 30], [34, 38], [25, 29], [23, 48], [12, 32], [12, 32]],
+  [[6, 10], [28, 34], [32, 110], [102, 199], [32, 110], [66, 70], [34, 38], [42, 134], [54, 80], [16, 32], [10, 32], [13, 32], [10, 26], [10, 16], [13, 32], [12, 32], [22, 26], [12, 32]],
+  [[9, 13], [10, 16], [164, 168], [131, 135], [113, 139], [32, 110], [32, 110], [86, 90], [29, 90], [121, 125], [32, 110], [14, 30], [14, 30], [12, 32], [12, 32], [38, 42], [12, 32], [12, 32]],
+  [[9, 13], [10, 28], [41, 45], [16, 32], [18, 22], [10, 32], [32, 110], [32, 110], [32, 110], [29, 83], [38, 67], [38, 42], [14, 30], [12, 32], [12, 32], [12, 32], [9, 13], [12, 32]],
+  [[10, 16], [22, 26], [54, 70], [32, 110], [32, 110], [178, 182], [32, 110], [32, 110], [16, 32], [16, 32], [31, 35], [26, 40], [28, 32], [12, 32], [12, 32], [12, 32], [12, 32], [12, 32]],
+  [[12, 32], [10, 19], [26, 32], [34, 38], [19, 28], [28, 32], [12, 32], [16, 32], [50, 54], [32, 38], [18, 22], [9, 13], [11, 22], [11, 22], [11, 22], [11, 22], [11, 22], [11, 22]],
+  [[12, 32], [9, 13], [21, 25], [28, 32], [21, 40], [26, 32], [12, 32], [13, 29], [26, 32], [11, 22], [11, 22], [11, 22], [11, 22], [6, 10], [11, 22], [11, 22], [11, 22], [11, 22]],
+  [[12, 32], [12, 32], [25, 29], [6, 29], [21, 32], [28, 32], [12, 32], [12, 32], [26, 32], [22, 26], [9, 13], [11, 22], [11, 22], [6, 10], [11, 22], [11, 22], [11, 22], [11, 22]],
+  [[12, 32], [12, 32], [10, 26], [38, 66], [63, 67], [22, 36], [12, 32], [19, 33], [19, 32], [13, 32], [11, 22], [11, 22], [11, 22], [11, 22], [11, 22], [11, 22], [11, 22], [11, 22]],
+  [[8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12], [8, 12]],
+  [[8, 16], [8, 16], [8, 16], [8, 42], [8, 42], [8, 42], [9, 13], [9, 13], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16]],
+  [[8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16], [8, 16]],
+];
+
+export function heightOf(i: number, j: number): readonly [number, number] {
+  const row = HEIGHTS[j];
+  if (!row || row.length !== COLS || HEIGHTS.length !== ROWS) throw new Error('Montreal height grid does not match the streets');
+  return row[i] ?? [12, 24];
+}

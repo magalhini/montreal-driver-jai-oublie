@@ -1,0 +1,25 @@
+{
+  "name": "montreal-driver",
+  "private": true,
+  "version": "1.0.16",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && npm run bump && vite build",
+    "bump": "npm version patch --no-git-tag-version",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "fingerprint": "node scripts/fingerprint.mjs",
+    "soak": "node scripts/soak.mjs",
+    "deploy": "bash scripts/deploy.sh"
+  },
+  "dependencies": {
+    "lil-gui": "^0.21.0",
+    "three": "^0.187.0"
+  },
+  "devDependencies": {
+    "@types/three": "^0.187.0",
+    "typescript": "~5.9.0",
+    "vite": "^8.0.0"
+  }
+}

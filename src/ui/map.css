@@ -1,0 +1,222 @@
+:root {
+  --minimap-size: 200px;
+}
+@media (max-height: 760px) {
+  :root {
+    --minimap-size: 160px;
+  }
+}
+
+/* Corner radar (bottom-left; the HUD status panel sits to its right) */
+.minimap {
+  position: absolute;
+  left: 24px;
+  bottom: 24px;
+  width: var(--minimap-size);
+  height: var(--minimap-size);
+  border-radius: 50%;
+  border: 2px solid rgba(180, 92, 255, 0.7);
+  box-shadow: 0 0 14px rgba(180, 92, 255, 0.45), 0 0 3px rgba(62, 242, 255, 0.6), inset 0 0 22px rgba(5, 3, 12, 0.9);
+  background: #06040e;
+}
+.minimap.hidden {
+  display: none;
+}
+.minimap canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  border-radius: 50%;
+}
+/* Faint vignette + scanlines over the radar */
+.minimap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, transparent 60%, rgba(5, 3, 12, 0.55) 100%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px);
+  pointer-events: none;
+}
+.minimap-dist {
+  position: absolute;
+  left: 50%;
+  bottom: -10px;
+  transform: translateX(-50%);
+  z-index: 1;
+  display: none;
+  white-space: nowrap;
+  padding: 2px 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: #ff3ea5;
+  text-shadow: 0 0 6px #ff3ea5;
+  background: rgba(10, 4, 24, 0.9);
+  border: 1px solid rgba(255, 62, 165, 0.7);
+}
+.minimap-dist.show {
+  display: block;
+}
+.minimap-dist.dest {
+  color: #ffb43e;
+  text-shadow: 0 0 6px #ffb43e;
+  border-color: rgba(255, 180, 62, 0.7);
+}
+
+/* Full-screen map */
+.fullmap {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: auto;
+  cursor: crosshair;
+  background: #05030b;
+  z-index: 20;
+}
+.fullmap.show {
+  display: block;
+  animation: fullmap-in 0.18s ease-out;
+}
+.fullmap.dragging {
+  cursor: grabbing;
+}
+.fullmap canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.fullmap::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(5, 3, 12, 0.7) 100%),
+    repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.14) 0 1px, transparent 1px 3px);
+}
+.fullmap-head {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 28px;
+  background: linear-gradient(rgba(10, 4, 24, 0.92), rgba(10, 4, 24, 0));
+  pointer-events: none;
+}
+.fullmap-head .title {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 18px;
+  color: #3ef2ff;
+  text-shadow: 0 0 8px #3ef2ff;
+}
+.fullmap-head .title small {
+  font-family: 'VT323', monospace;
+  font-size: 22px;
+  margin-left: 8px;
+  color: #b45cff;
+  text-shadow: 0 0 6px #b45cff;
+}
+.fullmap-head .info {
+  font-size: 24px;
+  color: rgba(255, 255, 255, 0.8);
+}
+.fullmap-head .info b {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 14px;
+  font-weight: normal;
+  margin-left: 8px;
+  color: #ff3ea5;
+  text-shadow: 0 0 6px #ff3ea5;
+}
+.fullmap-help {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  padding: 12px 24px 14px;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+  background: linear-gradient(rgba(10, 4, 24, 0), rgba(10, 4, 24, 0.92));
+  pointer-events: none;
+}
+.fullmap-help kbd {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 8px;
+  padding: 2px 4px;
+  margin-right: 4px;
+  color: #3ef2ff;
+  border: 1px solid rgba(62, 242, 255, 0.5);
+}
+.fullmap-legend {
+  position: absolute;
+  right: 24px;
+  bottom: 56px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 12px;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.75);
+  background: rgba(10, 4, 24, 0.75);
+  border: 1px solid rgba(180, 92, 255, 0.45);
+  pointer-events: none;
+}
+.fullmap-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  vertical-align: middle;
+}
+.fullmap-legend .you {
+  background: #fff;
+  clip-path: polygon(50% 0, 100% 100%, 50% 75%, 0 100%);
+}
+.fullmap-legend .route {
+  height: 3px;
+  background: #3ef2ff;
+  box-shadow: 0 0 6px #3ef2ff;
+}
+.fullmap-legend .waypoint {
+  background: #ff3ea5;
+  transform: rotate(45deg) scale(0.8);
+}
+.fullmap-legend .alley {
+  height: 5px;
+  background: #454a6e;
+  border-top: 1px solid rgba(160, 168, 220, 0.7);
+  border-bottom: 1px solid rgba(160, 168, 220, 0.7);
+}
+.fullmap-legend .station {
+  border: 2px solid #6aa6ff;
+  box-sizing: border-box;
+  background: #12182e;
+  box-shadow: 0 0 6px #6aa6ff;
+}
+.fullmap-legend .police {
+  border-radius: 50%;
+  background: #3e7bff;
+  animation: fullmap-siren 0.32s steps(1) infinite;
+}
+@keyframes fullmap-siren {
+  50% {
+    background: #ff2e4a;
+  }
+}
+@keyframes fullmap-in {
+  from {
+    opacity: 0;
+  }
+}

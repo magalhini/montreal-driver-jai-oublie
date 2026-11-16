@@ -1,0 +1,716 @@
+import * as THREE from "three";
+import { CONFIG, KMH } from "./config";
+import { Debug } from "./core/Debug";
+import { addDebugPanels } from "./debugPanels";
+import { Events } from "./core/Events";
+import { Game } from "./core/Game";
+import { Input } from "./core/Input";
+import { Rng } from "./core/Rng";
+import { World } from "./core/World";
+import { Heat } from "./ai/Heat";
+import { AudioSystem } from "./audio/AudioSystem";
+import { CATEGORIES, type AudioKey } from "./audio/Mixer";
+import { OffenseDetector } from "./ai/OffenseDetector";
+import { Pathfinder } from "./ai/Pathfinding";
+import { PoliceSystem } from "./ai/PoliceAI";
+import { ParkedCars } from "./ai/ParkedCars";
+import { PedestrianView } from "./ai/PedestrianView";
+import { Pedestrians } from "./ai/Pedestrians";
+import { RouteDebugView } from "./ai/RouteDebugView";
+import { DogWalkers } from "./ai/DogWalkers";
+import { DogView } from "./ai/DogView";
+import { RiderDodge } from "./ai/RiderDodge";
+import { Riders } from "./ai/Riders";
+import { RiderView } from "./ai/RiderView";
+import { TrafficSystem } from "./ai/TrafficAI";
+import {
+  TRAFFIC_LEVELS,
+  loadTrafficLevel,
+  saveTrafficLevel,
+  trafficTarget,
+} from "./gameplay/TrafficLevel";
+import { BustSystem } from "./gameplay/Bust";
+import { Economy } from "./gameplay/Economy";
+import { Gps } from "./gameplay/Gps";
+import { Recovery } from "./gameplay/Recovery";
+import { Wreck, wreckDetail } from "./gameplay/Wreck";
+import { WreckView } from "./gameplay/WreckView";
+import { Breakdown } from "./gameplay/Breakdown";
+import { BreakdownView } from "./gameplay/BreakdownView";
+import { PitStopSystem } from "./gameplay/PitStop";
+import { OfficerView } from "./gameplay/OfficerView";
+import { CollisionSystem } from "./physics/Collision";
+import { SpatialHash } from "./physics/SpatialHash";
+import { CameraRig } from "./render/CameraRig";
+import { StaticTiles } from "./render/StaticTiles";
+import {
+  GRAPHICS,
+  GRAPHICS_OPTIONS,
+  POSTFX,
+  PostFX,
+  setGraphic,
+  type GraphicsKey,
+} from "./render/PostFX";
+import { Cockpit } from "./vehicles/Cockpit";
+import { SpeedLimiter } from "./gameplay/SpeedLimiter";
+import { Renderer } from "./render/Renderer";
+import { FullMap } from "./ui/FullMap";
+import { Hud } from "./ui/Hud";
+import { buildMapImage } from "./ui/MapImage";
+import { Menu, type PlayMode } from "./ui/Menu";
+import { currentMap } from "./maps";
+import { Messages } from "./ui/Messages";
+import { Minimap } from "./ui/Minimap";
+import { PitShop } from "./ui/PitShop";
+import { Builds } from "./gameplay/Builds";
+import { Car } from "./vehicles/Car";
+import { equipCar, FLEET, PLAYER_CAR } from "./vehicles/Fleet";
+import { CarView } from "./vehicles/CarView";
+import { repair } from "./vehicles/Damage";
+import { Effects } from "./vehicles/Effects";
+import { PlayerController } from "./vehicles/PlayerController";
+import { Ignition } from "./vehicles/Ignition";
+import { TurnSignals } from "./vehicles/TurnSignals";
+import { VehiclePhysics } from "./vehicles/VehiclePhysics";
+import { buildAlleys } from "./world/AlleyView";
+import { buildBuildings } from "./world/BuildingFactory";
+import { buildCanal } from "./world/CanalView";
+import { buildParks } from "./world/ParkView";
+import { solidParts } from "./world/Interiors";
+import { buildEnvironment } from "./world/Environment";
+import { RainView } from "./world/RainView";
+import { Weather } from "./world/Weather";
+import { buildDepot } from "./world/DepotView";
+import { buildPoliceStation } from "./world/PoliceStationView";
+import { buildPitStops } from "./world/PitStopView";
+import { buildRoads } from "./world/RoadMesh";
+import { buildStreetLamps } from "./world/StreetLamps";
+import { buildStreetProps } from "./world/StreetProps";
+import { buildRoadSigns } from "./world/RoadSigns";
+import { SteamVents } from "./world/SteamVents";
+import { TrafficLights } from "./world/TrafficLights";
+import { TrafficLightView } from "./world/TrafficLightView";
+
+const r = new Renderer(document.getElementById("app")!);
+const events = new Events();
+const input = new Input();
+const rng = new Rng(CONFIG.SEED + 1);
+// T36: the city chosen at load (switching cities reloads the page)
+const map = currentMap();
+const city = map.generate(CONFIG.SEED);
+VehiclePhysics.ground = city.terrain;
+
+// Everything added to the scene from here to the tiling below is static city (IMPROVEMENTS #20)
+const staticStart = r.scene.children.length;
+const envParts = buildEnvironment(r.scene, r.renderer, city);
+const roadMats = buildRoads(city, r.scene, map.markings);
+const buildings = buildBuildings(city.buildings, r.scene);
+// The yard: HQ dressing, lit gates, planter wall, docks
+buildDepot(city, r.scene);
+buildPoliceStation(city, r.scene);
+const propColliders = buildStreetProps(city, r.scene);
+// Street lamps break away (and still hit the car), so their meshes are edited per instance and stay out of the tiling
+const streetLamps = buildStreetLamps(city);
+// Phase 1 pass: posted speed limits painted on the lanes and on round signs at the curb (breakaway posts:
+// edited per instance, so their group joins the scene after the tiling below)
+const signPosts = buildRoadSigns(city, r.scene);
+const canal = buildCanal(city, r.scene);
+buildAlleys(city, r.scene);
+// IMPROVEMENTS #20: garages (pit stops)
+buildPitStops(city, r.scene);
+buildParks(city, r.scene);
+// Cut the whole-city meshes into tiles so they can be frustum / distance culled
+const tiles = new StaticTiles();
+tiles.split(r.scene.children.slice(staticStart));
+r.scene.add(streetLamps.group);
+r.scene.add(signPosts.group);
+const lights = new TrafficLights(city, rng);
+const lightView = new TrafficLightView(
+  city,
+  lights,
+  r.scene,
+  r.camera,
+  map.signals,
+);
+const landmarkColliders = [
+  ...city.features.pitStops.flatMap((p) => p.colliders),
+  ...(city.features.station?.colliders ?? []),
+  ...(city.features.parks ?? []).flatMap((p) => p.colliders),
+  ...(city.features.depot ? [...city.features.depot.planters, ...city.features.depot.colliders] : []),
+];
+const statics = new SpatialHash([
+  ...city.buildings.flatMap(solidParts),
+  ...city.walls,
+  ...propColliders,
+  ...streetLamps.colliders,
+  ...signPosts.colliders,
+  ...lightView.colliders,
+  ...landmarkColliders,
+]);
+const world = new World(city, events, rng, statics, lights);
+signPosts.attach(events, statics);
+streetLamps.attach(events, statics);
+
+// The car starts on the street by the yard, in the lane, pointed the way traffic goes
+const lane = city.nearestLanePoint(city.depotPos);
+const start = {
+  pos: lane.pos,
+  yaw: Math.atan2(lane.lane.dir.x, lane.lane.dir.z),
+};
+// What the pit garage has done to the car (saved between sessions)
+const builds = new Builds();
+const starter = FLEET[PLAYER_CAR];
+const player = new Car(
+  "player",
+  starter.spec,
+  { ...starter.look },
+  start.pos,
+  start.yaw,
+);
+equipCar(player, PLAYER_CAR, builds.of(PLAYER_CAR));
+world.player = player;
+world.addCar(player);
+
+const camRig = new CameraRig(r.camera);
+camRig.groundAt = (x, z) => city.terrain.surfaceY(x, z);
+camRig.rooms = city.features.interiors;
+camRig.alleys = city.features.alleys;
+camRig.walls = new SpatialHash(city.buildings.flatMap(solidParts));
+const carView = new CarView(r.scene, () => world.cars, r.camera);
+carView.groundAt = (x, z) => city.terrain.heightAt(x, z);
+carView.surfaceAt = (x, z) => city.terrain.surfaceY(x, z);
+const effects = new Effects(r.scene);
+effects.heightAt = (x, z) => city.terrain.heightAt(x, z);
+effects.setViewportHeight(window.innerHeight, r.camera.fov);
+r.onResize((_w, h) => effects.setViewportHeight(h, r.camera.fov));
+events.on("collision", (e) => {
+  effects.sparksAt(e.pos, e.impulse / 6000);
+  if (e.a === player.id || e.b === player.id)
+    camRig.addShake(Math.min(1, e.impulse / 15000));
+});
+events.on("propBroken", (e) => {
+  if (e.struck) return; // the collision handler already sparked and shook
+  effects.sparksAt(e.pos, 0.4);
+  if (e.car === player.id) camRig.addShake(0.08);
+});
+
+const uiRoot = document.getElementById("ui")!;
+const hud = new Hud(uiRoot);
+const economy = new Economy();
+new Messages(uiRoot, events);
+
+const post = new PostFX(r.renderer, r.scene, r.camera);
+r.onResize(() => post.setSize());
+const cockpit = new Cockpit(player);
+const game = new Game(() => {
+  cockpit.renderMirror(r.renderer, r.scene);
+  post.render(game.time);
+});
+game.addSim({ update: () => world.cars.forEach((c) => c.savePrev()) });
+const weather = new Weather(CONFIG.SEED + 11);
+game.addSim(weather);
+game.addSim({ update: () => (VehiclePhysics.surfaceGrip = weather.grip) });
+game.addSim(lights);
+const limiter = new SpeedLimiter(world);
+game.addSim(new PlayerController(world, input, limiter));
+const ignition = new Ignition(world);
+game.addSim(ignition);
+const signals = new TurnSignals(world);
+game.addSim(signals);
+const traffic = new TrafficSystem(world);
+// Traffic level = difficulty (title / pause menu), saved between sessions
+let trafficLevel = loadTrafficLevel();
+traffic.target = trafficTarget(trafficLevel);
+traffic.populate();
+game.addSim(traffic);
+const heat = new Heat(world);
+const pathfinder = new Pathfinder(city);
+const police = new PoliceSystem(world, heat, pathfinder);
+police.populate();
+game.addSim(police);
+const parked = new ParkedCars(world);
+game.addSim(parked);
+const peds = new Pedestrians(world);
+world.pedestrians = peds.peds;
+peds.populate();
+game.addSim(peds);
+// Street life (IMPROVEMENTS #12): cyclists / scooters at the curb, dogs on leashes (trucks come with traffic)
+const riders = new Riders(world);
+riders.populate();
+game.addSim(riders);
+const riderDodge = new RiderDodge(world);
+game.addSim(riderDodge);
+const dogs = new DogWalkers(world, peds);
+game.addSim(dogs);
+game.addSim({ update: (dt) => world.cars.forEach((c) => c.step(dt)) });
+game.addSim({ update: () => world.compact() });
+game.addSim(new CollisionSystem(statics, () => world.cars, events));
+game.addSim(signPosts);
+game.addView(signPosts);
+game.addSim(streetLamps);
+game.addView(streetLamps);
+const wreck = new Wreck(world, economy, heat, police, game);
+game.addSim(wreck);
+// Past 120% damage the wheels come off: towed back repaired for a fee
+const breakdown = new Breakdown(world, economy, heat, police);
+breakdown.blocked = () =>
+  bust.phase !== "free" ||
+  wreck.active ||
+  recovery.active;
+breakdown.onRespawn = () => camRig.snap();
+game.addSim(breakdown);
+game.addSim(new OffenseDetector(world));
+game.addSim(heat);
+const bust = new BustSystem(world, heat, police, economy);
+bust.onRespawn = () => camRig.snap();
+game.addSim(bust);
+const recovery = new Recovery(world, economy);
+recovery.blocked = () =>
+  bust.phase !== "free" ||
+  wreck.active ||
+  breakdown.active;
+wreck.onRespawn = () => camRig.snap();
+recovery.onRespawn = () => camRig.snap();
+game.addSim(recovery);
+const pitStops = new PitStopSystem(world, police);
+pitStops.blocked = () =>
+  bust.phase !== "free" ||
+  wreck.active ||
+  breakdown.active ||
+  recovery.fade > 0;
+game.addSim(pitStops);
+events.on("splash", (e) => {
+  effects.splash(e.pos, e.y);
+  if (e.car === player.id) camRig.addShake(0.5);
+});
+const gps = new Gps(world, pathfinder);
+game.addSim(gps);
+game.addSim({ update: (dt) => (world.time += dt) });
+events.on("wrecked", (e) => {
+  hud.stunt("WRECKED", wreckDetail(e.speed, e.kind, e.otherMass), null, true);
+});
+
+const mapImage = buildMapImage(city);
+const minimap = new Minimap(uiRoot, mapImage, city, gps, player, police, () =>
+  viewHeading(r.camera),
+);
+const fullMap = new FullMap(uiRoot, mapImage, city, gps, player, police, input);
+
+// T30: title screen (the city keeps running behind it under the orbit camera) and pause menu
+const menu = new Menu(uiRoot, {
+  cash: () => economy.cash,
+  start: startSession,
+  resume: () => {
+    menu.hide();
+    game.setPaused("menu", false);
+  },
+  quit: quitToTitle,
+  mode: () => (world.mode === "menu" ? "free" : world.mode),
+  sound: (k) => audio.ui(k),
+  volumes: {
+    sliders: [
+      { key: "master", label: "MASTER", hint: "Everything" },
+      ...Object.entries(CATEGORIES).map(([key, c]) => ({
+        key,
+        label: c.label,
+        hint: c.hint,
+      })),
+    ],
+    get: (k) => audio.mixer.settings[k as AudioKey],
+    set: (k, v) => audio.mixer.set(k as AudioKey, v),
+  },
+  graphics: {
+    options: GRAPHICS_OPTIONS,
+    get: (k) => GRAPHICS[k as GraphicsKey],
+    set: (k, on) => setGraphic(k as GraphicsKey, on),
+  },
+  traffic: {
+    levels: TRAFFIC_LEVELS,
+    get: () => trafficLevel,
+    set: (level) => {
+      trafficLevel = level;
+      saveTrafficLevel(level);
+      traffic.setTarget(trafficTarget(level));
+    },
+  },
+});
+// The spec panel is built with the debug folders, after this. The pit garage retitles it when parts are fitted.
+let adoptSpec = (): void => {};
+let uiSound = (_kind: "move" | "ok" | "back"): void => {};
+// Pit garage: stop in a pit stop's circle for repairs, parts, rims, paint and mirror charms
+const shop = new PitShop(uiRoot, r.renderer, post, builds, {
+  car: () => player,
+  cash: () => economy.cash,
+  pay: (amount) => {
+    if (economy.cash < amount) return false;
+    economy.charge(amount);
+    return true;
+  },
+  refund: (amount) => economy.earn(amount),
+  repairQuote: () => pitStops.quote(),
+  repair: () => repair(player),
+  equip: (id, build) => {
+    equipCar(player, id, build);
+    adoptSpec();
+  },
+  park: (stop) => {
+    player.teleport({ x: stop.bay.x, z: stop.bay.z }, stop.bay.yaw);
+    camRig.snap();
+  },
+  message: (text, tone) => events.message(text, tone),
+  pause: (on) => game.setPaused("pitshop", on),
+  sound: (kind) => uiSound(kind),
+  garage: (ev) => audio.garage.event(ev),
+});
+const orbitCenter = new THREE.Vector3();
+uiRoot.classList.add("on-title");
+menu.showTitle();
+game.onFrame((dt) => {
+  input.poll();
+  menu.update(dt);
+  const back = input.pressed("pause") || input.pressed("escape");
+  const arrived = pitStops.take();
+  if (arrived) shop.open(arrived);
+  const shopOn = shop.frame(dt, input, back);
+  if (shopOn) {
+    // The pit garage owns the keys until its fades are done
+  } else if (menu.open) {
+    if (back) menu.back();
+  } else if (
+    input.pressed("map") ||
+    (fullMap.open && input.pressed("escape"))
+  ) {
+    fullMap.toggle();
+    game.setPaused("map", fullMap.open);
+  } else if (back && !fullMap.open) {
+    game.setPaused("menu", true);
+    menu.showPause();
+  }
+  minimap.visible = !fullMap.open && world.mode !== "menu";
+  fullMap.update(dt);
+  camRig.lookBack =
+    input.isHeld("lookBack") &&
+    !menu.open &&
+    !fullMap.open &&
+    !shop.active &&
+    world.mode !== "menu";
+  if (!menu.open && !fullMap.open && !shop.active) {
+    if (input.pressed("camera")) camRig.cycle();
+    if (input.pressed("limiter")) limiter.on = !limiter.on;
+    if (input.pressed("headlights") && !game.paused)
+      player.headlights = !player.headlights;
+    if (
+      input.pressed("ignition") &&
+      !world.controlLocked &&
+      !game.paused
+    )
+      ignition.toggle();
+    if (!world.controlLocked && !game.paused && player.phys.engineOn) {
+      if (input.pressed("blinkLeft")) signals.toggle("left");
+      if (input.pressed("blinkRight")) signals.toggle("right");
+    }
+  }
+  if (input.pressed("debug")) Debug.toggle();
+  Debug.update(dt);
+  buildings.update(game.time);
+  canal?.update(game.time, dt);
+});
+game.addView(lightView);
+// Phase 1 pass: manhole covers, and steam from some of them downtown / in the shotengai
+const steam = new SteamVents(city, r.scene, r.camera);
+game.addView(steam);
+game.addView(carView);
+const pedView = new PedestrianView(peds, r.scene, city.terrain);
+game.addView(pedView);
+game.addView(new DogView(dogs, peds, r.scene, city.terrain));
+const riderView = new RiderView(world, r.scene, city.terrain, r.camera);
+game.addView(riderView);
+game.addView(new OfficerView(bust, r.scene, city.terrain));
+const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
+  city.terrain.heightAt(x, z),
+);
+game.addView(wreckView);
+const breakdownView = new BreakdownView(
+  breakdown,
+  player,
+  r.scene,
+  effects,
+  (x, z) => city.terrain.heightAt(x, z),
+  statics,
+);
+game.addView(breakdownView);
+events.on("brokeDown", () => {
+  hud.stunt(
+    "BROKEN DOWN",
+    "Your car took too much damage. That looks expensive... ",
+    null,
+    true,
+  );
+  camRig.addShake(0.2);
+});
+game.addView({
+  sync: (alpha, dt) => {
+    effects.wet = weather.wetness;
+    pedView.rain = weather.rain;
+    riderView.rain = weather.rain;
+    effects.update(
+      world.cars,
+      player.pos,
+      wreck.playing ? dt * game.timeScale : dt,
+    );
+    camRig.focus = bust.officer?.pos ?? null;
+    cockpit.fit(player);
+    const body = carView.bodyOf(player.id);
+    cockpit.attach(body);
+    camRig.cockpit = body ? { body, eye: cockpit.eye } : null;
+    camRig.orbit = world.mode === "menu";
+    orbitCenter.set(player.pos.x, 0, player.pos.z);
+    if (wreck.playing) wreckView.aim(r.camera);
+    else if (breakdown.playing) breakdownView.aim(r.camera);
+    else camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
+    // Post FX on top of the tuned settings: the wreck's punch
+    post.boost.bloom = 0.55 * wreck.fx;
+    post.boost.aberration = 0.0035 * wreck.fx;
+    steam.rain = weather.rain;
+    const inCabin = camRig.interior && !breakdown.playing;
+    cockpit.update(player, dt, inCabin);
+    carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
+    hud.paused = game.pausedBy("debug") && !menu.open && !fullMap.open;
+    hud.limiter = limiter.on ? Math.round(limiter.cap / KMH) : null;
+    hud.speedLimit = limiter.postedKmh;
+    hud.speeding = player.speed > limiter.cap + 5 * KMH;
+    hud.lights = player.lampsOn;
+    hud.engine = ignition.state;
+    hud.immune = world.immune;
+    hud.cash = economy.cash;
+    if (world.mode === "free") hud.objective = "Free roam: explore the city";
+    hud.felony = heat.value;
+    hud.evading = heat.evading;
+    hud.bust = bust.progress;
+    hud.bustedFine = bust.busted ? bust.fine : null;
+    hud.fade = Math.max(
+      bust.fade,
+      recovery.fade,
+      wreck.fade,
+      breakdown.fade,
+      shop.fade,
+    );
+    hud.update(player, dt);
+    tiles.update(r.camera);
+    streetLamps.cull(r.camera);
+  },
+});
+
+Debug.attach({
+  renderer: r.renderer,
+  camera: r.camera,
+  game,
+  onFreeCam: (on) => {
+    camRig.enabled = !on;
+    world.controlLocked = on || world.mode === "menu";
+    if (!on) camRig.snap();
+  },
+});
+adoptSpec = addDebugPanels({
+  world,
+  player,
+  events,
+  city,
+  traffic,
+  peds,
+  riders,
+  riderDodge,
+  dogs,
+  heat,
+  police,
+  bust,
+  wreck,
+  economy,
+  gps,
+  camRig,
+  tiles,
+  pitStops,
+  builds,
+  openPitShop: (s) => shop.open(s),
+}).adoptSpec;
+const routeView = new RouteDebugView(
+  pathfinder,
+  city,
+  player,
+  new Rng(CONFIG.SEED + 7),
+  r.scene,
+  r.camera,
+  r.renderer.domElement,
+);
+game.addView(routeView);
+game.addView(minimap); // after the camera update
+const roofs = [
+  ...city.features.interiors.map((i) => i.box),
+  ...city.features.pitStops.map((p) => p.canopy),
+];
+game.addView(
+  new RainView(
+    weather,
+    r.scene,
+    r.camera,
+    city.terrain,
+    envParts,
+    roadMats,
+    roofs,
+  ),
+);
+// T34: synthesized audio, ears on the camera (after the camera update)
+const audio: AudioSystem = new AudioSystem({
+  world,
+  city,
+  camera: r.camera,
+  cabin: () => camRig.interior,
+  rain: () => weather.rain,
+  wetness: () => weather.wetness,
+  paused: () => game.paused,
+  title: (): boolean => menu.onTitle,
+  timeScale: () => game.timeScale,
+  garage: () => shop.scene,
+  fade: () =>
+    Math.max(
+      bust.fade,
+      recovery.fade,
+      wreck.fade,
+      breakdown.fade,
+      shop.fade,
+    ),
+  hornHeld: () => input.isHeld("horn"),
+  pursuit: () => heat.inPursuit,
+  peds: peds.peds,
+  vents: steam.vents,
+  roofs,
+});
+game.addView(audio);
+uiSound = (kind) => audio.ui(kind);
+const audioFolder = Debug.addFolder("Audio");
+for (const k of Object.keys(audio.mixer.settings) as AudioKey[])
+  audioFolder
+    .add(audio.mixer.settings, k, 0, 1, 0.05)
+    .onChange((v: number) => audio.mixer.set(k, v));
+
+game.start();
+// Build the pit garage while the title screen is up, so the first stop starts without a hitch
+setTimeout(() => shop.prepare(), 2500);
+
+/**
+ * Title -> driving: a fresh session at the start point. Cash and the pit garage upgrades carry over between
+ * sessions.
+ */
+function startSession(mode: PlayMode): void {
+  resetSession();
+  world.mode = mode;
+  world.controlLocked = false;
+  menu.hide();
+  game.setPaused("menu", false);
+  uiRoot.classList.remove("on-title");
+  hud.objective = "Free roam: explore the city";
+  greet();
+}
+
+/** Pause menu -> title: the car goes back to the start and the city keeps running behind the title. */
+function quitToTitle(): void {
+  resetSession();
+  world.mode = "menu";
+  world.controlLocked = true;
+  game.setPaused("menu", false);
+  uiRoot.classList.add("on-title");
+  menu.showTitle();
+}
+
+/** Abort busts / tows and chases, put the repaired car back at the start. */
+function resetSession(): void {
+  bust.cancel();
+  wreck.cancel();
+  breakdown.cancel();
+  recovery.cancel();
+  police.standDown();
+  heat.reset();
+  repair(player);
+  player.teleport(start.pos, start.yaw);
+  player.blinker = null;
+  player.headlights = true;
+  limiter.on = false;
+  gps.setWaypoint(null);
+  gps.setDestination(null);
+  camRig.snap();
+}
+
+let greeted = false;
+/** Welcome and a few practical tips, on the first session only. Landmark and scenery hints are left for the map. */
+function greet(): void {
+  if (greeted) return;
+  greeted = true;
+  events.message("Bienvenue à Montréal", "info");
+  const hint = (s: number, text: string) =>
+    setTimeout(
+      () => world.mode !== "menu" && events.message(text, "info"),
+      s * 1000,
+    );
+  hint(
+    3,
+    "Press M for the city map: click a destination on it and the GPS routes you there",
+  );
+  hint(
+    9,
+    "Don't let the police see you drive too fast. Hit L for the speed limiter",
+  );
+  if (city.features.pitStops.length)
+    hint(16, "Garages are marked on the map: stop under a canopy to repair your car");
+}
+
+/** Yaw of the screen's up direction on the ground (camera forward + up, projected), for the heading-up minimap. */
+function viewHeading(cam: THREE.Camera): number {
+  cam.updateMatrixWorld();
+  const e = cam.matrixWorld.elements;
+  return Math.atan2(e[4] - e[8], e[6] - e[10]);
+}
+
+(window as unknown as { dbg: unknown }).dbg = {
+  audio,
+  menu,
+  riders,
+  riderDodge,
+  riderView,
+  dogs,
+  weather,
+  signals,
+  effects,
+  gps,
+  minimap,
+  fullMap,
+  r,
+  world,
+  game,
+  THREE,
+  traffic,
+  peds,
+  pathfinder,
+  routeView,
+  heat,
+  police,
+  bust,
+  wreck,
+  wreckView,
+  breakdown,
+  breakdownView,
+  economy,
+  camRig,
+  city,
+  post,
+  POSTFX,
+  recovery,
+  cockpit,
+  carView,
+  limiter,
+  tiles,
+  pitStops,
+  shop,
+  builds,
+  steam,
+  parked,
+};
