@@ -247,8 +247,13 @@ export class LaneDriver {
     const node = city.nodes[this.lane.to];
     const edge = city.edges[this.lane.edgeId];
     const opts: { lane: Lane; turn: TurnType; w: number }[] = [];
+    // Hard closures (PRD 5.2): traffic never turns into a fenced street
+    const works = this.world.roadworks;
+    const fenced = (eid: number) => !!works && works.closedEdge(eid);
+    // ...nor into a lane closed by a cone taper: another lane of the same road the same way, or another road
+    const coned = (id: number) => !!works && works.conedLane(id);
     for (const eid of node.edges) {
-      if (eid === edge.id) continue;
+      if (eid === edge.id || fenced(eid)) continue;
       const e = city.edges[eid];
       const leaving = city.lanesLeaving(e, node.id);
       // One-way roads have no lanes leaving at their far end
@@ -263,15 +268,22 @@ export class LaneDriver {
         if (!curb && turn === EASY_TURN) continue;
         if (!inner && turn === HARD_TURN) continue;
       }
-      const idx = turn === 'straight' ? Math.min(this.lane.index, leaving.length - 1) : turn === EASY_TURN ? leaving.length - 1 : 0;
+      let idx = turn === 'straight' ? Math.min(this.lane.index, leaving.length - 1) : turn === EASY_TURN ? leaving.length - 1 : 0;
+      if (coned(leaving[idx])) {
+        // Straight on: the nearest open lane; a turn can't cut across to another lane
+        if (turn !== 'straight') continue;
+        const alt = leaving.map((id, k) => ({ id, k })).filter((x) => !coned(x.id)).sort((p, q) => Math.abs(p.k - idx) - Math.abs(q.k - idx))[0];
+        if (!alt) continue;
+        idx = alt.k;
+      }
       opts.push({ lane: city.lanes[leaving[idx]], turn, w: turn === 'straight' ? 1.4 : 1 });
     }
     if (opts.length === 0) {
-      // dead end fallback: allow anything
+      // dead end fallback: any open road (the closure roll never leaves a junction with only one)
       for (const eid of node.edges) {
-        if (eid === edge.id) continue;
+        if (eid === edge.id || fenced(eid)) continue;
         const e = city.edges[eid];
-        const ids = city.lanesLeaving(e, node.id);
+        const ids = city.lanesLeaving(e, node.id).filter((id) => !coned(id));
         if (ids.length === 0) continue;
         const l = city.lanes[ids[0]];
         opts.push({ lane: l, turn: turnType(this.lane.endDir, l.dir), w: 1 });
@@ -763,6 +775,7 @@ export class LaneDriver {
     // Curb-side turns are tighter than turns across the junction: take them slower
     if (turning && (this.pastLane || dStop < 25)) v0 = Math.min(v0, this.next.turn === EASY_TURN ? this.turnSpeed * 0.75 : this.turnSpeed);
     if (this.yieldT > 0) v0 = Math.min(v0, limit * T.yieldSpeed);
+    const works = this.world.roadworks;
     // Something coming head-on: stand on the brakes while swerving
     if (this.evadeT > 0) v0 = Math.min(v0, 3);
     v0 = Math.min(v0, this.speedCap);
@@ -807,6 +820,14 @@ export class LaneDriver {
       gap = riders.gap;
       vLead = riders.vLead;
       this.waiting = 'traffic';
+    }
+    // A fence or a cone taper in our lane (a car that ended up there: relocated, re-attached): stop short of it
+    // rather than drive through it (`chooseNext` never routes a car into either)
+    const fenceD = works && !this.pastLane ? Math.min(works.barrierAhead(this.lane, s.pos), works.conesAhead(this.lane, s.pos)) : Infinity;
+    if (fenceD - car.halfL - 1.5 < gap) {
+      gap = fenceD - car.halfL - 1.5;
+      vLead = 0;
+      this.waiting = 'none';
     }
     const pedGap = this.scanPeds();
     if (pedGap < gap) {

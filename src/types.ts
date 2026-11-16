@@ -250,7 +250,9 @@ export type OffenseKind =
   | 'carCrash'
   | 'policeCrash'
   | 'pedEndangered'
-  | 'sidewalk';
+  | 'sidewalk'
+  /** Through a line of cones (PRD 5.3): a passer-by calls it in, so no cop has to see it. */
+  | 'chantier';
 
 export type Tone = 'info' | 'warn' | 'good' | 'bad';
 
@@ -260,7 +262,17 @@ export type CrashKind = 'wall' | 'vehicle' | 'prop';
 export type GameEvent =
   /** `seconds`: how long it stays up (default: the feed's usual few seconds). */
   | { type: 'message'; text: string; tone: Tone; seconds?: number }
-  | { type: 'offense'; kind: OffenseKind; pos: Vec2; witnessed: boolean }
+  | {
+      type: 'offense';
+      kind: OffenseKind;
+      pos: Vec2;
+      witnessed: boolean;
+      /** Counts as witnessed even if no cop saw it (someone phoned it in). */
+      calledIn?: boolean;
+      /** Heat to add instead of the kind's usual amount, and the message to show instead of its usual one. */
+      heat?: number;
+      text?: string;
+    }
   | { type: 'collision'; a: number; b: number | null; impulse: number; pos: Vec2 }
   /** The player's car touched another car or a static box, however softly (every step they are in contact). */
   | { type: 'contact'; other: number | null; box: AABB | null }
@@ -295,4 +307,6 @@ export type GameEvent =
   | { type: 'escaped' }
   | { type: 'pursuitStarted' }
   | { type: 'horn' }
+  /** A car knocked a construction cone (`gameplay/Cones.ts`); `speed` is how fast the cone flew off (m/s). */
+  | { type: 'coneHit'; car: number; pos: Vec2; speed: number }
   | { type: 'splash'; car: number; pos: Vec2; y: number };

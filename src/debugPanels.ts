@@ -20,6 +20,11 @@ import { TIRE_TUNING, type Tires } from './gameplay/Tires';
 import { PIT_TUNING, type PitStopSystem } from './gameplay/PitStop';
 import { POTHOLE_TUNING, type PotholeHits } from './gameplay/PotholeHits';
 import type { Potholes } from './world/Potholes';
+import type { Closures } from './gameplay/Closures';
+import { CONE_TUNING, type Cones } from './gameplay/Cones';
+import { CHANTIER_TUNING, type Chantier } from './gameplay/Chantier';
+import { CALL_TUNING } from './ai/PoliceAI';
+import type { Lane } from './types';
 import type { CameraRig } from './render/CameraRig';
 import { GRAPHICS, GRAPHICS_OPTIONS, POSTFX, setGraphic, type GraphicsKey } from './render/PostFX';
 import type { StaticTiles } from './render/StaticTiles';
@@ -58,6 +63,9 @@ export interface DebugSystems {
   tires: Tires;
   potholes: Potholes;
   potholeHits: PotholeHits;
+  closures: Closures;
+  cones: Cones;
+  chantier: Chantier;
   openPitShop: (stop: PitStop) => void;
 }
 
@@ -86,6 +94,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   tires.add(TIRE_TUNING, 'winterGrip', 0.6, 1.1, 0.01).name('winter grip x');
   Debug.watch('tires', () => `${sys.tires.set}  grip x${sys.tires.grip.toFixed(2)}`);
   addPotholePanel(sys);
+  addClosurePanel(sys);
   Debug.watch('cars', () => {
     const trucks = [...traffic.drivers.values()].filter((d) => d.car.look.style === 'truck' || d.car.look.style === 'keitruck').length;
     const moods = { yield: 0, evade: 0, ped: 0 };
@@ -133,6 +142,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
       policeCrash: 'cop',
       pedEndangered: 'ped',
       sidewalk: 'walk',
+      chantier: 'cones',
     };
     const counts = (Object.keys(short) as OffenseKind[]).map((k) => `${short[k]} ${heat.witnessed[k]}/${heat.detected[k]}`);
     const waived = heat.waived.speeding + heat.waived.wrongWay;
@@ -377,5 +387,74 @@ function addPotholePanel(sys: DebugSystems): void {
     const l = hits.last;
     const last = l ? `  last ${l.depth} @${l.kmh.toFixed(0)} km/h +${(l.damage * 100).toFixed(1)}%` : '';
     return `${potholes.pits.length} (${big} big) on ${edges}/${city.edges.length} edges  hits ${hits.hits}${last}`;
+  });
+}
+
+/** Phase 7: the session's closures, cone and breach knobs, and buttons that put the car in front of a fence or a cone line. */
+function addClosurePanel(sys: DebugSystems): void {
+  const { closures, cones, chantier, player, city, events, police, gps } = sys;
+  const f = Debug.addFolder('Rue barrée & cones');
+  f.add(CHANTIER_TUNING, 'conesHit', 1, 10, 1).name('breach at cones hit');
+  f.add(CHANTIER_TUNING, 'firstHeat', 0, 0.5, 0.01).name('heat 1st line');
+  f.add(CHANTIER_TUNING, 'nextHeat', 0, 0.5, 0.01).name('heat next lines');
+  f.add(CALL_TUNING, 'time', 5, 120, 1).name('call-in lasts s');
+  f.add(CALL_TUNING, 'skill', 0.3, 1, 0.01).name('call-in speed x');
+  f.add(CONE_TUNING, 'kick', 0.5, 3, 0.05).name('cone kick x');
+  f.add(CONE_TUNING, 'friction', 1, 15, 0.5).name('cone friction m/s2');
+  f.add(CONE_TUNING, 'topple', 0.5, 10, 0.1).name('cone falls above m/s');
+  f.add(CONE_TUNING, 'carDrag', 0, 0.05, 0.001).name('car slowed per cone');
+  // Teleport 50 m before a fence or a cone line, in a lane that runs into it, pointed at it
+  const lineUp = (lanes: number[], target: { x: number; z: number }, what: string) => {
+    let best: Lane | null = null;
+    for (const id of lanes) {
+      const l = city.lanes[id];
+      if (!best || l.index > best.index) best = l;
+    }
+    if (!best) return;
+    const d = best.dir;
+    const along = (target.x - best.start.x) * d.x + (target.z - best.start.z) * d.z;
+    const back = Math.min(50, along - 4);
+    const p = { x: best.start.x + d.x * (along - back), z: best.start.z + d.z * (along - back) };
+    player.teleport(p, Math.atan2(d.x, d.z));
+    sys.camRig.snap();
+    events.message(`${what} ${back.toFixed(0)} m ahead`, 'info');
+  };
+  const nearest = <T extends { pos: { x: number; z: number } }>(xs: T[]): T | null => {
+    let best: T | null = null;
+    let bestD = Infinity;
+    for (const x of xs) {
+      const d = (x.pos.x - player.pos.x) ** 2 + (x.pos.z - player.pos.z) ** 2;
+      if (d < bestD && d > 70 * 70) (best = x), (bestD = d);
+    }
+    return best;
+  };
+  f.add(
+    {
+      go: () => {
+        const h = nearest(closures.hard.map((x) => ({ x, pos: x.center })));
+        if (!h) return;
+        const lanes = h.x.lanes.filter((id) => city.lanes[id].from === city.edges[h.x.edge].a);
+        lineUp(lanes.length ? lanes : h.x.lanes, h.x.fences[0].a, 'Fence');
+      },
+    },
+    'go',
+  ).name('line up on a fence');
+  f.add(
+    {
+      go: () => {
+        const l = nearest(closures.lines.map((x) => ({ x, pos: x.cones[0] })));
+        if (!l) return;
+        const mid = { x: (l.x.a.x + l.x.b.x) / 2, z: (l.x.a.z + l.x.b.z) / 2 };
+        lineUp(l.x.lanes, mid, 'Cone line');
+      },
+    },
+    'go',
+  ).name('line up on a cone line');
+  f.add({ go: () => police.respond(player.pos) }, 'go').name('call it in (send a patrol)');
+  f.add({ go: () => gps.setWaypoint(closures.hard.length ? closures.hard[0].center : null) }, 'go').name('GPS to a work zone');
+  const partial = closures.hard.filter((h) => h.side !== 'both').length;
+  Debug.watch('closures', () => {
+    const route = gps.route && closures.routeHitsFence(gps.route) ? '  GPS route hits a fence' : '';
+    return `salt ${closures.salt}: ${closures.hard.length} fences (${partial} one-way), ${closures.lines.length} cone lines, ${cones.cones.length} cones (${cones.scattered} moved)  breaches ${chantier.breaches}  answering ${police.responding}  test route ${closures.gpsHitsFence ? 'hits' : 'MISSES'} a fence (${closures.dropped} dropped)${route}`;
   });
 }

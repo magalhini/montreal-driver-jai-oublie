@@ -41,6 +41,12 @@ const DISPATCH_INTERVAL = 3;
 const DISPATCH_MIN_DIST = 110;
 /** Pursuers wedged this long where the player can't see them are moved to the nearest lane. */
 const STUCK_RELOCATE = 6;
+/**
+ * A call-in (PRD 5.3, the second cone line): the nearest patrol drives at the reported spot with its lights on,
+ * for at most `time` seconds, at this share of pursuit speed; the report follows the player every `ping`
+ * seconds. Seeing the player on the way starts the usual pursuit, whatever the meter says.
+ */
+export const CALL_TUNING = { time: 45, skill: 0.78, ping: 4, arrive: 14 };
 
 export type CopState = 'patrol' | 'pursuit';
 
@@ -59,6 +65,8 @@ export interface Cop {
   chase: PursuitDriver | null;
   state: CopState;
   spotTimer: number;
+  /** Answering a call-in: drives at the reported position until `until` (world time). */
+  call: { driver: PursuitDriver; until: number } | null;
 }
 
 /**
@@ -84,6 +92,9 @@ export class PoliceSystem implements SimSystem {
   relocations = 0;
   private spawnTimer = 0;
   private dispatchTimer = 0;
+  /** Where the call-in sent the responding patrol, and when the report was last refreshed. */
+  private readonly callPos: Vec2 = { x: 0, z: 0 };
+  private callPing = 0;
 
   constructor(
     private world: World,
@@ -115,7 +126,7 @@ export class PoliceSystem implements SimSystem {
     car.phys.state.vel.x = lane.dir.x * v0;
     car.phys.state.vel.z = lane.dir.z * v0;
     this.world.addCar(car);
-    const cop: Cop = { car, driver: new LaneDriver(this.world, car, lane), chase: null, state: 'patrol', spotTimer: this.world.rng.range(0, SPOT_INTERVAL) };
+    const cop: Cop = { car, driver: new LaneDriver(this.world, car, lane), chase: null, state: 'patrol', spotTimer: this.world.rng.range(0, SPOT_INTERVAL), call: null };
     this.cops.set(car.id, cop);
     return cop;
   }
@@ -143,7 +154,8 @@ export class PoliceSystem implements SimSystem {
         cop.spotTimer = SPOT_INTERVAL;
         if (this.canSee(car, pp, cop.state === 'pursuit')) {
           this.sawPlayer();
-          if (cop.state === 'patrol' && this.heat.value >= WANTED_HEAT && this.pursuers < CONFIG.MAX_PURSUERS && !w.onCourse) this.startPursuit(cop);
+          const wanted = this.heat.value >= WANTED_HEAT || cop.call !== null;
+          if (cop.state === 'patrol' && wanted && this.pursuers < CONFIG.MAX_PURSUERS && !w.onCourse) this.startPursuit(cop);
         }
       }
     }
@@ -163,8 +175,15 @@ export class PoliceSystem implements SimSystem {
       }
     }
     const target = this.chaseTarget();
+    this.callPing -= dt;
+    if (this.callPing <= 0) {
+      this.callPing = CALL_TUNING.ping;
+      this.callPos.x = pp.x;
+      this.callPos.z = pp.z;
+    }
     for (const cop of this.cops.values()) {
-      if (cop.state === 'patrol') cop.driver.drive();
+      if (cop.state === 'patrol' && cop.call) this.answer(cop, dt);
+      else if (cop.state === 'patrol') cop.driver.drive();
       else if (w.controlLocked) holdStill(cop.car); // busted sequence: no more bumping the player
       else cop.chase!.drive(target, dt);
     }
@@ -186,8 +205,52 @@ export class PoliceSystem implements SimSystem {
     }
   }
 
+  /**
+   * Someone phoned the player in (PRD 5.3): the nearest patrol, or a new one out of sight, heads for them with
+   * its lights on. Returns false if no car could be sent.
+   */
+  respond(pos: Vec2): boolean {
+    if (this.pursuers > 0 || this.world.immune) return false;
+    this.callPos.x = pos.x;
+    this.callPos.z = pos.z;
+    this.callPing = CALL_TUNING.ping;
+    let best: Cop | null = null;
+    for (const c of this.cops.values()) if (c.state === 'patrol' && (!best || dist(c.car.pos, pos) < dist(best.car.pos, pos))) best = c;
+    best ??= this.trySpawn(DISPATCH_MIN_DIST);
+    if (!best) return false;
+    best.call = { driver: new PursuitDriver(this.world, best.car, this.finder, CALL_TUNING.skill, true, 0), until: this.world.time + CALL_TUNING.time };
+    best.car.siren = true;
+    return true;
+  }
+
+  /** Patrol cars answering a call (debug). */
+  get responding(): number {
+    let n = 0;
+    for (const c of this.cops.values()) if (c.call) n++;
+    return n;
+  }
+
+  /** Drive at the reported spot; give up there (or when the call times out) and go back to patrolling. */
+  private answer(cop: Cop, dt: number): void {
+    const call = cop.call!;
+    const there = dist(cop.car.pos, this.callPos) < CALL_TUNING.arrive;
+    if (this.world.time > call.until || (there && this.world.time - this.lastSeen > 2)) {
+      this.dropCall(cop);
+      cop.driver.drive();
+      return;
+    }
+    call.driver.drive({ pos: this.callPos, vel: { x: 0, z: 0 }, car: null }, dt);
+  }
+
+  private dropCall(cop: Cop): void {
+    cop.call = null;
+    cop.car.siren = false;
+    cop.driver = new LaneDriver(this.world, cop.car, this.alignedLane(cop.car));
+  }
+
   /** Wreck respawn or debug immunity: pursuers go back to patrol where they are and sightings are forgotten. */
   callOff(): void {
+    for (const cop of this.cops.values()) if (cop.call) this.dropCall(cop);
     for (const cop of this.cops.values()) if (cop.state === 'pursuit') this.endPursuit(cop);
     this.lastSeen = this.lastKnownAt = -99;
     this.heat.inPursuit = false;
@@ -196,6 +259,7 @@ export class PoliceSystem implements SimSystem {
 
   /** After a bust: pursuing cars leave (despawn, call while the screen is black) and sightings are forgotten. */
   standDown(): void {
+    for (const cop of this.cops.values()) if (cop.call) this.dropCall(cop);
     for (const [id, cop] of this.cops) {
       if (cop.state !== 'pursuit') continue;
       cop.car.removed = true;
@@ -266,6 +330,7 @@ export class PoliceSystem implements SimSystem {
 
   private startPursuit(cop: Cop): void {
     const first = this.pursuers === 0;
+    cop.call = null;
     cop.state = 'pursuit';
     cop.car.siren = true;
     // Every second unit flanks: it routes to where the player is heading and cuts in from a side street
@@ -301,6 +366,8 @@ export class PoliceSystem implements SimSystem {
     const pp = w.player.pos;
     const hit = w.city.randomLanePointNear(w.rng, pp, rMin, CONFIG.SPAWN_RADIUS);
     if (!hit) return null;
+    // Nothing spawns on a fenced street or in a coned lane (it would only drive into the fence / the cones)
+    if (w.roadworks && (w.roadworks.closedEdge(hit.lane.edgeId) || w.roadworks.conedLane(hit.lane.id))) return null;
     const d = dist(hit.pos, pp);
     if (!ignoreView) {
       const ahead = dot({ x: hit.pos.x - pp.x, z: hit.pos.z - pp.z }, fwd(w.player.yaw));

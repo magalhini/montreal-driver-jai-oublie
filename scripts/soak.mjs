@@ -1,5 +1,6 @@
 // Headless traffic soak (T37): `npm run soak [-- <mapId>] [--seeds=3] [--minutes=5] [--write]`
 // Deterministic: prints per-seed counts and compares them with scripts/soak.<map>.txt (3 x 5 min runs only).
+// `--closures` turns the Phase 7 road works on (no baseline; any AI car hitting a fence fails it).
 // Exits 1 on any AI red-light or ARRÊT run, or when the results differ from the baseline. Pure refactors must match
 // it exactly; AI changes may move it (refresh with --write and note why), but never toward more red runs or
 // AI collisions.
@@ -14,7 +15,9 @@ const id = args.find((a) => !a.startsWith('--')) ?? 'montreal';
 const seeds = opt('seeds', 3);
 const minutes = opt('minutes', 5);
 const write = args.includes('--write');
-const standard = seeds === 3 && minutes === 5;
+// `--closures`: the Phase 7 fences and cone lines on (no baseline: it fails on any AI fence hit instead)
+const closures = args.includes('--closures');
+const standard = seeds === 3 && minutes === 5 && !closures;
 process.env.NEON_MAP = id;
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -25,9 +28,10 @@ try {
   const { soak } = await server.ssrLoadModule('/scripts/soakCore.ts');
   console.log(`soak ${id}: ${seeds} seed(s) x ${minutes} min`);
   for (let s = 0; s < seeds; s++) {
-    const r = soak(id, 1000 + s, minutes * 60);
-    bad ||= r.redRuns > 0 || r.stopRuns > 0;
-    const line = `seed ${r.seed}: red runs ${r.redRuns}/${r.crossings}, stop runs ${r.stopRuns}/${r.stopCrossings}, AI collisions ${r.aiCollisions}, parked hits ${r.parkedHits}, stalls ${r.stalls}, off-road ${(r.offRoad * 100).toFixed(2)}%, cars ${r.cars.toFixed(1)}`;
+    const r = soak(id, 1000 + s, minutes * 60, closures);
+    bad ||= r.redRuns > 0 || r.stopRuns > 0 || (r.fenceHits ?? 0) > 0;
+    const works = r.fenceHits !== undefined ? `, fence hits ${r.fenceHits}, cones moved ${r.conesMoved}` : '';
+    const line = `seed ${r.seed}: red runs ${r.redRuns}/${r.crossings}, stop runs ${r.stopRuns}/${r.stopCrossings}, AI collisions ${r.aiCollisions}, parked hits ${r.parkedHits}, stalls ${r.stalls}, off-road ${(r.offRoad * 100).toFixed(2)}%, cars ${r.cars.toFixed(1)}${works}`;
     lines.push(line);
     console.log(`${line}, ${r.msPerStep.toFixed(2)} ms/step`);
     for (const l of r.collisionLog) console.log(`  ${l}`);

@@ -82,6 +82,11 @@ export class Pathfinder {
   constructor(
     private readonly city: CityModel,
     readonly costs: PathCosts = { ...DEFAULT_COSTS },
+    /**
+     * Edge ids that are not a legal step (PRD 5.2: the hard closures, for traffic and police). The edge you start
+     * on and the goal's edge are still driven, up to the goal. The GPS gets none: it never learns about fences.
+     */
+    readonly blocked: ReadonlySet<number> = new Set(),
   ) {
     this.base = new Int32Array(city.nodes.length);
     let n = 0;
@@ -209,10 +214,13 @@ export class Pathfinder {
         const next = city.otherNode(e, node);
         const turn = this.turnCost(node, arrive, k);
         if (turn === Infinity) continue;
+        const fenced = this.blocked.has(e.id);
+        if (fenced && e !== to.edge) continue;
         if (e === to.edge && (opts.goalFrom === undefined || opts.goalFrom === node)) {
           const frac = next === to.edge.b ? to.t : 1 - to.t;
           this.relax(this.goal, gs + pass + turn + (frac * e.length) / e.speedLimit, s, 0);
         }
+        if (fenced) continue;
         const cost = gs + pass + turn + e.length / e.speedLimit;
         this.relax(this.stateOf(next, e.id), cost, s, this.h(next, to.pos));
       }

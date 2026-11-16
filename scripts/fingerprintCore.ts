@@ -9,6 +9,7 @@ import { mapDef } from '../src/maps';
 import { resolveMap } from '../src/maps/catalog';
 import { cumulative, pointAt } from '../src/world/Polyline';
 import { rollPotholes } from '../src/world/Potholes';
+import { Closures, defaultAnchors } from '../src/gameplay/Closures';
 import { surfaceAt } from '../src/world/Surfaces';
 
 class Hash {
@@ -80,6 +81,11 @@ export function fingerprint(id: string): string[] {
   }
   // Potholes (Phase 6): rolled from the seed after the city, so they move only when the roll or the roads do
   for (const p of rollPotholes(city, def.seed)) g('potholes').add([p.edge, p.s, p.lat, p.r, p.depth]);
+  // Closures (Phase 7): the roll for run salt 0 (the game rolls a new salt per page load)
+  const works = new Closures(city, def.seed, 0, defaultAnchors(city), rollPotholes(city, def.seed));
+  for (const h of works.hard) g('closures').add([h.edge, h.side, h.s0, h.s1, h.lat0, h.lat1, h.dressing, h.fences.map((f) => f.signs)]);
+  for (const l of works.lines) g('closures').add([l.edge, l.a, l.b, l.cones.length]);
+  g('closures').add(works.loose);
 
   return [`map ${map} seed ${def.seed}`, ...Object.entries(groups).map(([k, h]) => `${k.padEnd(10)} ${String(h.count).padStart(8)} ${h.hex}`)];
 }

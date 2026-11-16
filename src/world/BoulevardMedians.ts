@@ -28,7 +28,7 @@ export const MEDIAN_TUNING = {
 };
 
 /** Builds the islands and returns their colliders. Pits in the middle of the road push an island elsewhere. */
-export function buildMedians(city: CityModel, scene: THREE.Scene, pits: readonly Pothole[]): AABB[] {
+export function buildMedians(city: CityModel, scene: THREE.Scene, pits: readonly Pothole[], closed: ReadonlySet<number> = new Set()): AABB[] {
   const T = MEDIAN_TUNING;
   const rng = new Rng(CONFIG.SEED ^ 0x3ed1a);
   const colliders: AABB[] = [];
@@ -42,7 +42,8 @@ export function buildMedians(city: CityModel, scene: THREE.Scene, pits: readonly
     const len = rng.range(T.length[0], T.length[1]);
     const where = rng.next();
     const second = rng.chance(0.4);
-    if (!take) continue;
+    // A work zone takes the middle of the block (PRD Phase 7)
+    if (!take || closed.has(e.id)) continue;
     const a = city.nodes[e.a];
     const b = city.nodes[e.b];
     const x0 = Math.min(a.pos.x, b.pos.x) + (a.pos.x < b.pos.x ? a.hx : b.hx) + T.endGap;

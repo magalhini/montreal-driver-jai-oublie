@@ -12,6 +12,7 @@ export const OFFENSE_HEAT: Record<OffenseKind, number> = {
   policeCrash: 0.25,
   pedEndangered: 0.12,
   sidewalk: 0.05,
+  chantier: 0.12,
 };
 
 export const OFFENSE_TEXT: Record<OffenseKind, string> = {
@@ -22,6 +23,7 @@ export const OFFENSE_TEXT: Record<OffenseKind, string> = {
   policeCrash: 'Rammed a police car!',
   pedEndangered: 'Endangered a pedestrian!',
   sidewalk: 'Driving on the sidewalk!',
+  chantier: 'Through the cones. Someone called it in.',
 };
 
 /**
@@ -51,6 +53,7 @@ const perKind = (): Record<OffenseKind, number> => ({
   policeCrash: 0,
   pedEndangered: 0,
   sidewalk: 0,
+  chantier: 0,
 });
 
 /**
@@ -112,7 +115,10 @@ export class Heat implements SimSystem {
     // Being shoved around (hit recently, not on the throttle) is not the player's fault.
     if (p.lastHit < PUSHED_TIME && p.input.throttle < 0.1) return;
     this.detected[e.kind]++;
-    if (this.world.immune || this.world.onCourse || !this.witness(e)) return;
+    if (this.world.immune || this.world.onCourse) return;
+    // A called-in offense counts without a cop, and a cop who happens to see it does not jump into a chase over
+    // it (the cone lines: `gameplay/Chantier.ts` decides when a patrol is sent). Anything else needs a witness.
+    if (!e.calledIn && !this.witness(e)) return;
     this.witnessed[e.kind]++;
     if (ONCE_PER_PURSUIT.includes(e.kind)) {
       if (this.charged.has(e.kind)) {
@@ -123,10 +129,10 @@ export class Heat implements SimSystem {
       this.charged.add(e.kind);
       this.calm = 0; // the chase this starts is reported by the police a step later
     }
-    this.value = Math.min(1, this.value + OFFENSE_HEAT[e.kind]);
-    if (this.msgCooldown[e.kind] <= 0) {
+    this.value = Math.min(1, this.value + (e.heat ?? OFFENSE_HEAT[e.kind]));
+    if (this.msgCooldown[e.kind] <= 0 || e.text) {
       this.msgCooldown[e.kind] = MESSAGE_COOLDOWN;
-      this.world.events.message(OFFENSE_TEXT[e.kind], 'bad');
+      this.world.events.message(e.text ?? OFFENSE_TEXT[e.kind], 'bad');
     }
     this.world.events.emit({ ...e, witnessed: true });
   }

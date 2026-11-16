@@ -378,7 +378,7 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 
 1. `src/gameplay/Closures.ts` rolls hard and soft closures for the session, with the connectivity and “GPS path hits a fence” tests from section 5.2.
 2. Extend `Pathfinder` with a blocked-edge set. GPS gets none. Traffic and police get the hard set.
-3. Hard closure view: striped rails, fence, excavator or gravel, orange signs. Static colliders, real damage.
+3. Hard closure view: striped rails, fence, excavator or gravel, orange signs. Static colliders, real damage. Signs should resemble the ones in the `inspo` folder, orange signs with `RUE BARREE` and `DETOUR`.
 4. Cone prop: instanced mesh, a small sim list of positions and velocities, shoved by the player and by traffic, no damage. Lines have ids and the two-strike `chantier` offense from section 5.3, including the call-in that counts as witnessed and the patrol vector on the second strike.
 5. Loose cones with no line id, around pits and corners, same prop, no offense.
 6. HUD lines for the fence and for each strike.

@@ -1,6 +1,6 @@
 import type { Rider } from '../ai/Rider';
 import type { SpatialHash } from '../physics/SpatialHash';
-import type { Vec2 } from '../types';
+import type { Lane, Vec2 } from '../types';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
 import type { TrafficLights } from '../world/TrafficLights';
@@ -17,6 +17,21 @@ export interface Walker {
   active: boolean;
   /** Out on the carriageway (crossing, or picking themselves up after diving away from the player). */
   onRoad: boolean;
+}
+
+/** What the AI needs to know about the session's road works (`gameplay/Closures.ts`). */
+export interface Roadworks {
+  /** Hard-closed edge: traffic never turns into it, nothing spawns on it. */
+  closedEdge(id: number): boolean;
+  /** A lane closed by a cone taper: traffic never drives into it (the other lanes of the road stay open). */
+  conedLane(id: number): boolean;
+  /** Meters along the lane from p to a fence across it / to a cone taper in it (Infinity: none ahead). */
+  barrierAhead(lane: Lane, p: Vec2): number;
+  conesAhead(lane: Lane, p: Vec2): number;
+  /** Inside (or within `margin` of) a fenced work zone. */
+  inWorkZone(p: Vec2, margin?: number): boolean;
+  /** A curb parking bay with cones standing in it. */
+  reservedBay(p: Vec2): boolean;
 }
 
 /** Shared simulation context passed to systems. */
@@ -38,6 +53,8 @@ export class World {
    * parked cars, speed, the lot's sidewalk) or start a chase. Set by `gameplay/Gymkhana.ts`.
    */
   onCourse = false;
+  /** Rue barrée and cone lines (PRD Phase 7); null: an open city (headless tools). */
+  roadworks: Roadworks | null = null;
 
   constructor(
     readonly city: CityModel,

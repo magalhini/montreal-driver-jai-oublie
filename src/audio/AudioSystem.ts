@@ -117,6 +117,12 @@ export class AudioSystem implements ViewSystem {
       const player = e.car === w.player.id;
       this.sfx.crash({ pos: at(e.pos.x, e.pos.z, e.car), bus: mx.effects, cat: 'crashes', ref: player ? 6 : 5, wet: 0.5 }, 0.18, 'prop');
     });
+    // Plastic cone knocked over (PRD 5.3): the prop clatter, quiet
+    ev.on('coneHit', (e) => {
+      if (Math.hypot(e.pos.x - this.ls.pos.x, e.pos.z - this.ls.pos.z) > 80) return;
+      const k = clamp(e.speed / 25, 0.05, 0.16);
+      this.sfx.crash({ pos: at(e.pos.x, e.pos.z, e.car), bus: mx.effects, cat: 'crashes', ref: e.car === w.player.id ? 5 : 4, wet: 0.4 }, k, 'prop');
+    });
     ev.on('wrecked', () => {
       const p = w.player;
       const spot = { pos: { x: p.pos.x, y: p.y + 0.6, z: p.pos.z }, bus: mx.effects, cat: 'crashes' as const, ref: 8, wet: 0.8 };

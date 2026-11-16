@@ -40,6 +40,9 @@ import { Breakdown } from "./gameplay/Breakdown";
 import { BreakdownView } from "./gameplay/BreakdownView";
 import { PitStopSystem } from "./gameplay/PitStop";
 import { PotholeHits } from "./gameplay/PotholeHits";
+import { Closures, closureSalt, defaultAnchors } from "./gameplay/Closures";
+import { Cones } from "./gameplay/Cones";
+import { Chantier } from "./gameplay/Chantier";
 import { OfficerView } from "./gameplay/OfficerView";
 import { CollisionSystem } from "./physics/Collision";
 import { SpatialHash } from "./physics/SpatialHash";
@@ -92,6 +95,8 @@ import { buildPitStops } from "./world/PitStopView";
 import { Potholes } from "./world/Potholes";
 import { buildPotholes } from "./world/PotholeView";
 import { buildMedians } from "./world/BoulevardMedians";
+import { buildClosures } from "./world/ClosureView";
+import { ConeView } from "./world/ConeView";
 import { buildRoads } from "./world/RoadMesh";
 import { buildStreetLamps } from "./world/StreetLamps";
 import { buildStreetProps } from "./world/StreetProps";
@@ -112,6 +117,14 @@ VehiclePhysics.ground = city.terrain;
 
 // Potholes are rolled first: the boulevard islands keep off them
 const potholes = new Potholes(city, CONFIG.SEED);
+// Rue barrée and cone lines (PRD Phase 7): rolled once per page load (`?closures=<n>` replays one), then frozen
+const closures = new Closures(
+  city,
+  CONFIG.SEED,
+  closureSalt(),
+  defaultAnchors(city),
+  potholes.pits,
+);
 // Everything added to the scene from here to the tiling below is static city (IMPROVEMENTS #20)
 const staticStart = r.scene.children.length;
 const envParts = buildEnvironment(r.scene, r.renderer, city);
@@ -131,7 +144,14 @@ const streetSignColliders = buildStreetSigns(city, r.scene);
 // Vieux-Montréal's cobbles: bare trees, bike racks and winter terraces on the sidewalks (PRD Phase 5)
 const oldCityColliders = buildOldCity(city, r.scene, streetLamps.positions);
 // Planted islands with bare trees down the middle of René-Lévesque and the other long boulevards
-const medianColliders = buildMedians(city, r.scene, potholes.pits);
+const medianColliders = buildMedians(
+  city,
+  r.scene,
+  potholes.pits,
+  closures.closed,
+);
+// Work zones: barricades, boards, fences and the machines behind them (colliders are the roll's)
+buildClosures(city, closures, r.scene);
 const canal = buildCanal(city, r.scene);
 buildAlleys(city, r.scene);
 // IMPROVEMENTS #20: garages (pit stops)
@@ -174,8 +194,10 @@ const statics = new SpatialHash([
   ...signPosts.colliders,
   ...lightView.colliders,
   ...landmarkColliders,
+  ...closures.colliders,
 ]);
 const world = new World(city, events, rng, statics, lights);
+world.roadworks = closures;
 signPosts.attach(events, statics);
 streetLamps.attach(events, statics);
 
@@ -259,7 +281,8 @@ traffic.target = trafficTarget(trafficLevel);
 traffic.populate();
 game.addSim(traffic);
 const heat = new Heat(world);
-const pathfinder = new Pathfinder(city);
+// Traffic and police know about the fences (PRD 5.2); the GPS gets its own pathfinder below, which doesn't
+const pathfinder = new Pathfinder(city, undefined, closures.closed);
 const police = new PoliceSystem(world, heat, pathfinder);
 police.populate();
 game.addSim(police);
@@ -283,6 +306,9 @@ const potholeHits = new PotholeHits(world, potholes);
 game.addSim(potholeHits);
 game.addSim({ update: () => world.compact() });
 game.addSim(new CollisionSystem(statics, () => world.cars, events));
+// Cones (PRD 5.3): shoved by every car after the collisions settled
+const cones = new Cones(world, closures);
+game.addSim(cones);
 game.addSim(signPosts);
 game.addView(signPosts);
 game.addSim(streetLamps);
@@ -298,6 +324,9 @@ breakdown.blocked = () =>
 breakdown.onRespawn = () => camRig.snap();
 game.addSim(breakdown);
 game.addSim(new OffenseDetector(world));
+// Cone lines breached, the call-ins and the "rue barrée" line
+const chantier = new Chantier(world, closures, cones, heat, police);
+game.addSim(chantier);
 game.addSim(heat);
 const bust = new BustSystem(world, heat, police, economy);
 bust.onRespawn = () => camRig.snap();
@@ -321,7 +350,8 @@ events.on("splash", (e) => {
   effects.splash(e.pos, e.y);
   if (e.car === player.id) camRig.addShake(0.5);
 });
-const gps = new Gps(world, pathfinder);
+// The GPS plans through every fence (PRD 5.2: that absence is the design)
+const gps = new Gps(world, new Pathfinder(city));
 game.addSim(gps);
 game.addSim({ update: (dt) => (world.time += dt) });
 events.on("wrecked", (e) => {
@@ -458,6 +488,7 @@ game.addView(lightView);
 const steam = new SteamVents(city, r.scene, r.camera);
 game.addView(steam);
 game.addView(carView);
+game.addView(new ConeView(cones, r.scene, city.terrain));
 const pedView = new PedestrianView(peds, r.scene, city.terrain);
 game.addView(pedView);
 game.addView(new DogView(dogs, peds, r.scene, city.terrain));
@@ -572,6 +603,9 @@ adoptSpec = addDebugPanels({
   tires,
   potholes,
   potholeHits,
+  closures,
+  cones,
+  chantier,
   openPitShop: (s) => shop.open(s),
 }).adoptSpec;
 const routeView = new RouteDebugView(
@@ -679,6 +713,7 @@ function resetSession(): void {
   police.standDown();
   heat.reset();
   potholeHits.reset();
+  chantier.reset();
   repair(player);
   player.teleport(start.pos, start.yaw);
   player.blinker = null;
@@ -765,6 +800,9 @@ function viewHeading(cam: THREE.Camera): number {
   parked,
   potholes,
   potholeHits,
+  closures,
+  cones,
+  chantier,
   signPosts,
   streetSignColliders,
   medianColliders,

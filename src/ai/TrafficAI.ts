@@ -100,6 +100,8 @@ export class TrafficSystem implements SimSystem {
     const pp = w.player.pos;
     const hit = w.city.randomLanePointNear(w.rng, pp, rMin, CONFIG.SPAWN_RADIUS);
     if (!hit) return;
+    // Nothing spawns on a fenced street or in a coned lane (it would only drive into the fence / the cones)
+    if (w.roadworks && (w.roadworks.closedEdge(hit.lane.edgeId) || w.roadworks.conedLane(hit.lane.id))) return;
     const d = dist(hit.pos, pp);
     if (!ignoreView && this.inView(hit.pos, d)) return;
     if (!this.clearAt(hit.pos, 14)) return;

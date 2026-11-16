@@ -28,6 +28,9 @@ import { VehiclePhysics } from '../src/vehicles/VehiclePhysics';
 import { solidParts } from '../src/world/Interiors';
 import { surfaceAt } from '../src/world/Surfaces';
 import { TrafficLights } from '../src/world/TrafficLights';
+import { Closures, defaultAnchors } from '../src/gameplay/Closures';
+import { Cones } from '../src/gameplay/Cones';
+import { rollPotholes } from '../src/world/Potholes';
 
 export interface SoakResult {
   seed: number;
@@ -51,6 +54,9 @@ export interface SoakResult {
   /** AI cars that sat still for `STALL_S` or longer (a locked junction, a queue that never moves), not counting queues behind the stuck bot. */
   stalls: number;
   msPerStep: number;
+  /** With `--closures`: AI cars that hit a work-zone fence (must stay 0), and cones knocked about. */
+  fenceHits?: number;
+  conesMoved?: number;
   /** One line per AI-vs-AI collision. */
   collisionLog: string[];
 }
@@ -58,7 +64,7 @@ export interface SoakResult {
 /** Standing still this long (s) counts as stalled: longer than any red phase. */
 const STALL_S = 90;
 
-export function soak(id: string, seed: number, seconds: number): SoakResult {
+export function soak(id: string, seed: number, seconds: number, withClosures = false): SoakResult {
   const map = resolveMap(id);
   if (!map || CONFIG.MAP !== map) throw new Error(`CONFIG.MAP is ${CONFIG.MAP}, expected ${map ?? id} (set NEON_MAP)`);
   const def = mapDef(map);
@@ -68,9 +74,12 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   const rng = new Rng(seed);
   const lights = new TrafficLights(city, rng);
   // Street furniture and landmark colliders are left out: the soak is about lanes, signals and cars
-  const statics = new SpatialHash([...city.buildings.flatMap(solidParts), ...city.walls]);
+  // `--closures` (PRD Phase 7): the session's fences and cone lines, rolled with the soak seed as the salt
+  const closures = withClosures ? new Closures(city, def.seed, seed, defaultAnchors(city), rollPotholes(city, def.seed)) : null;
+  const statics = new SpatialHash([...city.buildings.flatMap(solidParts), ...city.walls, ...(closures?.colliders ?? [])]);
   const world = new World(city, events, rng, statics, lights);
   world.mode = 'free';
+  world.roadworks = closures;
 
   const startLane = city.nearestLanePoint(city.startPos);
   const starter = FLEET[PLAYER_CAR];
@@ -88,7 +97,7 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   traffic.populate();
   add(traffic);
   const heat = new Heat(world);
-  const police = new PoliceSystem(world, heat, new Pathfinder(city));
+  const police = new PoliceSystem(world, heat, new Pathfinder(city, undefined, closures?.closed));
   police.populate();
   add(police);
   add(new ParkedCars(world));
@@ -103,9 +112,24 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
   add({ update: (dt) => world.cars.forEach((c) => c.step(dt)) });
   add({ update: () => world.compact() });
   add(new CollisionSystem(statics, () => world.cars, events));
+  const cones = closures ? new Cones(world, closures) : null;
+  if (cones) add(cones);
   add({ update: (dt) => (world.time += dt) });
 
   const res: SoakResult = { seed, seconds, redRuns: 0, crossings: 0, stopRuns: 0, stopCrossings: 0, aiCollisions: 0, parkedHits: 0, offRoad: 0, cars: 0, stalls: 0, msPerStep: 0, collisionLog: [] };
+  if (closures) {
+    res.fenceHits = 0;
+    events.on('collision', (e) => {
+      if (e.b !== null || !isAi(e.a) || !closures.inWorkZone(e.pos, 1)) return;
+      const key = `f${e.a}`;
+      const last = lastHit.get(key);
+      lastHit.set(key, world.time);
+      if (last !== undefined && world.time - last < 2) return;
+      res.fenceHits!++;
+      const c = world.carById(e.a)!;
+      res.collisionLog.push(`t=${world.time.toFixed(1)} ${c.kind} #${c.id} hit a work-zone fence at ${(c.phys.state.speed * 3.6).toFixed(0)} km/h, impulse ${Math.round(e.impulse)}`);
+    });
+  }
   const lastHit = new Map<string, number>();
   const isAi = (id: number | null) => {
     const k = id === null ? null : world.carById(id)?.kind;
@@ -206,6 +230,7 @@ export function soak(id: string, seed: number, seconds: number): SoakResult {
     }
   }
   res.msPerStep = (performance.now() - t0) / steps;
+  if (cones) res.conesMoved = cones.scattered;
   res.offRoad = samples ? off / samples : 0;
   res.cars = carSum / Math.max(1, Math.round(steps / 60));
   return res;
