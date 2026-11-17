@@ -125,7 +125,7 @@ const KEI_CAB: CabFit = {
 
 /** Driver's-eye interior fitted to a body style's greenhouse (car frame: +z forward, y up from the ground). */
 export function buildCockpit(style: BodyStyle): CockpitParts {
-  const st: CabFit = style === 'keitruck' ? KEI_CAB : PROFILES[style === 'truck' ? 'sedan' : style];
+  const st: CabFit = style === 'keitruck' ? KEI_CAB : PROFILES[style === 'truck' || style === 'pickup' ? 'sedan' : style];
   const [[bz, by], [tz, ty]] = st.ws; // windshield base and top (z, y)
   const wsZ = (y: number) => bz + ((y - by) / (ty - by)) * (tz - bz);
   const roofY = Math.max(...st.roof.map((p) => p[1]));

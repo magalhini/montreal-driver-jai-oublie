@@ -96,6 +96,7 @@ import { ConeView } from "./world/ConeView";
 import { buildRoads } from "./world/RoadMesh";
 import { buildStreetLamps } from "./world/StreetLamps";
 import { buildStreetProps } from "./world/StreetProps";
+import { buildShopSigns } from "./world/ShopSigns";
 import { buildRoadSigns } from "./world/RoadSigns";
 import { buildStreetSigns } from "./world/StreetSigns";
 import { SteamVents } from "./world/SteamVents";
@@ -128,6 +129,8 @@ const staticStart = r.scene.children.length;
 const envParts = buildEnvironment(r.scene, r.renderer, city);
 const roadMats = buildRoads(city, r.scene, map.markings);
 const buildings = buildBuildings(city.buildings, r.scene);
+// Montreal shop boards on some street faces (PRD 11B): IGA, Provigo, Starbucks, Tim Hortons, poutine
+buildShopSigns(city, r.scene);
 // Notre-Dame and the clock tower (their own meshes; their boxes are in `city.buildings` as colliders)
 buildLandmarks(city, r.scene);
 buildPoliceStation(city, r.scene);

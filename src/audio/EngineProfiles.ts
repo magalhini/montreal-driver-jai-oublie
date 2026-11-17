@@ -143,6 +143,7 @@ const BY_SPEC: Record<string, EngineId> = {
   'SPVM Cruiser': 'vEight',
   'Box Truck': 'diesel',
   'Kei Truck': 'triple',
+  Pickup: 'four',
   'Traffic Sedan': 'four',
 };
 

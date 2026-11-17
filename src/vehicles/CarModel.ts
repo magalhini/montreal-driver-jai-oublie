@@ -25,7 +25,7 @@ export interface CarParts {
   rear: THREE.BufferGeometry; // tail lights
   barL?: THREE.BufferGeometry; // police light bar halves
   barR?: THREE.BufferGeometry;
-  /** Taxi roof lamp (lit amber for hire, red with a fare aboard). */
+  /** Taxi roof lamp (green, Montreal: white body, green light). */
   sign?: THREE.BufferGeometry;
   wheelPos: [number, number, number][]; // FL, FR, RL, RR (+ inner rear duals on trucks); the first two steer
   /** Lens centers on the body surface, for glow halos. */
@@ -40,7 +40,8 @@ export interface CarParts {
 
 const baseCache = new Map<string, BaseParts>();
 const cache = new Map<string, CarParts>();
-const TAXI_COLOR = 0xe0b020;
+/** White paint that marks a sedan as a taxi. The roof lamp and the green belt are added for this color. */
+export const TAXI_COLOR = 0xf4f7f2;
 
 /** Procedural car parts for a body style and paint color (cached). `detail` adds the player's extra bodywork. */
 export function buildCarParts(style: BodyStyle, color: number, detail?: CarDetail): CarParts {

@@ -3,18 +3,19 @@ import { dist, dot, fwd } from '../core/math';
 import type { World } from '../core/World';
 import type { Lane, SimSystem, Vec2 } from '../types';
 import { Car, type BodyStyle } from '../vehicles/Car';
-import { BOX_TRUCK, KEI_TRUCK, MAME, TRAFFIC_SEDAN } from '../vehicles/CarSpec';
+import { TAXI_COLOR } from '../vehicles/CarModel';
+import { BOX_TRUCK, PICKUP, TRAFFIC_SEDAN } from '../vehicles/CarSpec';
 import { LaneDriver } from './LaneDriver';
 
 const COLORS = [0xe8e8e8, 0x9aa0a8, 0x18181d, 0xa01818, 0x1c2a5a, 0xc8b48a, 0x2a7a7a, 0x2f5a3a, 0xd8d0c0, 0x5a2a4a];
-const STYLES: BodyStyle[] = ['sedan', 'sedan', 'sedan', 'kei', 'kei', 'wagon', 'wagon', 'coupe', 'city'];
-/** Cream, red, sky, yellow, green, black: the small cars stand out from the sedan palette. */
-const CITY_COLORS = [0xf4f1e8, 0xc4382a, 0x7dbae0, 0xf0d24a, 0x3d8f62, 0x1a1a1c];
+/** Full-size cars only (PRD 11B): no kei, no bubble car. Sedans are the majority, and the modern shape. */
+const STYLES: BodyStyle[] = ['sedan', 'sedan', 'sedan', 'sedan', 'wagon', 'wagon', 'coupe'];
 /** Mostly white cabs, a few pale blue / green / navy ones. */
 const TRUCK_COLORS = [0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0x8fb0c8, 0x5f8a6a, 0x26406e];
-const KEI_TRUCK_COLORS = [0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0x9aa0a8, 0x26406e, 0x5f8a6a];
-/** Share of spawns that are trucks ("the occasional truck"), and at most this many box trucks around. */
-export const TRUCK_TUNING = { boxTruck: 0.06, keiTruck: 0.08, maxBoxTrucks: 3 };
+/** Pickup paints: white, silver, black, red, blue, dark green. */
+const PICKUP_COLORS = [0xf2f2f0, 0xb7bcc2, 0x1a1a1c, 0x8e1c1c, 0x1c355c, 0x1e3d28];
+/** Share of spawns that are trucks, and at most this many box trucks around. Pickups take the old kei-truck share. */
+export const TRUCK_TUNING = { boxTruck: 0.06, pickup: 0.1, maxBoxTrucks: 3 };
 
 /** Spawns, drives and despawns civilian traffic in a ring around the player. */
 export class TrafficSystem implements SimSystem {
@@ -57,23 +58,19 @@ export class TrafficSystem implements SimSystem {
     const rng = this.world.rng;
     const r = rng.next();
     if (r < TRUCK_TUNING.boxTruck && this.boxTrucks < TRUCK_TUNING.maxBoxTrucks) return 'truck';
-    if (r > 1 - TRUCK_TUNING.keiTruck) return 'keitruck';
+    if (r > 1 - TRUCK_TUNING.pickup) return 'pickup';
     return rng.pick(STYLES);
   }
 
   spawnCar(lane: Lane, pos: Vec2, opts?: { style?: BodyStyle; color?: number }): Car {
     const rng = this.world.rng;
     const style = opts?.style ?? this.pickStyle();
-    const palette = style === 'truck' ? TRUCK_COLORS : style === 'keitruck' ? KEI_TRUCK_COLORS : style === 'city' ? CITY_COLORS : COLORS;
-    const color = opts?.color ?? (style === 'sedan' && rng.chance(0.15) ? 0xe0b020 : rng.pick(palette));
+    const palette = style === 'truck' ? TRUCK_COLORS : style === 'pickup' ? PICKUP_COLORS : COLORS;
+    const taxi = style === 'sedan' && rng.chance(0.14);
+    const color = opts?.color ?? (taxi ? TAXI_COLOR : rng.pick(palette));
     const yaw = Math.atan2(lane.dir.x, lane.dir.z);
-    const spec = style === 'truck' ? BOX_TRUCK : style === 'keitruck' ? KEI_TRUCK : style === 'city' ? MAME : TRAFFIC_SEDAN;
+    const spec = style === 'truck' ? BOX_TRUCK : style === 'pickup' ? PICKUP : TRAFFIC_SEDAN;
     const car = new Car('traffic', spec, { style, color }, pos, yaw);
-    if (style === 'kei') {
-      car.phys.spec.halfLength = 1.65;
-      car.phys.spec.halfWidth = 0.72;
-      car.phys.spec.mass = 750;
-    }
     const sp = car.phys.state;
     const v0 = this.world.city.edges[lane.edgeId].speedLimit * 0.7;
     sp.vel.x = lane.dir.x * v0;

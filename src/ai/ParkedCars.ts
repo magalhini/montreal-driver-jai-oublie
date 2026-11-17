@@ -2,14 +2,15 @@ import { dist, wrapAngle } from '../core/math';
 import type { World } from '../core/World';
 import type { SimSystem, Vec2 } from '../types';
 import { Car, type BodyStyle, type CarLook } from '../vehicles/Car';
-import { MAME, POLICE_CRUISER, TRAFFIC_SEDAN, type CarSpec } from '../vehicles/CarSpec';
+import { TAXI_COLOR } from '../vehicles/CarModel';
+import { POLICE_CRUISER, TRAFFIC_SEDAN, type CarSpec } from '../vehicles/CarSpec';
 import { repair } from '../vehicles/Damage';
 import { cumulative, tangentAt } from '../world/Polyline';
 
-const specFor = (style: BodyStyle): CarSpec => (style === 'police' ? POLICE_CRUISER : style === 'city' ? MAME : TRAFFIC_SEDAN);
+const specFor = (style: BodyStyle): CarSpec => (style === 'police' ? POLICE_CRUISER : TRAFFIC_SEDAN);
 
-const COLORS = [0xe8e8e8, 0x9aa0a8, 0x18181d, 0xa01818, 0x1c2a5a, 0xc8b48a, 0x2a7a7a, 0x2f5a3a, 0xd8d0c0, 0x5a2a4a, 0xe0b020];
-const STYLES: BodyStyle[] = ['sedan', 'sedan', 'kei', 'kei', 'wagon', 'coupe', 'city'];
+const COLORS = [0xe8e8e8, 0x9aa0a8, 0x18181d, 0xa01818, 0x1c2a5a, 0xc8b48a, 0x2a7a7a, 0x2f5a3a, 0xd8d0c0, 0x5a2a4a];
+const STYLES: BodyStyle[] = ['sedan', 'sedan', 'sedan', 'wagon', 'coupe'];
 const WAKE = 150;
 const SLEEP = 210;
 
@@ -184,14 +185,10 @@ export class ParkedCars implements SimSystem {
       const slot = g.slots[i];
       // A curb bay someone is standing in (the player parked there, a car pulled over) stays empty this time
       if (g.curb && w.cars.some((c) => !c.removed && dist(c.pos, slot.pos) < c.halfL + 2.6)) continue;
-      const look: CarLook = slot.look ?? { style: STYLES[Math.floor(r * 97) % STYLES.length], color: COLORS[Math.floor(r * 211) % COLORS.length] };
-      const style = look.style;
+      const style = slot.look?.style ?? STYLES[Math.floor(r * 97) % STYLES.length];
+      const taxi = !slot.look && style === 'sedan' && bayHash(slot.pos) < 0.1;
+      const look: CarLook = slot.look ?? { style, color: taxi ? TAXI_COLOR : COLORS[Math.floor(r * 211) % COLORS.length] };
       const car = new Car('parked', specFor(style), { ...look }, slot.pos, slot.yaw);
-      if (style === 'kei') {
-        car.phys.spec.halfLength = 1.65;
-        car.phys.spec.halfWidth = 0.72;
-        car.phys.spec.mass = 750;
-      }
       // Always the same few bays: out of the band, its inner side `intrude` into the lane, hazards on
       let home = slot;
       const D = DOUBLE_PARK_TUNING;

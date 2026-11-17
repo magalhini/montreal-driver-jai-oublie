@@ -22,8 +22,8 @@ const MAT = {
   redOn: new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.1, 0.1), toneMapped: false }),
   blueOn: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.15, 0.35, 1), toneMapped: false }),
   barOff: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.25, 0.05, 0.08) }),
-  /** For hire: the warm 空車 lamp. */
-  taxiFree: new THREE.MeshBasicMaterial({ color: new THREE.Color(1, 0.62, 0.16), toneMapped: false }),
+  /** For hire: Montreal's green roof lamp on a white cab. */
+  taxiFree: new THREE.MeshBasicMaterial({ color: new THREE.Color(0.35, 1, 0.45), toneMapped: false }),
   /** Fare aboard: the lamp goes red. */
   lampOff: new THREE.MeshStandardMaterial({ color: 0x9a9a90, roughness: 0.15, metalness: 0.6 }),
   tailOff: new THREE.MeshStandardMaterial({ color: 0x3a0806, roughness: 0.2, metalness: 0.4 }),
@@ -74,8 +74,8 @@ const GLOW = {
   blinkCore: { color: new THREE.Color(2.4, 1.0, 0.12), size: 0.32 },
   blinkHalo: { color: new THREE.Color(1.1, 0.42, 0.03), size: 1.5 },
   blinkSide: { color: new THREE.Color(1.3, 0.52, 0.05), size: 0.9 },
-  /** Roof lamp, for hire. */
-  taxiFree: { color: new THREE.Color(1.15, 0.62, 0.14), size: 1.15 },
+  /** Roof lamp, for hire: green. */
+  taxiFree: { color: new THREE.Color(0.35, 1.15, 0.42), size: 1.15 },
   /** Roof lamp with a fare aboard. */
 };
 /**

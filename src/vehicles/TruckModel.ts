@@ -4,6 +4,7 @@ import type { CarParts } from './CarModel';
 import { bake, Kit, lensGeo, look, paintBase, type Base } from './CarKit';
 import { BLACK, CHROME, CHROME_C, GLASS, GLASS_C, MATTE, TRIM } from './CarMaterial';
 import { buildBoxTruck } from './TruckBox';
+import { buildPickup } from './TruckPickup';
 import type { P3, TruckCtx } from './TruckCab';
 import { buildKeiTruck, keiLoad } from './TruckKei';
 
@@ -13,6 +14,7 @@ import { buildKeiTruck, keiLoad } from './TruckKei';
  */
 export const TRUCK_DIMS: Record<TruckStyle, { L: number; W: number; r: number; wf: number; wr: number; duals: boolean; tf: number; tr: number; ti: number }> = {
   truck: { L: 5.7, W: 1.94, r: 0.38, wf: 1.75, wr: -1.3, duals: true, tf: 0.8, tr: 0.835, ti: 0.59 },
+  pickup: { L: 5.4, W: 1.94, r: 0.36, wf: 1.68, wr: -1.42, duals: false, tf: 0.82, tr: 0.82, ti: 0 },
   keitruck: { L: 3.4, W: 1.48, r: 0.28, wf: 1.15, wr: -0.85, duals: false, tf: 0.63, tr: 0.63, ti: 0 },
 };
 
@@ -47,11 +49,12 @@ function buildBase(style: TruckStyle, load: number, detail?: CarDetail): TruckBa
     tailPos: [],
   };
   if (style === 'truck') buildBoxTruck(c);
+  else if (style === 'pickup') buildPickup(c);
   else buildKeiTruck(c, load, detail === 'work');
   return { base: bake(c.kit), front: lensGeo(c.heads), rear: lensGeo(c.tails), headPos: c.headPos, tailPos: c.tailPos };
 }
 
-/** Cab-over truck parts: a 2-ton aluminium box van (TruckBox) or a kei flatbed (TruckKei). Paint is the cab (and kei bed) color. */
+/** Truck parts: a box van, a pickup, or the unused kei flatbed. Paint is the cab (and bed) color. */
 export function buildTruckParts(style: TruckStyle, color: number, detail?: CarDetail): CarParts {
   const d = TRUCK_DIMS[style];
   const load = style === 'keitruck' && detail !== 'work' ? keiLoad(color) : 0;

@@ -98,7 +98,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   addPotholePanel(sys);
   addClosurePanel(sys);
   Debug.watch('cars', () => {
-    const trucks = [...traffic.drivers.values()].filter((d) => d.car.look.style === 'truck' || d.car.look.style === 'keitruck').length;
+    const trucks = [...traffic.drivers.values()].filter((d) => d.car.look.style === 'truck' || d.car.look.style === 'pickup').length;
     const moods = { yield: 0, evade: 0, ped: 0 };
     for (const d of traffic.drivers.values()) if (d.mood !== 'cruise') moods[d.mood]++;
     return `${world.cars.length} (traffic ${traffic.drivers.size}, trucks ${trucks}) yield ${moods.yield} evade ${moods.evade} ped ${moods.ped}`;
@@ -125,7 +125,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   streetFolder.add(RIDER_TUNING, 'scooters', 0, 1, 0.05).name('scooter share');
   streetFolder.add(DOG_TUNING, 'share', 0, 5, 0.1).name('dog walkers x');
   streetFolder.add(TRUCK_TUNING, 'boxTruck', 0, 1, 0.01).name('box truck share');
-  streetFolder.add(TRUCK_TUNING, 'keiTruck', 0, 1, 0.01).name('kei truck share');
+  streetFolder.add(TRUCK_TUNING, 'pickup', 0, 1, 0.01).name('pickup share');
   streetFolder.add(TRUCK_TUNING, 'maxBoxTrucks', 0, 10, 1).name('max box trucks');
   const laneAhead = (d: number) => {
     const f = fwd(player.yaw);
@@ -134,7 +134,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   streetFolder.add({ cyclist: () => { const h = laneAhead(30); riders.spawn(h.lane, h.t, 'bicycle'); } }, 'cyclist').name('spawn cyclist ahead');
   streetFolder.add({ scooter: () => { const h = laneAhead(30); riders.spawn(h.lane, h.t, 'scooter'); } }, 'scooter').name('spawn scooter ahead');
   streetFolder.add({ truck: () => { const h = laneAhead(40); traffic.spawnCar(h.lane, h.pos, { style: 'truck' }); } }, 'truck').name('spawn truck ahead');
-  streetFolder.add({ kei: () => { const h = laneAhead(40); traffic.spawnCar(h.lane, h.pos, { style: 'keitruck' }); } }, 'kei').name('spawn kei truck ahead');
+  streetFolder.add({ pickup: () => { const h = laneAhead(40); traffic.spawnCar(h.lane, h.pos, { style: 'pickup' }); } }, 'pickup').name('spawn pickup ahead');
   Debug.watch('heat', () => {
     const short: Record<OffenseKind, string> = {
       redLight: 'red',

@@ -4,7 +4,7 @@
  * instance (T39); only the roof grime reads world xz.
  *
  * `uDay` (0 night, 1 the winter afternoon) turns most windows into dark glass that reflects the sky, drops
- * the Japanese shop dressing (glyph sign bands, noren), and `uWindows` scales everything the facades emit.
+ * the night glow on shop fascias, and `uWindows` scales everything the facades emit. Shop names are mesh boards.
  * `aMat` lays brick (1) or dressed stone (2) coursing over the wall color.
  */
 export const VERT_HEAD = /* glsl */ `
@@ -209,23 +209,14 @@ export const FRAG_BODY = /* glsl */ `
             float door = 1.0 - step(0.13, abs(f.x - doorX));
             float frame = (1.0 - step(0.012, abs(abs(f.x - doorX) - 0.13))) * step(f.y, 0.8);
             float inner = (0.5 + 0.5 * f.y) * mix(1.0, shelves * goods, 1.0 - door);
-            // Noren over some doors: dyed cloth in strips, glowing from the shop light behind
-            float hasNoren = step(0.62, bh(vec2(floor(g.x), seed + 4.0))) * (1.0 - uDay);
-            float noren = hasNoren * door * step(0.52, f.y) * step(f.y, 0.83) * step(fract((f.x - doorX) * sw / 0.32 + 0.5), 0.9);
-            vec3 cloth = bh(vec2(floor(g.x), seed + 6.0)) < 0.5 ? vec3(0.08, 0.12, 0.45) : vec3(0.6, 0.06, 0.06);
-            emit += front * sc * 0.22 * inner * (1.0 - frame * 0.8) * (1.0 - noren);
-            emit += noren * (cloth * 0.6 + sc * 0.05);
+            emit += front * sc * 0.22 * inner * (1.0 - frame * 0.8);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.05), front);
-            glass = front * 0.4 * (1.0 - noren);
-            // Lit sign band (kanban) above the shopfront: the shop's color, a row of light glyphs in the middle
+            glass = front * 0.4;
+            // Painted fascia. The words (IGA, Provigo, Tim Hortons…) are mesh boards in ShopSigns.
             float band = cellBox(f, vec2(0.02, 0.865), vec2(0.98, 0.985), fw);
             vec3 kc = shopLight(bh(vec2(floor(g.x) * 3.3, seed + 1.0)));
-            float gc = f.x * sw / 0.4;
-            float glyph = step(0.3, bh(vec2(floor(gc), floor(g.x) + seed))) * cellBox(vec2(fract(gc), (f.y - 0.865) / 0.12), vec2(0.14, 0.2), vec2(0.86, 0.82), vec2(fwidth(gc), fw.y / 0.12));
-            float text = step(0.22, f.x) * step(f.x, 0.78);
-            // By day the band is a painted fascia: no lit glyphs
-            emit += band * (kc * 0.22 + glyph * text * mix(vec3(1.0), kc, 0.3) * 0.55 * (1.0 - uDay));
-            diffuseColor.rgb = mix(diffuseColor.rgb, kc * mix(0.2, 0.32, uDay), band);
+            emit += band * kc * 0.08 * (1.0 - uDay);
+            diffuseColor.rgb = mix(diffuseColor.rgb, kc * mix(0.22, 0.35, uDay), band);
           } else {
             float rib = 0.75 + 0.25 * sin(v * 52.0);
             diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.22, 0.23, 0.25) * rib, front);

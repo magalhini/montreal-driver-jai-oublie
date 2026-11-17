@@ -4,40 +4,16 @@ import type { CarDetail, CarStyle } from './Car';
 import type { BodyProfile } from './BodyProfiles';
 import { circle, disc, onX, prep, rbox, slice, strip, yAt } from './CarGeometry';
 import { look, type Kit } from './CarKit';
-import { AMBER, BLACK, CHROME, CHROME_C, GLOW, GOLD, MATTE, TRIM, WHITE, rgb } from './CarMaterial';
+import { BLACK, CHROME, CHROME_C, GLOW, GOLD, MATTE, TRIM, rgb } from './CarMaterial';
 
-const archSpan = (st: BodyProfile): [number, number] => {
-  const R = st.r + (st.arch?.[0] ?? 0.055);
-  return [st.wr + R + 0.08, st.wf - R - 0.08];
-};
-
-/** Checker squares along both doors, sitting just proud of the skin. */
-function checkers(kit: Kit, st: BodyProfile, y: number, h: number): void {
-  const hw = st.W / 2;
-  const [z0, z1] = archSpan(st);
-  const n = Math.max(8, Math.round((z1 - z0) / 0.12));
-  const step = (z1 - z0) / n;
-  const dark = look(BLACK, MATTE);
-  const light = look(WHITE);
-  for (let i = 0; i < n; i++) {
-    const a = z0 + step * i;
-    kit.both(rbox(a, a + step * 0.92, y, y + h, hw + 0.006, hw + 0.016, 0.003, 0.002), i % 2 === 0 ? dark : light);
-  }
-}
-
-/** Hired Crown: white roof, company stripe, door checkers and badge, mudflaps, a fender aerial. The roof sign is the sedan's. */
+/** Player taxi: door badge, mudflaps, a fender aerial. The white paint, green belt and roof lamp are on every cab. */
 function addTaxi(kit: Kit, st: BodyProfile): void {
   const hw = st.W / 2;
   const hl = st.L / 2;
   const dark = look(BLACK, MATTE);
   const chrome = look(CHROME_C, CHROME);
-  const green = look(rgb(0.04, 0.22, 0.09));
   const roof = [st.ws[1], ...st.roof, st.bl[0]];
   const top = Math.max(...roof.map((p) => p[1]));
-  kit.add(strip(roof, -0.42, 0.42, 0.012), look(WHITE));
-  checkers(kit, st, st.belt - 0.2, 0.075);
-  const [z0, z1] = archSpan(st);
-  kit.both(rbox(z0, z1, st.belt - 0.12, st.belt - 0.1, hw + 0.008, hw + 0.02, 0.004, 0.002), green);
   const bz = (st.doors[0] + (st.doors[1] ?? st.doors[0])) / 2;
   const by = st.belt - 0.28;
   kit.both(onX(circle(bz, by, 0.055), hw + 0.012), chrome);
@@ -48,7 +24,7 @@ function addTaxi(kit: Kit, st: BodyProfile): void {
   const az = hl - 0.55;
   const ay = yAt([st.nose[st.nose.length - 1], ...st.hood], az);
   kit.add(prep(new THREE.CylinderGeometry(0.003, 0.005, 0.46, 5).translate(hw - 0.16, ay + 0.24, az)), dark);
-  kit.both(rbox(-0.22, -0.08, top + 0.004, top + 0.028, 0.4, 0.52, 0.006, 0.003), look(AMBER, GLOW));
+  kit.both(rbox(-0.22, -0.08, top + 0.004, top + 0.028, 0.4, 0.52, 0.006, 0.003), look(rgb(0.12, 0.55, 0.22), GLOW));
 }
 
 /** Parked SPVM cruiser: a push bar, steady corner lamps, a pillar spotlight and a second aerial. The stripe and the words are on every police body. */

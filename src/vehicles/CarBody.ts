@@ -504,6 +504,11 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   }
   let sign: THREE.BufferGeometry | undefined;
   if (taxi) {
+    // Montreal cab: white paint, one green belt. The roof lamp is a separate mesh so it can glow green.
+    const green = look(rgb(0.07, 0.4, 0.16));
+    const z0 = st.wr + R + 0.08;
+    const z1 = st.wf - R - 0.08;
+    kit.both(rbox(z0, z1, st.belt - 0.2, st.belt - 0.1, hw + 0.008, hw + 0.018, 0.004, 0.002), green);
     const zc = -0.05;
     const y = yAt(roofPts, zc) - 0.01;
     kit.add(rbox(zc - 0.075, zc + 0.075, y, y + 0.04, -0.17, 0.17, 0.015, 0.008), dark);

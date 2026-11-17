@@ -213,11 +213,10 @@ export function streetTexture(): THREE.CanvasTexture {
     else g.fillText(text, x0, y0);
     g.restore();
   };
-  neon('ラーメン', 160, 210, '#ff3ea5', 44);
-  neon('BAR', 420, 150, '#3ef2ff', 52);
-  neon('カラオケ', 640, 230, '#ffb43e', 40);
-  neon('薬', 860, 120, '#9dff6a', 30, true);
-  neon('ホテル', 930, 140, '#ff3ea5', 34, true);
+  neon('IGA', 150, 200, '#ff2a2a', 52);
+  neon('TIM HORTONS', 430, 155, '#ff3b3b', 28);
+  neon('PROVIGO', 680, 220, '#ffd000', 32);
+  neon('POUTINE', 920, 170, '#ffe14a', 26);
   // Wet street and the reflections in it
   const road = g.createLinearGradient(0, 380, 0, 512);
   road.addColorStop(0, '#120a1c');

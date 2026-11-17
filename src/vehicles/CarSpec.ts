@@ -83,8 +83,8 @@ export const TRAFFIC_SEDAN: CarSpec = {
   gripFront: 1.35,
   gripRear: 1.4,
   peakFalloff: 0.05,
-  halfWidth: 0.88,
-  halfLength: 2.3,
+  halfWidth: 0.91,
+  halfLength: 2.41,
   driftAssist: 0.9,
   yawDamping: 0.8,
   steerSpeed: 3.5,
@@ -136,7 +136,31 @@ export const BOX_TRUCK: CarSpec = {
   steerSpeed: 2.6,
 };
 
-/** Kei flatbed truck: kei-car size and weight. */
+/** Half-ton pickup (PRD 11B): the kei flatbed's place in traffic. Conventional cab, open bed. */
+export const PICKUP: CarSpec = {
+  ...TRAFFIC_SEDAN,
+  name: "Pickup",
+  mass: 1980,
+  inertiaScale: 1.12,
+  cgToFront: 1.4,
+  cgToRear: 1.3,
+  cgHeight: 0.68,
+  halfWidth: 0.97,
+  halfLength: 2.7,
+  wheelRadius: 0.36,
+  peakTorque: 310,
+  peakRpm: 4200,
+  redline: 6200,
+  gripFront: 1.28,
+  gripRear: 1.32,
+  brakeForce: 16000,
+  drag: 0.55,
+  rollingResistance: 18,
+  maxSteer: 0.58,
+  steerSpeed: 2.8,
+};
+
+/** Kei flatbed truck: kei-car size and weight. Kept so the old mesh still builds; traffic does not spawn it. */
 export const KEI_TRUCK: CarSpec = {
   ...TRAFFIC_SEDAN,
   name: "Kei Truck",
