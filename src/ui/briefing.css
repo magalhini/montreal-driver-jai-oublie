@@ -81,6 +81,37 @@
   color: rgba(255, 255, 255, 0.92);
 }
 
+.briefing-controls {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(255, 180, 62, 0.25);
+}
+
+.briefing-controls dl {
+  display: grid;
+  grid-template-columns: repeat(3, auto);
+  gap: 8px 22px;
+  justify-content: start;
+  margin: 10px 0 0;
+}
+
+.briefing-controls dl > div {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.briefing-controls dt {
+  display: flex;
+  gap: 3px;
+}
+
+.briefing-controls dd {
+  margin: 0;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.85);
+}
+
 .briefing-actions {
   display: flex;
   gap: 12px;

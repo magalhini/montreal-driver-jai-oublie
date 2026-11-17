@@ -6,11 +6,11 @@ lanes        114630 ff2ef1de
 blocks          270 a86c5752
 buildings      9917 0b4f62f2
 walls            78 bb462a26
-features          1 ca4de3f3
+features          1 d6475f4c
 misc              1 9958a19f
 surfaces     386656 8d9e23ad
 heights       96664 7b5a63a7
 surfaceY      96664 4322d604
 water         96664 dc574185
 potholes       1292 d69744f6
-closures        109 b6b0b395
+closures        109 5880b16c

@@ -1,4 +1,5 @@
 import { CONFIG, KMH } from '../../config';
+import { STORAGE_STOP, storageStop } from '../../gameplay/MissionRoute';
 import { montrealRelief } from './Relief';
 import { leftVec, scale } from '../../core/math';
 import { Rng, hash01 } from '../../core/Rng';
@@ -249,6 +250,12 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   settleBuildings(city);
   // Last: the bays keep clear of every curb cut the planners above made
   f.curb = planCurbParking(city);
+  // Nobody parks on the winter-tire storage's circle
+  const store = storageStop(city);
+  const along = { x: Math.sin(store.yaw), z: Math.cos(store.yaw) };
+  f.curb = f.curb.filter(
+    (b) => b.edge !== store.edge || Math.abs((b.pos.x - store.pos.x) * along.x + (b.pos.z - store.pos.z) * along.z) > STORAGE_STOP.clearBays || (b.pos.x - store.pos.x) * store.curb.x + (b.pos.z - store.pos.z) * store.curb.z < -2,
+  );
   return city;
 }
 

@@ -1,9 +1,8 @@
 import type { Heat } from '../ai/Heat';
-import { dist } from '../core/math';
 import type { World } from '../core/World';
 import type { SimSystem, Vec2 } from '../types';
 import { DESTINATION_GARAGE, type PitStop } from '../world/PitStops';
-import { GPS_TUNING, type Gps } from './Gps';
+import type { Gps } from './Gps';
 import { garageVias, storagePoint, storageVias } from './MissionRoute';
 import type { Tires } from './Tires';
 
@@ -68,7 +67,7 @@ export class WinterTires implements SimSystem {
 
   /** Eastern garage, the one named Jacques Pneu. Null only if the city has no pit stops. */
   readonly garage: PitStop | null;
-  /** De la Montagne & Ottawa, where the winter tires are stored. */
+  /** The storage circle on Ottawa, where the winter tires wait. */
   private readonly storage: Vec2;
 
   constructor(
@@ -181,7 +180,6 @@ export class WinterTires implements SimSystem {
 
   update(dt: number): void {
     if (this.active && !this.done && this.heat.inPursuit) this.chased = true;
-    this.watchStorage();
     if (!this.mounting) return;
     // A bust or a tow takes the car. The drive stays on; the bay will mount the tires the next time.
     if (this.blocked() || this.world.mode !== 'free') {
@@ -211,7 +209,7 @@ export class WinterTires implements SimSystem {
     return this.pickedUp && this.active && !this.done && !this.mounting && !this.pendingMount && stop === this.garage;
   }
 
-  /** The first pin: down Lucien-L'Allier to the storage corner. */
+  /** The first pin: down Lucien-L'Allier and along Ottawa to the storage circle. */
   private aimStorage(): void {
     this.gps.setCourse(storageVias(this.world.city), this.storage, 'STORAGE');
   }
@@ -223,13 +221,17 @@ export class WinterTires implements SimSystem {
     this.gps.setCourse(garageVias(this.world.city), { x: g.bay.x, z: g.bay.z }, 'JACQUES PNEU');
   }
 
-  /** Driving through the storage corner loads the tires and retargets the GPS. */
-  private watchStorage(): void {
-    if (!this.active || this.done || this.pickedUp || this.mounting) return;
-    if (dist(this.world.player.pos, this.storage) >= GPS_TUNING.arrive) return;
+  /** The storage circle wants the car: the drive is on and the tires are not in it yet. */
+  get needsTires(): boolean {
+    return this.active && !this.done && !this.pickedUp && !this.mounting;
+  }
+
+  /** The storage scene put the tires in the trunk: retarget the GPS on the garage. */
+  loadTires(): void {
+    if (!this.needsTires) return;
     this.pickedUp = true;
     this.aimGarage();
-    this.world.events.message('Winter tires are in the car. Jacques Pneu is on the other side of town.', 'good', 7);
+    this.world.events.message('Winter tires are in the trunk. Jacques Pneu is on the other side of town.', 'good', 7);
   }
 
   private finish(): void {

@@ -2,6 +2,16 @@ import { DESTINATION_GARAGE } from '../world/PitStops';
 import { MISSION_BRIEF, MISSION_STEPS } from '../gameplay/WinterTires';
 import './briefing.css';
 
+/** Keys listed on the card, as the player first needs them. */
+const CONTROLS: [string[], string][] = [
+  [['W', 'A', 'S', 'D'], 'Drive'],
+  [['SPACE'], 'Handbrake'],
+  [['L'], 'Speed limiter'],
+  [['H'], 'Horn'],
+  [['C'], 'Camera'],
+  [['ESC'], 'Title menu'],
+];
+
 /**
  * The winter-tire card, up when that drive starts and before the car is released. Enter, the button, or
  * gamepad A starts the drive. Escape, the other button, or gamepad B goes back to the title.
@@ -22,6 +32,10 @@ export class Briefing {
         <p class="briefing-where">${DESTINATION_GARAGE} is across town.</p>
         <ol class="briefing-steps"></ol>
         <p class="briefing-body"></p>
+        <div class="briefing-controls">
+          <div class="briefing-kicker">CONTROLS</div>
+          <dl>${CONTROLS.map(([keys, what]) => `<div><dt>${keys.map((k) => `<kbd>${k}</kbd>`).join('')}</dt><dd>${what}</dd></div>`).join('')}</dl>
+        </div>
         <div class="briefing-actions">
           <button type="button" class="briefing-drive">DRIVE</button>
           <button type="button" class="briefing-back">TITLE</button>

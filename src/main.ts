@@ -28,6 +28,9 @@ import { Economy } from "./gameplay/Economy";
 import { Gps } from "./gameplay/Gps";
 import { Tires } from "./gameplay/Tires";
 import { WinterTires } from "./gameplay/WinterTires";
+import { TirePickup } from "./gameplay/TirePickup";
+import { TirePickupView } from "./gameplay/TirePickupView";
+import { storageStop } from "./gameplay/MissionRoute";
 import { Recovery } from "./gameplay/Recovery";
 import { Wreck, wreckDetail } from "./gameplay/Wreck";
 import { WreckView } from "./gameplay/WreckView";
@@ -101,7 +104,7 @@ import { buildStreetProps } from "./world/StreetProps";
 import { buildShopSigns } from "./world/ShopSigns";
 import { buildRoadSigns } from "./world/RoadSigns";
 import { buildStreetSigns } from "./world/StreetSigns";
-import { buildStorageBeacon } from "./world/StorageBeacon";
+import { buildTireStorage } from "./world/TireStorage";
 import { SteamVents } from "./world/SteamVents";
 import { TrafficLights } from "./world/TrafficLights";
 import { TrafficLightView } from "./world/TrafficLightView";
@@ -359,13 +362,20 @@ events.on("splash", (e) => {
 const gps = new Gps(world, new Pathfinder(city));
 game.addSim(gps);
 const mission = new WinterTires(world, tires, gps, heat);
-const storageBeacon = buildStorageBeacon(r.scene, city);
+const tireStorage = buildTireStorage(r.scene, city, storageStop(city));
 mission.blocked = () =>
   bust.phase !== "free" ||
   wreck.active ||
   breakdown.active ||
   recovery.active;
 game.addSim(mission);
+// The storage stop on Ottawa: stop in its circle and the scene loads the tires into the trunk
+const pickup = new TirePickup(world, storageStop(city));
+pickup.armed = () => mission.needsTires;
+pickup.blocked = mission.blocked;
+pickup.chased = () => police.pursuers > 0;
+pickup.onLoaded = () => mission.loadTires();
+game.addSim(pickup);
 pitStops.hint = (stop) => mission.bayHint(stop);
 game.addSim({ update: (dt) => (world.time += dt) });
 events.on("wrecked", (e) => {
@@ -445,6 +455,8 @@ game.onFrame((dt) => {
   input.poll();
   menu.update(dt);
   const back = input.pressed("pause") || input.pressed("escape");
+  // Escape skips the storage scene instead of pausing
+  if (pickup.playing && input.pressed("escape") && !menu.open) pickup.skip();
   const briefingOn = briefing.open;
   if (briefingOn) {
     const choice = briefing.poll(input.pressed("escape"));
@@ -480,7 +492,7 @@ game.onFrame((dt) => {
   ) {
     fullMap.toggle();
     game.setPaused("map", fullMap.open);
-  } else if (back && !fullMap.open) {
+  } else if (back && !fullMap.open && !pickup.playing) {
     game.setPaused("menu", true);
     menu.showPause();
   }
@@ -527,6 +539,9 @@ const riderView = new RiderView(world, r.scene, city.terrain, r.camera);
 game.addView(riderView);
 game.addView(new OfficerView(bust, r.scene, city.terrain));
 game.addView(new TicketAgentView(parkingTickets, r.scene, city.terrain));
+const pickupView = new TirePickupView(pickup, player, tireStorage, r.scene, city.terrain, () => carView.bodyOf(player.id));
+game.addView(pickupView);
+let pickupCam = false;
 const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
   city.terrain.heightAt(x, z),
 );
@@ -568,12 +583,17 @@ game.addView({
     orbitCenter.set(player.pos.x, 0, player.pos.z);
     if (wreck.playing) wreckView.aim(r.camera);
     else if (breakdown.playing) breakdownView.aim(r.camera);
-    else camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
+    else if (pickup.cinematic) pickupView.aim(r.camera, dt);
+    else {
+      if (pickupCam) camRig.snap();
+      camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
+    }
+    pickupCam = pickup.cinematic;
     // Post FX on top of the tuned settings: the wreck's punch
     post.boost.bloom = 0.55 * wreck.fx;
     post.boost.aberration = 0.0035 * wreck.fx;
     steam.rain = weather.rain;
-    const inCabin = camRig.interior && !breakdown.playing;
+    const inCabin = camRig.interior && !breakdown.playing && !pickup.cinematic;
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     hud.paused = game.pausedBy("debug") && !menu.open && !fullMap.open;
@@ -585,7 +605,6 @@ game.addView({
     hud.immune = world.immune;
     hud.cash = economy.cash;
     if (world.mode === "free") hud.objective = mission.objective();
-    storageBeacon.visible = mission.active && !mission.pickedUp;
     hud.felony = heat.value;
     hud.evading = heat.evading;
     hud.bust = bust.progress;
@@ -596,6 +615,7 @@ game.addView({
       wreck.fade,
       breakdown.fade,
       shop.fade,
+      pickup.fade,
     );
     hud.update(player, dt);
     tiles.update(r.camera);
@@ -694,6 +714,7 @@ const audio: AudioSystem = new AudioSystem({
       wreck.fade,
       breakdown.fade,
       shop.fade,
+      pickup.fade,
     ),
   hornHeld: () => input.isHeld("horn"),
   pursuit: () => heat.inPursuit,
@@ -771,6 +792,7 @@ function resetSession(): void {
   potholeHits.reset();
   chantier.reset();
   mission.clear();
+  pickup.reset();
   repair(player);
   player.teleport(start.pos, start.yaw);
   player.blinker = null;
@@ -821,6 +843,8 @@ function viewHeading(cam: THREE.Camera): number {
   weather,
   tires,
   mission,
+  pickup,
+  pickupView,
   briefing,
   signals,
   effects,

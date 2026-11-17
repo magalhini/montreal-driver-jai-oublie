@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import { Pathfinder, stitchRoute, type Route } from '../ai/Pathfinding';
-import { missionPins } from './MissionRoute';
+import { missionPins, storageStop } from './MissionRoute';
 import type { AABB, Lane, OrientedBox, RoadEdge, StreetClass, Vec2 } from '../types';
 import { inDriveway } from '../world/Features';
 import type { Pothole } from '../world/Potholes';
@@ -263,6 +263,10 @@ export class Closures {
   ) {
     const rng = new Rng((seed ^ SALT ^ Math.imul(salt + 1, 0x9e3779b1)) >>> 0);
     const keep = new Set<number>([city.nearestLanePoint(anchors.spawn).lane.edgeId, city.nearestLanePoint(anchors.goal).lane.edgeId]);
+    // The winter-tire storage's block: its circle has to be reachable and clear
+    const store = storageStop(city);
+    keep.add(store.edge);
+    this.keepClear = store.edge;
     this.rollHard(rng, keep);
     this.ensureGpsHitsFence(rng, keep, anchors);
     this.finishHard(rng);
@@ -270,7 +274,16 @@ export class Closures {
     // Merges roll from their own stream, so adding them moved nothing else
     this.rollMerges(new Rng((seed ^ SALT ^ 0x3e46 ^ Math.imul(salt + 1, 0x85ebca6b)) >>> 0));
     this.rollLoose(rng, pits);
+    // No cone on the storage circle, or on the sidewalk between it and the door
+    const near = (p: Vec2) => {
+      const t = Math.max(0, Math.min(1, ((p.x - store.pos.x) * (store.door.x - store.pos.x) + (p.z - store.pos.z) * (store.door.z - store.pos.z)) / ((store.door.x - store.pos.x) ** 2 + (store.door.z - store.pos.z) ** 2)));
+      return Math.hypot(p.x - (store.pos.x + (store.door.x - store.pos.x) * t), p.z - (store.pos.z + (store.door.z - store.pos.z) * t)) < 6;
+    };
+    for (let i = this.loose.length - 1; i >= 0; i--) if (near(this.loose[i])) this.loose.splice(i, 1);
   }
+
+  /** Edge no cone line or merge may take (the tire storage's block). */
+  private keepClear = -1;
 
   /** Lane merges (`LaneMerge`), by edge and by the closed lane. */
   readonly merges: LaneMerge[] = [];
@@ -694,7 +707,7 @@ export class Closures {
       const nRun = rng.int(T.runCones[0], T.runCones[1]);
       const board = rng.chance(0.5);
       const boardLeft = rng.chance(0.5);
-      if (!take || this.closed.has(e.id) || this.lines.length >= T.maxLines) continue;
+      if (!take || this.closed.has(e.id) || e.id === this.keepClear || this.lines.length >= T.maxLines) continue;
       const f = frame(e);
       const ids = ab ? e.lanesAB : e.lanesBA;
       if (!ids.length || f.L < 2 * T.endGap + taper + 10) continue;
