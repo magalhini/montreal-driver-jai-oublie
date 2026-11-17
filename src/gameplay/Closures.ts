@@ -820,13 +820,55 @@ export function closureSalt(): number {
 }
 
 /**
- * Until the winter-tire mission picks its own (PRD Phase 11): the session's start lane, and the garage
- * farthest east (the Berri side), as the GPS test's ends.
+ * Mission ends (PRD 5.1): a lane on the Guy / Sherbrooke side, pointed east, and the garage farthest east
+ * (Jacques Pneu, the Berri side). The roll keeps the GPS path between them crossing a fence, and never
+ * closes either of those edges. Free roam uses the same spawn, so it is not inside a work zone either.
  */
 export function defaultAnchors(city: CityModel): ClosureAnchors {
-  const start = city.nearestLanePoint(city.startPos);
+  const goal = eastGarage(city);
+  const start = westSpawn(city);
+  return { spawn: start.pos, heading: start.heading, goal };
+}
+
+/** The eastern pit's service circle, or a point on the east edge when the city has no garages. */
+function eastGarage(city: CityModel): Vec2 {
   const pits = city.features.pitStops;
-  const east = pits.length ? pits.reduce((a, p) => (p.bay.x > a.bay.x ? p : a)) : null;
-  const goal = east ? { x: east.bay.x, z: east.bay.z } : { x: city.bounds.maxX - 100, z: city.startPos.z };
-  return { spawn: start.pos, heading: start.lane.dir, goal };
+  if (!pits.length) return { x: city.bounds.maxX - 100, z: (city.bounds.minZ + city.bounds.maxZ) / 2 };
+  const east = pits.reduce((a, p) => (p.bay.x > a.bay.x ? p : a));
+  return { x: east.bay.x, z: east.bay.z };
+}
+
+/**
+ * Eastbound lane in the northwest of the grid (Guy / Sherbrooke), mid-block so the car is not sitting in
+ * a junction. Falls back to the northwestern-most eastbound lane if that corner has none.
+ */
+function westSpawn(city: CityModel): { pos: Vec2; heading: Vec2 } {
+  const b = city.bounds;
+  const xMax = b.minX + (b.maxX - b.minX) * 0.22;
+  const zMax = b.minZ + (b.maxZ - b.minZ) * 0.32;
+  const along = (l: { start: Vec2; end: Vec2 }): Vec2 => ({
+    x: l.start.x + (l.end.x - l.start.x) * 0.45,
+    z: l.start.z + (l.end.z - l.start.z) * 0.45,
+  });
+  const eastbound = city.lanes.filter((l) => l.dir.x > 0.75 && l.length > 40);
+  const pool = eastbound.filter((l) => {
+    const p = along(l);
+    return p.x <= xMax && p.z <= zMax;
+  });
+  const lanes = pool.length ? pool : eastbound;
+  let best = lanes[0] ?? city.lanes[0];
+  let bestKey = Infinity;
+  for (const l of lanes) {
+    const p = along(l);
+    const key = p.x + p.z + l.index * 30;
+    if (key < bestKey) {
+      bestKey = key;
+      best = l;
+    }
+  }
+  const guess = along(best);
+  const hit = city.nearestLanePoint(guess);
+  const lane = hit.lane.id === best.id ? hit.lane : best;
+  const pos = hit.lane.id === best.id ? hit.pos : guess;
+  return { pos, heading: { x: lane.dir.x, z: lane.dir.z } };
 }

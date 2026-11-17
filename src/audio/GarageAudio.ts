@@ -62,6 +62,8 @@ export class GarageAudio {
   private walkWas = 0;
   private ratchetAt = 0;
   private compAt = 0;
+  /** Forecourt tire change, audible with the city (the workshop bed stays faded out). */
+  private street!: GainNode;
 
   constructor(
     private readonly mx: Mixer,
@@ -71,6 +73,24 @@ export class GarageAudio {
     cat.connect(mx.gain(mx.roomSend, 0.6));
     this.amb = mx.gain(cat, 0);
     this.room = new LoopLayer(bank, 'garageRoom', this.amb);
+    // The tire mount plays on the street, outside the workshop fade.
+    this.street = mx.catGain('life', mx.effects);
+  }
+
+  /** Fetch the mount clips when the drive starts, so the bay is not waiting on the network. */
+  warm(): void {
+    this.bank.get('jack');
+    this.bank.get('impactWrench');
+    this.bank.get('ratchet');
+    this.bank.get('hood');
+  }
+
+  /** One tool in the winter-tire mount (PRD 5.1): jack, impact wrench, ratchet, hood. */
+  tire(step: 'jack' | 'wrench' | 'ratchet' | 'hood'): void {
+    if (step === 'jack') this.play('jack', 'pump4', 0.5, 0, this.street);
+    else if (step === 'wrench') this.play('impactWrench', 'long', 0.4, 0, this.street);
+    else if (step === 'ratchet') this.play('ratchet', 'run', 0.4, 0, this.street);
+    else this.play('hood', 'close', 0.45, 0, this.street);
   }
 
   /** `scene`: seconds since the car arrived (cutscene, then the menu), or null outside the garage. */
@@ -225,15 +245,15 @@ export class GarageAudio {
     }
   }
 
-  /** One burst cut from a recording, `delay` seconds from now. */
-  private play<S extends Sound>(sound: S, cue: CueOf<S>, level: number, delay = 0): void {
+  /** One burst cut from a recording, `delay` seconds from now. `dest` defaults to the workshop bed. */
+  private play<S extends Sound>(sound: S, cue: CueOf<S>, level: number, delay = 0, dest?: GainNode): void {
     const buf = this.bank.get(GARAGE_SOUNDS[sound].id);
     if (!buf) return;
     const [start, len] = (GARAGE_SOUNDS[sound].cues as Record<string, Cue>)[cue as string];
     const mx = this.mx;
     const src = mx.ctx.createBufferSource();
     src.buffer = buf;
-    const g = mx.gain(this.amb, level);
+    const g = mx.gain(dest ?? this.amb, level);
     src.connect(g);
     src.start(mx.now + 0.02 + delay, start, len);
     src.onended = () => {

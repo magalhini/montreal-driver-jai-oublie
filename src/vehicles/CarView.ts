@@ -377,11 +377,12 @@ export class CarView implements ViewSystem {
       v.root.rotation.set(-s.pitch, yaw, s.roll, 'YXZ');
       const roll = clamp(s.accelL * 0.011, -0.09, 0.09);
       const pitch = clamp(-s.accelF * 0.008, -0.06, 0.06);
-      v.body.rotation.set(pitch, 0, roll);
-      // suspension: squash on landing (damped bounce), sit lower under load, wheels drop in the air
+      // susPitch is nose-up, and positive body x is nose-down
+      v.body.rotation.set(pitch - s.susPitch, 0, roll);
+      // suspension: squash on landing (damped bounce), ride a pothole up and down, sit lower under load
       const bounce = Math.min(0.16, s.landImpact * 0.022) * Math.exp(-s.landT * 6) * Math.cos(s.landT * 16);
       const sag = clamp((s.load - 1) * 0.05, -0.03, 0.06);
-      v.body.position.y = Math.abs(roll) * 0.4 - bounce - (s.airborne ? -0.04 : sag);
+      v.body.position.y = Math.abs(roll) * 0.4 - bounce + s.heave - (s.airborne ? -0.04 : sag);
       v.droop += ((s.airborne ? 0.13 : 0) - v.droop) * Math.min(1, dt * 10);
       v.wheelAngle += (s.speed / v.r) * dt;
       v.rearAngle += drivenWheelRate(car, v.r) * dt;

@@ -23,16 +23,11 @@ import { RiderDodge } from "./ai/RiderDodge";
 import { Riders } from "./ai/Riders";
 import { RiderView } from "./ai/RiderView";
 import { TrafficSystem } from "./ai/TrafficAI";
-import {
-  TRAFFIC_LEVELS,
-  loadTrafficLevel,
-  saveTrafficLevel,
-  trafficTarget,
-} from "./gameplay/TrafficLevel";
 import { BustSystem } from "./gameplay/Bust";
 import { Economy } from "./gameplay/Economy";
 import { Gps } from "./gameplay/Gps";
 import { Tires } from "./gameplay/Tires";
+import { WinterTires } from "./gameplay/WinterTires";
 import { Recovery } from "./gameplay/Recovery";
 import { Wreck, wreckDetail } from "./gameplay/Wreck";
 import { WreckView } from "./gameplay/WreckView";
@@ -63,6 +58,7 @@ import { FullMap } from "./ui/FullMap";
 import { Hud } from "./ui/Hud";
 import { buildMapImage } from "./ui/MapImage";
 import { Menu, type PlayMode } from "./ui/Menu";
+import { Briefing } from "./ui/Briefing";
 import { currentMap } from "./maps";
 import { Messages } from "./ui/Messages";
 import { Minimap } from "./ui/Minimap";
@@ -117,12 +113,14 @@ VehiclePhysics.ground = city.terrain;
 
 // Potholes are rolled first: the boulevard islands keep off them
 const potholes = new Potholes(city, CONFIG.SEED);
-// Rue barrée and cone lines (PRD Phase 7): rolled once per page load (`?closures=<n>` replays one), then frozen
+// Rue barrée and cone lines (PRD Phase 7): rolled once per page load (`?closures=<n>` replays one), then frozen.
+// The anchors are the winter-tire drive: west spawn, eastern garage (PRD 5.1).
+const anchors = defaultAnchors(city);
 const closures = new Closures(
   city,
   CONFIG.SEED,
   closureSalt(),
-  defaultAnchors(city),
+  anchors,
   potholes.pits,
 );
 // Everything added to the scene from here to the tiling below is static city (IMPROVEMENTS #20)
@@ -201,11 +199,10 @@ world.roadworks = closures;
 signPosts.attach(events, statics);
 streetLamps.attach(events, statics);
 
-// The car starts on the street by the Griffintown square, in the lane, pointed the way traffic goes
-const lane = city.nearestLanePoint(city.startPos);
+// West side of the grid, pointed east: the winter-tire spawn, and free roam's too (PRD Phase 11)
 const start = {
-  pos: lane.pos,
-  yaw: Math.atan2(lane.lane.dir.x, lane.lane.dir.z),
+  pos: anchors.spawn,
+  yaw: Math.atan2(anchors.heading.x, anchors.heading.z),
 };
 // What the pit garage has done to the car (saved between sessions)
 const builds = new Builds();
@@ -275,9 +272,8 @@ game.addSim(ignition);
 const signals = new TurnSignals(world);
 game.addSim(signals);
 const traffic = new TrafficSystem(world);
-// Traffic level = difficulty (title / pause menu), saved between sessions
-let trafficLevel = loadTrafficLevel();
-traffic.target = trafficTarget(trafficLevel);
+// Always Busy: a full boulevard, in the winter-tire drive and in free roam.
+traffic.target = CONFIG.MAX_TRAFFIC;
 traffic.populate();
 game.addSim(traffic);
 const heat = new Heat(world);
@@ -353,6 +349,14 @@ events.on("splash", (e) => {
 // The GPS plans through every fence (PRD 5.2: that absence is the design)
 const gps = new Gps(world, new Pathfinder(city));
 game.addSim(gps);
+const mission = new WinterTires(world, tires, gps, heat);
+mission.blocked = () =>
+  bust.phase !== "free" ||
+  wreck.active ||
+  breakdown.active ||
+  recovery.active;
+game.addSim(mission);
+pitStops.hint = (stop) => mission.bayHint(stop);
 game.addSim({ update: (dt) => (world.time += dt) });
 events.on("wrecked", (e) => {
   hud.stunt("WRECKED", wreckDetail(e.speed, e.kind, e.otherMass), null, true);
@@ -365,6 +369,8 @@ const minimap = new Minimap(uiRoot, mapImage, city, gps, player, police, () =>
 const fullMap = new FullMap(uiRoot, mapImage, city, gps, player, police, input);
 
 // T30: title screen (the city keeps running behind it under the orbit camera) and pause menu
+let session: PlayMode = "free";
+const briefing = new Briefing(uiRoot);
 const menu = new Menu(uiRoot, {
   cash: () => economy.cash,
   start: startSession,
@@ -373,7 +379,7 @@ const menu = new Menu(uiRoot, {
     game.setPaused("menu", false);
   },
   quit: quitToTitle,
-  mode: () => (world.mode === "menu" ? "free" : world.mode),
+  mode: () => session,
   sound: (k) => audio.ui(k),
   volumes: {
     sliders: [
@@ -391,15 +397,6 @@ const menu = new Menu(uiRoot, {
     options: GRAPHICS_OPTIONS,
     get: (k) => GRAPHICS[k as GraphicsKey],
     set: (k, on) => setGraphic(k as GraphicsKey, on),
-  },
-  traffic: {
-    levels: TRAFFIC_LEVELS,
-    get: () => trafficLevel,
-    set: (level) => {
-      trafficLevel = level;
-      saveTrafficLevel(level);
-      traffic.setTarget(trafficTarget(level));
-    },
   },
 });
 // The spec panel is built with the debug folders, after this. The pit garage retitles it when parts are fitted.
@@ -433,14 +430,37 @@ const shop = new PitShop(uiRoot, r.renderer, post, builds, {
 const orbitCenter = new THREE.Vector3();
 uiRoot.classList.add("on-title");
 menu.showTitle();
+let shopWas = false;
 game.onFrame((dt) => {
   input.poll();
   menu.update(dt);
   const back = input.pressed("pause") || input.pressed("escape");
-  const arrived = pitStops.take();
-  if (arrived) shop.open(arrived);
-  const shopOn = shop.frame(dt, input, back);
-  if (shopOn) {
+  const briefingOn = briefing.open;
+  if (briefingOn) {
+    const choice = briefing.poll(input.pressed("escape"));
+    if (choice === "drive") {
+      briefing.hide();
+      world.controlLocked = false;
+      events.message(
+        "GPS set: Jacques Pneu Garage. It does not know which streets are closed.",
+        "info",
+        7,
+      );
+    } else if (choice === "title") quitToTitle();
+  }
+  const arrived = briefingOn ? null : pitStops.take();
+  if (arrived) {
+    const kind = mission.arrival(arrived);
+    if (kind === "mount") mission.beginMount();
+    else shop.open(arrived);
+  }
+  const shopOn = briefingOn ? false : shop.frame(dt, input, back);
+  if (!briefingOn && shopWas && !shop.active && mission.consumeMount())
+    mission.beginMount();
+  shopWas = shop.active;
+  if (briefingOn) {
+    // The briefing owns confirm and escape until the car is released
+  } else if (shopOn) {
     // The pit garage owns the keys until its fades are done
   } else if (menu.open) {
     if (back) menu.back();
@@ -454,15 +474,16 @@ game.onFrame((dt) => {
     game.setPaused("menu", true);
     menu.showPause();
   }
-  minimap.visible = !fullMap.open && world.mode !== "menu";
+  minimap.visible = !fullMap.open && world.mode !== "menu" && !briefing.open;
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
     !menu.open &&
     !fullMap.open &&
     !shop.active &&
+    !briefing.open &&
     world.mode !== "menu";
-  if (!menu.open && !fullMap.open && !shop.active) {
+  if (!menu.open && !fullMap.open && !shop.active && !briefing.open) {
     if (input.pressed("camera")) camRig.cycle();
     if (input.pressed("limiter")) limiter.on = !limiter.on;
     if (input.pressed("headlights") && !game.paused)
@@ -552,7 +573,7 @@ game.addView({
     hud.engine = ignition.state;
     hud.immune = world.immune;
     hud.cash = economy.cash;
-    if (world.mode === "free") hud.objective = "Free roam: explore the city";
+    if (world.mode === "free") hud.objective = mission.objective();
     hud.felony = heat.value;
     hud.evading = heat.evading;
     hud.bust = bust.progress;
@@ -608,6 +629,7 @@ adoptSpec = addDebugPanels({
   chantier,
   openPitShop: (s) => shop.open(s),
 }).adoptSpec;
+Debug.watch("mission", () => mission.status());
 const routeView = new RouteDebugView(
   pathfinder,
   city,
@@ -669,6 +691,17 @@ const audio: AudioSystem = new AudioSystem({
 });
 game.addView(audio);
 uiSound = (kind) => audio.ui(kind);
+mission.onCue = (step) => audio.garage.tire(step);
+mission.warm = () => audio.garage.warm();
+mission.onDone = (chased) =>
+  hud.stunt(
+    "WINTER TIRES",
+    chased
+      ? "The SPVM joined the drive. The GPS still thinks the way home is clear."
+      : "A clean run. The GPS still thinks the way home is clear.",
+    false,
+    true,
+  );
 const audioFolder = Debug.addFolder("Audio");
 for (const k of Object.keys(audio.mixer.settings) as AudioKey[])
   audioFolder
@@ -680,22 +713,32 @@ game.start();
 setTimeout(() => shop.prepare(), 2500);
 
 /**
- * Title -> driving: a fresh session at the start point. Cash and the pit garage upgrades carry over between
- * sessions.
+ * Title -> driving. Winter tires is the drive across town; free roam is the same city with winter tires and
+ * no pin. Cash and the pit garage upgrades carry over between sessions.
  */
 function startSession(mode: PlayMode): void {
+  session = mode;
+  briefing.hide();
   resetSession();
-  world.mode = mode;
-  world.controlLocked = false;
+  world.mode = "free";
   menu.hide();
   game.setPaused("menu", false);
   uiRoot.classList.remove("on-title");
-  hud.objective = "Free roam: explore the city";
-  greet();
+  if (mode === "mission") {
+    mission.arm();
+    world.controlLocked = true;
+    briefing.show();
+  } else {
+    tires.set = "winter";
+    world.controlLocked = false;
+    greet();
+  }
+  hud.objective = mission.objective();
 }
 
 /** Pause menu -> title: the car goes back to the start and the city keeps running behind the title. */
 function quitToTitle(): void {
+  briefing.hide();
   resetSession();
   world.mode = "menu";
   world.controlLocked = true;
@@ -704,7 +747,7 @@ function quitToTitle(): void {
   menu.showTitle();
 }
 
-/** Abort busts / tows and chases, put the repaired car back at the start. */
+/** Abort busts / tows and chases, put the repaired car back at the start. The mission pin does not survive. */
 function resetSession(): void {
   bust.cancel();
   wreck.cancel();
@@ -714,6 +757,7 @@ function resetSession(): void {
   heat.reset();
   potholeHits.reset();
   chantier.reset();
+  mission.clear();
   repair(player);
   player.teleport(start.pos, start.yaw);
   player.blinker = null;
@@ -763,6 +807,8 @@ function viewHeading(cam: THREE.Camera): number {
   dogs,
   weather,
   tires,
+  mission,
+  briefing,
   signals,
   effects,
   gps,

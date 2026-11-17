@@ -55,7 +55,10 @@ export const PIT_STOP = {
   ] as [number, number][],
 };
 
-const NAMES = ['NEO OIL 新宿', 'NEO OIL 港', 'NEO OIL 北'];
+/** The winter-tire drive ends at this bay (the eastern garage). The sign and the map use the same words. */
+export const DESTINATION_GARAGE = 'Jacques Pneu Garage';
+
+const NAMES = ['Pneus Métro', 'Garage du Canal', 'Mécanique Berri'];
 
 /**
  * Pick the pit stop blocks among the plain residential / shotengai blocks on level ground (`level(bl)`), and
@@ -76,6 +79,11 @@ export function planPitStops(city: CityModel, kinds: string[], level: (bl: Block
     if (!bl) continue;
     kinds[bl.id] = 'pitStop';
     out.push(layout(city, bl, NAMES[out.length % NAMES.length], rng));
+  }
+  // The mission destination is the eastern bay, whatever block the spots landed on (PRD Phase 11).
+  if (out.length) {
+    const east = out.reduce((a, p) => (p.bay.x > a.bay.x ? p : a));
+    east.name = DESTINATION_GARAGE;
   }
   return out;
 }

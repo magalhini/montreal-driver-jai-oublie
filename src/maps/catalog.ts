@@ -1,6 +1,6 @@
-export type DriveSide = 'left' | 'right';
+export type DriveSide = "left" | "right";
 /** Time of day the city is dressed for: the winter afternoon, or the night kit the base game shipped with. */
-export type SkyStyle = 'winterDay' | 'night';
+export type SkyStyle = "winterDay" | "night";
 
 /**
  * What a city is, without its generator: `config.ts` reads this at load to set the seed and the drive side,
@@ -19,20 +19,20 @@ export interface MapInfo {
 }
 
 /** Montreal Driver ships one city. */
-export type MapId = 'montreal';
+export type MapId = "montreal";
 
 export const MAPS: Record<MapId, MapInfo> = {
   montreal: {
-    id: 'montreal',
-    title: 'MONTREAL',
-    sub: '2 décembre. Les pneus d’hiver, c’est hier.',
+    id: "montreal",
+    title: "MONTREAL",
+    sub: "1 décembre. Les pneus d’hiver, c’est hier.",
     seed: 20261202,
-    driveSide: 'right',
-    sky: 'winterDay',
+    driveSide: "right",
+    sky: "winterDay",
   },
 };
 
-export const DEFAULT_MAP: MapId = 'montreal';
+export const DEFAULT_MAP: MapId = "montreal";
 
 export function resolveMap(id: string | null | undefined): MapId | null {
   if (!id) return null;

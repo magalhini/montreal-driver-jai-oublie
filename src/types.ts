@@ -231,6 +231,15 @@ export interface VehicleState {
   /** Seconds since the last landing and the vertical speed it hit the ground with (m/s). */
   landT: number;
   landImpact: number;
+  /**
+   * Suspension travel after a bump (m, + up, and m/s). The body only: the wheels stay on the ground.
+   * A pothole above 30 km/h kicks it downward; the spring brings it back up and lets it settle.
+   */
+  heave: number;
+  heaveV: number;
+  /** Extra nose-up (rad, and rad/s) from that same spring, on top of the terrain pitch. */
+  susPitch: number;
+  susPitchV: number;
   /** Speed lost against a terrain wall this step (ramp backs, quay walls). */
   wallHit: number;
 }

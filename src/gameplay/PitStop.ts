@@ -51,6 +51,8 @@ export class PitStopSystem implements SimSystem {
   progress = 0;
   /** Other sequences on screen (bust, wreck, breakdown, recovery). */
   blocked: () => boolean = () => false;
+  /** Canopy line for this station, or null for the usual repair / upgrade line. */
+  hint: (stop: PitStop) => string | null = () => null;
   private visited = false;
   private arrived: PitStop | null = null;
   /** The damage message was shown (until the car is repaired). */
@@ -127,7 +129,8 @@ export class PitStopSystem implements SimSystem {
       if (stop && driving) {
         const fix = this.quote();
         w.events.message(
-          `${stop.name}: stop in the circle for ${fix > 0 ? "repairs and " : ""}upgrades`,
+          this.hint(stop) ??
+            `${stop.name}: stop in the circle for ${fix > 0 ? "repairs and " : ""}upgrades`,
           "info",
         );
       }

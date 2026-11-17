@@ -13,8 +13,8 @@ export const TIRE_TUNING = {
 };
 
 /**
- * The car's tire flag (pure sim state). Phase 3 flips it from the debug panel; the winter-tire run
- * (`WinterTires`, Phase 11) sets it at a mission start and at the garage bay.
+ * The car's tire flag (pure sim state). The winter-tire run sets it to summer at the start of the drive
+ * and to winter when the bay finishes the mount. Free roam sets winter. The debug panel can still flip it.
  */
 export class Tires {
   set: TireSet = 'summer';

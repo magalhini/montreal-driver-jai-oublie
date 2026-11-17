@@ -375,6 +375,9 @@ function addPotholePanel(sys: DebugSystems): void {
   f.add(T, 'shove', 0, 0.1, 0.005).name('shove x speed');
   f.add(T, 'yank', 0, 0.3, 0.01).name('steering yank rad');
   f.add(T, 'thump', 0, 1, 0.01).name('thump per m/s');
+  f.add(T, 'feelKmh', 0, 80, 1).name('suspension above km/h');
+  f.add(T, 'heave', 0, 4, 0.05).name('heave kick m/s');
+  f.add(T, 'nod', 0, 3, 0.05).name('nose nod rad/s');
   f.add(T, 'messageCooldown', 0, 120, 1).name('message cooldown s');
   // Put the car 45 m before the nearest big pit, on its line, pointed the way that lane drives
   f.add(

@@ -4,7 +4,7 @@ import { MAPS } from '../maps/catalog';
 import { VERSION } from '../version';
 import './menu.css';
 
-export type PlayMode = 'free';
+export type PlayMode = 'mission' | 'free';
 
 /** What the menus can do to the game (implemented in main.ts). */
 export interface MenuHost {
@@ -21,14 +21,6 @@ export interface MenuHost {
   volumes?: VolumeHost;
   /** On/off picture options for the GRAPHICS page. */
   graphics?: GraphicsHost;
-  /** The traffic level (the difficulty): index into `levels`. */
-  traffic?: TrafficHost;
-}
-
-export interface TrafficHost {
-  levels: readonly { name: string; hint: string }[];
-  get(): number;
-  set(level: number): void;
 }
 
 /** Volume sliders, 0..1 each. */
@@ -66,7 +58,7 @@ export interface Page {
   back?: () => void;
 }
 
-const MODE_NAME: Record<PlayMode, string> = { free: 'FREE ROAM' };
+const MODE_NAME: Record<PlayMode, string> = { mission: 'WINTER TIRES', free: 'FREE ROAM' };
 
 const KEYBOARD: [string, string][] = [
   ['W S / ↑ ↓', 'throttle / brake, reverse'],
@@ -269,38 +261,14 @@ export class Menu {
       heading: '',
       sub: MAPS[CONFIG.MAP].sub,
       items: [
-        { label: 'FREE ROAM', hint: `Drive downtown Montreal. Garages, the SPVM, traffic. Wallet ${formatCash(this.host.cash())}`, run: () => this.host.start('free') },
-        ...this.trafficItem(),
-        { label: 'QUICK TUTORIAL', hint: 'How the city works, in one minute', run: () => this.tutorial(this.host.traffic ? 2 : 1) },
-        { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showTitle(), this.host.traffic ? 3 : 2) },
-        ...this.audioItem(() => this.showTitle(), this.host.traffic ? 4 : 3),
-        ...this.graphicsItem(() => this.showTitle(), this.host.traffic ? 5 : 4),
+        { label: 'WINTER TIRES', hint: 'December 1st. Summer tires. The garage is across town.', run: () => this.host.start('mission') },
+        { label: 'FREE ROAM', hint: `Winter tires, no destination. The same city. Wallet ${formatCash(this.host.cash())}`, run: () => this.host.start('free') },
+        { label: 'QUICK TUTORIAL', hint: 'How the city works, in one minute', run: () => this.tutorial(2) },
+        { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showTitle(), 3) },
+        ...this.audioItem(() => this.showTitle(), 4),
+        ...this.graphicsItem(() => this.showTitle(), 5),
       ],
     };
-  }
-
-  /** TRAFFIC ◀ level ▶: how busy the streets are, i.e. the difficulty. Takes effect right away. */
-  private trafficItem(): Item[] {
-    const t = this.host.traffic;
-    if (!t) return [];
-    const n = t.levels.length;
-    const arrow = (dir: -1 | 1, c: string, on: boolean) => `<b data-adj="${dir}"${on ? '' : ' style="visibility:hidden"'}>${c}</b>`;
-    const item: Item = { label: 'TRAFFIC', hint: '', run: () => step(1, true), adjust: (dir) => step(dir, false) };
-    const render = () => {
-      const i = t.get();
-      item.html = `TRAFFIC<span class="city-name">${arrow(-1, '◀', i > 0)}${t.levels[i].name}${arrow(1, '▶', i < n - 1)}</span>`;
-      item.hint = `Difficulty: ${t.levels[i].hint}. ◀ ▶ to change`;
-    };
-    // ◀ ▶ stop at the ends; Enter / click cycles round
-    const step = (dir: -1 | 1, wrap: boolean) => {
-      const i = wrap ? (t.get() + dir + n) % n : Math.min(n - 1, Math.max(0, t.get() + dir));
-      if (i === t.get()) return;
-      t.set(i);
-      render();
-      this.renderList();
-    };
-    render();
-    return [item];
   }
 
   private pausePage(): Page {
@@ -309,10 +277,9 @@ export class Menu {
       sub: `${MODE_NAME[this.host.mode()]} · ${formatCash(this.host.cash())}`,
       items: [
         { label: 'RESUME', hint: '', run: () => this.host.resume() },
-        ...this.trafficItem(),
-        { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showPause(), this.host.traffic ? 2 : 1) },
-        ...this.audioItem(() => this.showPause(), this.host.traffic ? 3 : 2),
-        ...this.graphicsItem(() => this.showPause(), this.host.traffic ? 4 : 3),
+        { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showPause(), 1) },
+        ...this.audioItem(() => this.showPause(), 2),
+        ...this.graphicsItem(() => this.showPause(), 3),
         { label: 'QUIT TO TITLE', hint: 'Your cash and car upgrades are saved', run: () => this.host.quit() },
       ],
       back: () => this.host.resume(),

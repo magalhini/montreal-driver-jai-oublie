@@ -35,6 +35,11 @@ export const POTHOLE_TUNING = {
   yank: 0.06,
   /** Suspension thump ("landing" speed, m/s) per m/s of car speed. Over 1.5 it is heard, over 2.5 the camera shakes. */
   thump: 0.25,
+  /** Above this the body rides the hit: it drops on its suspension and rebounds, instead of only twitching. */
+  feelKmh: 30,
+  /** Downward heave speed (m/s) and nose rate (rad/s) for a centred big pit around 60 km/h. Less just over 30, more past 60. */
+  heave: 1.7,
+  nod: 0.9,
   /** AI cars this close to the player bounce through pits. Cruisers also take the kick and the damage. */
   aiRange: 140,
   /** Seconds before another pothole line can show. */
@@ -183,6 +188,13 @@ export class PotholeHits implements SimSystem {
     const f = Math.min(1.5, kmh / 60);
     // Front wheel in: the nose dips. Rear wheel: the tail drops and the nose comes up.
     s.pitch += (front ? -1 : 0.6) * T.pitch * f * k;
+    // Above 30 the shell follows the wheel in and the spring brings it back up. Damage is unchanged.
+    if (kmh > T.feelKmh) {
+      const u = clamp((kmh - T.feelKmh) / 60, 0, 1);
+      const ride = (0.55 + 0.85 * u) * k;
+      s.heaveV = Math.max(-2.5, s.heaveV - T.heave * ride);
+      s.susPitchV = clamp(s.susPitchV + (front ? -1 : 0.65) * T.nod * ride, -2, 2);
+    }
     if (!hurt) return;
 
     // Toward the pit, by how far off the tire's line its centre is: dead centre is a straight thud, an edge pulls

@@ -150,7 +150,7 @@ export function pegboardTexture(): THREE.CanvasTexture {
   return texture(c);
 }
 
-/** Neon sign over the door: NEO OIL in red, PIT GARAGE in cyan, the Japanese under it. Transparent. */
+/** Sign over the workshop door. One room for every garage, so it stays generic; the station name is on the menu. */
 export function signTexture(): THREE.CanvasTexture {
   const [c, g] = canvas(1024, 256);
   g.textAlign = 'center';
@@ -167,18 +167,10 @@ export function signTexture(): THREE.CanvasTexture {
     g.fillText(text, x, y);
     g.globalAlpha = 1;
   };
-  // NEO OIL and PIT GARAGE side by side, centered as a pair
-  const big = `bold 92px ${FONT}`;
-  const mid = `bold 70px ${FONT}`;
-  g.font = big;
-  const a = g.measureText('NEO OIL').width;
-  g.font = mid;
-  const b = g.measureText('PIT GARAGE').width;
-  const gap = 44;
-  const x0 = 512 - (a + gap + b) / 2;
-  glow('NEO OIL', big, '#ff3a2a', x0 + a / 2, 92);
-  glow('PIT GARAGE', mid, '#3ef2ff', x0 + a + gap + b / 2, 96);
-  glow('ネオ石油 整備工場', `bold 50px ${FONT}`, '#ffb43e', 512, 200);
+  const big = `bold 96px ${FONT}`;
+  const mid = `bold 64px ${FONT}`;
+  glow('PNEUS', big, '#ff3a2a', 512, 88);
+  glow('GARAGE', mid, '#ffb43e', 512, 178);
   return texture(c);
 }
 

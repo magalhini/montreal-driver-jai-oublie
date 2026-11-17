@@ -148,7 +148,7 @@ export class CameraRig {
       this.initialized = false; // cut, don't swing through the car
     }
     if (back) {
-      this.rearView(p, yaw, carY, car.halfL, speed, dt);
+      this.rearView(p, yaw, carY, car.halfL, speed, dt, s.heave);
       return;
     }
     if (this.interior) {
@@ -181,6 +181,8 @@ export class CameraRig {
 
     const fx = Math.sin(this.camYaw);
     const fz = Math.cos(this.camYaw);
+    // The chase camera takes part of the suspension ride, so a pothole is felt and the body is still seen to move.
+    const bob = this.mode === 'top' ? 0 : s.heave * 0.55;
     const desired = new THREE.Vector3();
     const look = new THREE.Vector3();
     if (this.focus) {
@@ -189,8 +191,8 @@ export class CameraRig {
       const dx = this.focus.x - p.x;
       const dz = this.focus.z - p.z;
       const d = Math.hypot(dx, dz) || 1;
-      desired.set(p.x - fx * 7 + (dx / d) * 1.5, cy + 5.2, p.z - fz * 7 + (dz / d) * 1.5);
-      look.set((p.x + this.focus.x) / 2, cy + 0.8, (p.z + this.focus.z) / 2);
+      desired.set(p.x - fx * 7 + (dx / d) * 1.5, cy + 5.2 + bob, p.z - fz * 7 + (dz / d) * 1.5);
+      look.set((p.x + this.focus.x) / 2, cy + 0.8 + bob, (p.z + this.focus.z) / 2);
       if (!this.initialized) {
         this.pos.copy(desired);
         this.look.copy(look);
@@ -201,7 +203,8 @@ export class CameraRig {
     } else if (this.mode === 'bumper') {
       const yf = Math.sin(yaw);
       const zf = Math.cos(yaw);
-      const pitch = s.pitch;
+      const pitch = s.pitch + s.susPitch;
+      const ride = s.heave;
       if (car.look.style === 'keitruck') {
         // Cab-over: the shared mount (0.6 m forward, 1.15 m up) is inside the shell, so the
         // lens sees the back of the body. Sit ahead of the face (z ≈ 1.72) and aim down the
@@ -209,18 +212,18 @@ export class CameraRig {
         _e.set(-pitch, yaw, s.roll, 'YXZ');
         _q.setFromEuler(_e);
         _p.set(0, 1.2, 2.05).applyQuaternion(_q);
-        desired.set(p.x + _p.x, carY + _p.y, p.z + _p.z);
+        desired.set(p.x + _p.x, carY + _p.y + ride, p.z + _p.z);
         _p.set(0, 0.55, 18).applyQuaternion(_q);
-        look.set(p.x + _p.x, carY + _p.y, p.z + _p.z);
+        look.set(p.x + _p.x, carY + _p.y + ride, p.z + _p.z);
       } else {
-        desired.set(p.x + yf * 0.6, carY + 1.15, p.z + zf * 0.6);
-        look.set(p.x + yf * 20, carY + 1.0 + Math.tan(pitch) * 20, p.z + zf * 20);
+        desired.set(p.x + yf * 0.6, carY + 1.15 + ride, p.z + zf * 0.6);
+        look.set(p.x + yf * 20, carY + 1.0 + ride + Math.tan(pitch) * 20, p.z + zf * 20);
       }
       this.pos.copy(desired);
       this.look.copy(look);
     } else {
-      desired.set(p.x - fx * dist, cy + height, p.z - fz * dist);
-      look.set(p.x + fx * lookAhead, cy + 1.1 + (carY - cy) * 0.6, p.z + fz * lookAhead);
+      desired.set(p.x - fx * dist, cy + height + bob, p.z - fz * dist);
+      look.set(p.x + fx * lookAhead, cy + 1.1 + bob + (carY - cy) * 0.6, p.z + fz * lookAhead);
       if (!this.initialized) {
         this.pos.copy(desired);
         this.look.copy(look);
@@ -343,17 +346,18 @@ export class CameraRig {
    * Looking back (held): a camera just ahead of the car, over its roof, looking down the road behind, so a
    * cop on your bumper fills the frame. From the cockpit and bumper views it is a low rear-bumper camera.
    */
-  private rearView(p: Vec2, yaw: number, carY: number, halfL: number, speed: number, dt: number): void {
+  private rearView(p: Vec2, yaw: number, carY: number, halfL: number, speed: number, dt: number, heave: number): void {
     const cam = this.camera;
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
     const low = this.mode === 'cockpit' || this.mode === 'bumper';
     const ahead = low ? -(halfL + 0.25) : 4.6;
     const up = low ? 0.95 : 2.7;
-    cam.position.set(p.x + fx * ahead, carY + up, p.z + fz * ahead);
+    const ride = heave * (low ? 0.9 : 0.5);
+    cam.position.set(p.x + fx * ahead, carY + up + ride, p.z + fz * ahead);
     const floor = this.groundAt(cam.position.x, cam.position.z) + 0.6;
     if (cam.position.y < floor) cam.position.y = floor;
-    this.look.set(p.x - fx * 18, carY + (low ? 1.0 : 0.6), p.z - fz * 18);
+    this.look.set(p.x - fx * 18, carY + (low ? 1.0 : 0.6) + ride, p.z - fz * 18);
     this.pos.copy(cam.position);
     cam.lookAt(this.look);
     this.lens(66 + clamp(speed * 0.2, 0, 10), 0.3, dt);

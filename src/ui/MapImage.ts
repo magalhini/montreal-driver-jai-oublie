@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import type { Block, DistrictType, RoadEdge, Vec2 } from '../types';
 import { inner } from '../world/Features';
+import { DESTINATION_GARAGE } from '../world/PitStops';
 import type { CityModel } from '../world/RoadGraph';
 
 /** Pixels per meter of the pre-rendered map. */
@@ -383,7 +384,16 @@ export function mapLabels(city: CityModel): MapLabel[] {
   f.kinds.forEach((k, id) => {
     if (k === 'lot') out.push({ text: 'PARKING', pos: center(city.blocks[id]), kind: 'landmark' });
   });
-  for (const s of f.pitStops) out.push({ text: 'GARAGE', pos: { x: (s.box.minX + s.box.maxX) / 2, z: (s.box.minZ + s.box.maxZ) / 2 }, kind: 'landmark' });
+  for (const s of f.pitStops) {
+    const jacques = s.name === DESTINATION_GARAGE;
+    out.push({
+      text: jacques ? 'JACQUES PNEU' : s.name.toUpperCase(),
+      sub: 'garage',
+      // North of the lot, so the mission pin on the service circle does not sit on the words
+      pos: { x: (s.box.minX + s.box.maxX) / 2, z: (jacques ? s.box.minZ - 24 : (s.box.minZ + s.box.maxZ) / 2) },
+      kind: 'landmark',
+    });
+  }
   // The basilica and the square in front of it are one label (they are a block apart: two would collide)
   const nd = f.basilica;
   const armes = f.squares?.find((q) => q.name);

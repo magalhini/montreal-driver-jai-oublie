@@ -44,8 +44,12 @@ export class Gps implements SimSystem {
     return this.route?.length ?? 0;
   }
 
-  /** Custom waypoint (snapped to the nearest road centerline); null clears it. */
+  /** Custom waypoint (snapped to the nearest road centerline); null clears it. A fixed destination ignores a click. */
   setWaypoint(p: Vec2 | null): void {
+    if (this.fixed && p) {
+      this.world.events.message('The GPS is set for the garage.', 'info');
+      return;
+    }
     this.waypoint = p ? { ...this.finder.snap(p).pos } : null;
     this.replan();
   }

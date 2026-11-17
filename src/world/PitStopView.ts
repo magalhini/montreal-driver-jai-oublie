@@ -8,8 +8,16 @@ import { sharedGlow } from './textures';
  * classic glowing forecourt you can see from blocks away), branded fascia, pump islands, a price sign
  * at the corner, the pit garage's service circle beside the pumps. The kiosk is a regular building. All static.
  */
-const FONT = "'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif";
-const RED = '#e8321e';
+const FONT = "Arial, Helvetica, sans-serif";
+const RED = '#c42018';
+
+/** Two lines for a garage name: "Jacques Pneu Garage" -> "JACQUES PNEU" / "GARAGE". */
+function nameLines(name: string): string[] {
+  const words = name.toUpperCase().split(/\s+/);
+  if (words.length <= 2) return words;
+  if (words[words.length - 1] === 'GARAGE') return [words.slice(0, -1).join(' '), 'GARAGE'];
+  return [words.slice(0, 2).join(' '), words.slice(2).join(' ')];
+}
 
 type M = THREE.Matrix4;
 const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number): M => new THREE.Matrix4().makeScale(sx, sy, sz).setPosition(x, y, z);
@@ -21,76 +29,77 @@ function instanced(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Mat
   scene.add(im);
 }
 
-/** White fascia with a red band and the brand. */
-function fasciaTexture(): THREE.Texture {
+/** White fascia with a red band and this garage's name, repeated along the canopy. */
+function fasciaTexture(name: string): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 1024;
   c.height = 64;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#f4f2ee';
+  g.fillStyle = '#f4f1ea';
   g.fillRect(0, 0, 1024, 64);
   g.fillStyle = RED;
   g.fillRect(0, 40, 1024, 14);
-  g.fillStyle = '#f2a21c';
+  g.fillStyle = '#f2c14e';
   g.fillRect(0, 54, 1024, 5);
-  g.font = `bold 34px ${FONT}`;
+  const label = name.toUpperCase();
+  let size = 30;
+  g.font = `bold ${size}px ${FONT}`;
+  while (size > 16 && g.measureText(label).width > 480) g.font = `bold ${--size}px ${FONT}`;
   g.textBaseline = 'middle';
   g.fillStyle = RED;
-  for (let x = 40; x < 1024; x += 340) g.fillText('NEO OIL  ネオ石油', x, 22);
+  for (let x = 16; x < 1024; x += 512) g.fillText(label, x, 22);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
 }
 
-/** Price board: brand, PIT STOP, repair price. */
+/** Street sign at the corner: the garage's name, then what you stop for. */
 function signTexture(name: string): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 256;
   c.height = 384;
   const g = c.getContext('2d')!;
-  g.fillStyle = '#f4f2ee';
+  g.fillStyle = '#f4f1ea';
   g.fillRect(0, 0, 256, 384);
   g.fillStyle = RED;
-  g.fillRect(0, 0, 256, 120);
+  g.fillRect(0, 0, 256, 176);
+  g.fillStyle = '#f2c14e';
+  g.fillRect(0, 176, 256, 12);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillStyle = '#fff';
-  g.font = `bold 52px ${FONT}`;
-  g.fillText('NEO', 128, 44);
-  g.font = `bold 38px ${FONT}`;
-  g.fillText('OIL', 128, 92);
+  const lines = nameLines(name);
+  const size = lines.some((l) => l.length > 10) ? 26 : 34;
+  g.font = `bold ${size}px ${FONT}`;
+  lines.forEach((line, i) => g.fillText(line, 128, 48 + i * (size + 10)));
   g.fillStyle = '#14141a';
-  g.fillRect(14, 136, 228, 232);
-  g.fillStyle = '#3ef2ff';
-  g.font = `bold 40px ${FONT}`;
-  g.fillText('PIT STOP', 128, 182);
-  g.font = `bold 26px ${FONT}`;
+  g.fillRect(16, 204, 224, 160);
   g.fillStyle = '#ffb43e';
-  g.fillText('修理・チューン', 128, 226);
-  g.fillText('REPAIR · TUNE', 128, 258);
+  g.font = `bold 28px ${FONT}`;
+  g.fillText('PNEUS', 128, 242);
+  g.fillStyle = '#fff';
+  g.font = `bold 22px ${FONT}`;
+  g.fillText('RÉPARATION', 128, 278);
   g.fillStyle = '#9dff6a';
-  g.font = `bold 24px ${FONT}`;
-  g.fillText('STOP IN', 128, 300);
-  g.fillText('THE CIRCLE', 128, 330);
-  g.fillStyle = '#888';
-  g.font = `16px ${FONT}`;
-  g.fillText(name, 128, 356);
+  g.font = `bold 22px ${FONT}`;
+  g.fillText('STOP IN', 128, 318);
+  g.fillText('THE CIRCLE', 128, 346);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
   return t;
 }
 
-/** The service circle painted on the forecourt: a lit ring, a dashed inner ring and the garage's name. */
-function bayTexture(): THREE.Texture {
+/** The service circle painted on the forecourt: an amber ring and this garage's name. */
+function bayTexture(name: string): THREE.Texture {
   const c = document.createElement('canvas');
   c.width = 512;
   c.height = 512;
   const g = c.getContext('2d')!;
   g.translate(256, 256);
-  g.strokeStyle = '#3ef2ff';
-  g.shadowColor = '#3ef2ff';
+  g.strokeStyle = '#ffb43e';
+  g.shadowColor = '#ffb43e';
   g.shadowBlur = 18;
   g.lineWidth = 22;
   g.beginPath();
@@ -105,15 +114,15 @@ function bayTexture(): THREE.Texture {
   g.setLineDash([]);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.fillStyle = '#ffb43e';
-  g.font = `bold 92px ${FONT}`;
-  g.fillText('整備', 0, -46);
   g.fillStyle = '#ffffff';
-  g.font = `bold 44px ${FONT}`;
-  g.fillText('PIT GARAGE', 0, 40);
-  g.fillStyle = '#3ef2ff';
-  g.font = `bold 28px ${FONT}`;
-  g.fillText('STOP HERE', 0, 96);
+  const line = nameLines(name)[0] ?? name.toUpperCase();
+  let size = 48;
+  g.font = `bold ${size}px ${FONT}`;
+  while (size > 22 && g.measureText(line).width > 320) g.font = `bold ${--size}px ${FONT}`;
+  g.fillText(line, 0, -16);
+  g.fillStyle = '#ffb43e';
+  g.font = `bold 32px ${FONT}`;
+  g.fillText('STOP HERE', 0, 48);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -131,10 +140,9 @@ export function buildPitStops(city: CityModel, scene: THREE.Scene): void {
   const screens: M[] = [];
   const pools: M[] = [];
   const flat = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
-  const fascia = new THREE.MeshBasicMaterial({ map: fasciaTexture(), color: new THREE.Color(1.25, 1.25, 1.25) });
-  const bayMat = new THREE.MeshBasicMaterial({ map: bayTexture(), color: new THREE.Color(1.3, 1.3, 1.3), transparent: true, depthWrite: false, toneMapped: false });
-
   for (const s of stops) {
+    const fascia = new THREE.MeshBasicMaterial({ map: fasciaTexture(s.name), color: new THREE.Color(1.25, 1.25, 1.25) });
+    const bayMat = new THREE.MeshBasicMaterial({ map: bayTexture(s.name), color: new THREE.Color(1.3, 1.3, 1.3), transparent: true, depthWrite: false, toneMapped: false });
     // Service circle, the writing facing a car that comes in off the street beside it
     const bay = new THREE.Mesh(new THREE.PlaneGeometry(2 * s.bay.r, 2 * s.bay.r), bayMat);
     bay.rotation.set(-Math.PI / 2, s.sides[1] === 'N' ? Math.PI : 0, 0, 'YXZ');

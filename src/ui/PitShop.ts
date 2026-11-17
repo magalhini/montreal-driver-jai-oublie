@@ -292,7 +292,11 @@ export class PitShop {
           this.garage.prepare();
           this.phase = "intro";
           this.t = 0;
-          this.caption.innerHTML = `<div class="name">${this.stop?.name ?? "NEO OIL"}</div><div class="jp">PIT GARAGE · 整備工場</div>`;
+          this.caption.innerHTML = `<div class="name">${this.stop?.name ?? "GARAGE"}</div><div class="jp">PNEUS · RÉPARATION</div>`;
+          const kicker = this.root.querySelector(".ps-kicker");
+          const brand = this.root.querySelector(".ps-jp");
+          if (kicker) kicker.textContent = this.stop?.name ?? "GARAGE";
+          if (brand) brand.textContent = "PNEUS · RÉPARATION";
           this.caption.classList.remove("show");
           void this.caption.offsetWidth;
           this.caption.classList.add("show");

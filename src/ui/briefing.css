@@ -1,0 +1,98 @@
+/* Winter-tire briefing (ui/Briefing.ts), over the car at the start of that drive. */
+
+.briefing {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: rgba(8, 6, 14, 0.72);
+}
+
+.briefing.show {
+  display: flex;
+}
+
+.briefing-card {
+  width: min(640px, calc(100vw - 48px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 28px 32px 22px;
+  background: rgba(10, 4, 24, 0.94);
+  border: 1px solid rgba(255, 180, 62, 0.55);
+  box-shadow: 0 0 24px rgba(255, 180, 62, 0.18), inset 0 0 24px rgba(62, 242, 255, 0.05);
+  text-align: left;
+}
+
+.briefing-kicker {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 10px;
+  letter-spacing: 2px;
+  color: var(--neon-amber);
+}
+
+.briefing-card h1 {
+  margin: 12px 0 8px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(16px, 2vw, 22px);
+  font-weight: normal;
+  line-height: 1.5;
+  color: #fff;
+}
+
+.briefing-where {
+  margin: 0 0 14px;
+  font-size: 26px;
+  color: var(--neon-cyan);
+}
+
+.briefing-body {
+  margin: 0;
+  font-size: 26px;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.briefing-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.briefing-actions button {
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  letter-spacing: 1px;
+  padding: 12px 18px;
+  color: #fff;
+  background: rgba(10, 4, 24, 0.6);
+  border: 1px solid rgba(62, 242, 255, 0.7);
+  cursor: pointer;
+}
+
+.briefing-actions button:hover,
+.briefing-drive {
+  text-shadow: 0 0 8px var(--neon-cyan);
+  box-shadow: 0 0 14px rgba(62, 242, 255, 0.35);
+}
+
+.briefing-back {
+  color: rgba(255, 255, 255, 0.7) !important;
+  border-color: rgba(255, 255, 255, 0.28) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+}
+
+.briefing-hint {
+  margin-top: 14px;
+  font-size: 20px;
+  opacity: 0.7;
+}
+
+.briefing kbd {
+  font-family: inherit;
+  padding: 0 4px;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+}

@@ -39,6 +39,16 @@ const SPIN_COUPLING = 0.62;
  * wheels hook is ordinary throttle.
  */
 const CLUTCH_SLIP_FORCE = 0.55;
+/** Body bounce after a bump: about 1.5 Hz, light enough to rise back up once before it settles. */
+const HEAVE_W = 9.4;
+const HEAVE_Z = 0.23;
+/** Nose nod, a little slower and deader than the heave so it dips and comes back without pecking. */
+const NOD_W = 8;
+const NOD_Z = 0.34;
+/** Travel stops (m, rad). Past these the spring rebounds, the way a bump stop would. */
+const HEAVE_MIN = -0.15;
+const HEAVE_MAX = 0.08;
+const NOD_LIMIT = 0.09;
 
 /**
  * Lateral tire force curve: rises to 1 at x = 1, then falls by `falloff`.
@@ -131,6 +141,10 @@ export class VehiclePhysics {
       water: 0,
       landT: 99,
       landImpact: 0,
+      heave: 0,
+      heaveV: 0,
+      susPitch: 0,
+      susPitchV: 0,
       wallHit: 0,
     };
     this.settle();
@@ -144,6 +158,10 @@ export class VehiclePhysics {
     s.airborne = false;
     s.load = 1;
     s.water = 0;
+    s.heave = 0;
+    s.heaveV = 0;
+    s.susPitch = 0;
+    s.susPitchV = 0;
     this.fresh = true;
   }
 
@@ -516,6 +534,33 @@ export class VehiclePhysics {
       const k = Math.min(1, dt * 22);
       s.pitch += (Math.atan2(hF - hR, L) - s.pitch) * k;
       s.roll += (Math.atan(gradL) - s.roll) * k;
+    }
+    this.stepSuspension(dt);
+  }
+
+  /**
+   * The body riding a bump. Terrain pitch is pulled back onto the road every step, so a pothole's nod and
+   * heave live on their own springs: drop in, come back up, settle. Wheels are not part of this.
+   */
+  private stepSuspension(dt: number): void {
+    const s = this.state;
+    s.heaveV += (-HEAVE_W * HEAVE_W * s.heave - 2 * HEAVE_Z * HEAVE_W * s.heaveV) * dt;
+    s.heave += s.heaveV * dt;
+    if (s.heave < HEAVE_MIN) {
+      s.heave = HEAVE_MIN;
+      if (s.heaveV < 0) s.heaveV *= -0.3;
+    } else if (s.heave > HEAVE_MAX) {
+      s.heave = HEAVE_MAX;
+      if (s.heaveV > 0) s.heaveV *= -0.3;
+    }
+    s.susPitchV += (-NOD_W * NOD_W * s.susPitch - 2 * NOD_Z * NOD_W * s.susPitchV) * dt;
+    s.susPitch += s.susPitchV * dt;
+    if (s.susPitch < -NOD_LIMIT) {
+      s.susPitch = -NOD_LIMIT;
+      if (s.susPitchV < 0) s.susPitchV *= -0.25;
+    } else if (s.susPitch > NOD_LIMIT) {
+      s.susPitch = NOD_LIMIT;
+      if (s.susPitchV > 0) s.susPitchV *= -0.25;
     }
   }
 
