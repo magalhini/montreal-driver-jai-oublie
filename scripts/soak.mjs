@@ -30,7 +30,7 @@ try {
   for (let s = 0; s < seeds; s++) {
     const r = soak(id, 1000 + s, minutes * 60, closures);
     bad ||= r.redRuns > 0 || r.stopRuns > 0 || (r.fenceHits ?? 0) > 0;
-    const works = r.fenceHits !== undefined ? `, fence hits ${r.fenceHits}, cones moved ${r.conesMoved}, merges ${r.merges}` : '';
+    const works = r.fenceHits !== undefined ? `, fence hits ${r.fenceHits}, cones moved ${r.conesMoved}, merges ${r.merges}, lane hops ${r.hops}` : '';
     const line = `seed ${r.seed}: red runs ${r.redRuns}/${r.crossings}, stop runs ${r.stopRuns}/${r.stopCrossings}, AI collisions ${r.aiCollisions}, parked hits ${r.parkedHits}, stalls ${r.stalls}, off-road ${(r.offRoad * 100).toFixed(2)}%, cars ${r.cars.toFixed(1)}${works}`;
     lines.push(line);
     console.log(`${line}, ${r.msPerStep.toFixed(2)} ms/step`);

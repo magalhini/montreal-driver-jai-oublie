@@ -4,6 +4,7 @@ import type { SimSystem, Vec2 } from '../types';
 import { Car, type BodyStyle, type CarLook } from '../vehicles/Car';
 import { MAME, POLICE_CRUISER, TRAFFIC_SEDAN, type CarSpec } from '../vehicles/CarSpec';
 import { repair } from '../vehicles/Damage';
+import { cumulative, tangentAt } from '../world/Polyline';
 
 const specFor = (style: BodyStyle): CarSpec => (style === 'police' ? POLICE_CRUISER : style === 'city' ? MAME : TRAFFIC_SEDAN);
 
@@ -22,14 +23,26 @@ export const CURB_PARKED_TUNING = {
   /** A chunk wakes within `wake` of the player and sleeps beyond `sleep` (m), nearest first. */
   wake: 130,
   sleep: 165,
-  /** Most curb cars alive at once (with traffic and police under `CarView`'s 160-car batches). */
+  /** Most curb cars alive at once (with traffic and police under `CarView`'s 200-car batches). */
   cap: 70,
   /** With the cap reached, a nearer chunk replaces the farthest live one only if that one is this much farther (m). */
   evictMargin: 25,
 };
 
-/** A bay; `look` fixes the car parked in it (a site's own cars), else it is random. */
-type Slot = { pos: Vec2; yaw: number; look?: CarLook };
+/**
+ * Double parking (PRD 5.5, Phase 8): a share of the filled curb bays hold a car stopped out in the street with its
+ * hazards on, `intrude` meters into the travel lane. Traffic squeezes past it (`LaneDriver`), riders go round.
+ */
+export const DOUBLE_PARK_TUNING = {
+  share: 0.06,
+  intrude: 1,
+};
+
+/**
+ * A bay; `look` fixes the car parked in it (a site's own cars), else it is random. A curb bay knows the way out to
+ * the travel lanes (`out`, unit) and how far its middle is from the lane's edge (`band`), for double parking.
+ */
+type Slot = { pos: Vec2; yaw: number; look?: CarLook; out?: Vec2; band?: number };
 
 /** One lot's bays: woken and put to sleep together. `share` of the bays is filled (always the same ones). */
 interface Group {
@@ -46,6 +59,12 @@ interface Group {
   curb: boolean;
   /** Distance to the player at the last update. */
   d: number;
+}
+
+/** A fixed draw (0..1) per bay position: which bays hold a double-parked car. */
+function bayHash(p: Vec2): number {
+  const h = Math.sin(p.x * 12.9898 + p.z * 78.233) * 43758.5453;
+  return h - Math.floor(h);
 }
 
 /** How far a car can be nudged before it counts as out of its bay (m / rad). */
@@ -88,7 +107,10 @@ export class ParkedCars implements SimSystem {
         flush();
         key = k;
       }
-      run.push({ pos: b.pos, yaw: b.yaw });
+      const e = world.city.edges[b.edge];
+      const t = tangentAt(e.pts, cumulative(e.pts), (b.s0 + b.s1) / 2);
+      // Left of a -> b is (t.z, -t.x); the bay is on `side`, the lanes the other way
+      run.push({ pos: b.pos, yaw: b.yaw, out: { x: -b.side * t.z, z: b.side * t.x }, band: e.parking / 2 });
     }
     flush();
   }
@@ -170,10 +192,20 @@ export class ParkedCars implements SimSystem {
         car.phys.spec.halfWidth = 0.72;
         car.phys.spec.mass = 750;
       }
+      // Always the same few bays: out of the band, its inner side `intrude` into the lane, hazards on
+      let home = slot;
+      const D = DOUBLE_PARK_TUNING;
+      if (g.curb && slot.out && slot.band !== undefined && bayHash(slot.pos) < D.share) {
+        const shift = slot.band + D.intrude - car.halfW;
+        home = { pos: { x: slot.pos.x + slot.out.x * shift, z: slot.pos.z + slot.out.z * shift }, yaw: slot.yaw };
+        car.teleport(home.pos, home.yaw);
+        car.doubleParked = true;
+        car.hazards = true;
+      }
       car.input.handbrake = true;
       w.addCar(car);
       g.cars.push(car);
-      g.home.push(slot);
+      g.home.push(home);
     }
     g.restoring = false;
     if (g.curb && g.cars.length) {

@@ -70,8 +70,36 @@ export const DRIVER_TUNING = {
   mergeRate: 1.3,
 };
 
-/** Lane merges done by AI drivers since load (debug, soak). */
-export const MERGE_STATS = { merges: 0 };
+/**
+ * Montreal manners (PRD 5.5, Phase 8): small chances on top of the careful driver. Nobody runs a light or a
+ * fence because of them; they make the city rude, not unsafe.
+ */
+export const ERRATIC_TUNING = {
+  /** Chance a driver brakes late for a red it is coming up to (x 0.5 .. 1.5 with temper), and how hard (m/s^2). */
+  lateBrake: 0.16,
+  lateDecel: 4.6,
+  /** Squeezing past a double-parked car: side gap (m), the most a car moves over in its lane (m), speed (m/s). */
+  dpGap: 0.3,
+  dpNudge: 1.1,
+  dpPass: 5.5,
+  /**
+   * Abrupt lane changes, boulevards only: behind a car going under `hopSlow` x our speed for `hopAfter` s
+   * (pushy drivers sooner), or out of nowhere at `hopRandom` per second for the pushiest. A short blink first (s),
+   * a quick move over (offset ease per s), the gaps they accept (x the merge gaps), then a rest (s).
+   */
+  hopSlow: 0.5,
+  hopAfter: 2.2,
+  hopRandom: 0.03,
+  hopSignal: 0.35,
+  hopRate: 2.1,
+  hopGap: 0.7,
+  hopCool: 10,
+  /** Only while rolling at least this fast (m/s). */
+  hopMinSpeed: 3,
+};
+
+/** Lane merges (lane ends) and abrupt lane changes (`hops`) done by AI drivers since load (debug, soak). */
+export const MERGE_STATS = { merges: 0, hops: 0 };
 
 /** The driver of each AI car, so opposing turners can settle who goes first (see `passesOpposingTurner`). */
 const DRIVER_OF = new WeakMap<Car, LaneDriver>();
@@ -218,6 +246,17 @@ export class LaneDriver {
   private mergeT = 0;
   /** Seconds signalling for the merge so far. */
   private mergeWait = 0;
+  /** Offset ease (per s) while moving over after a lane change: merges are calm, hops are not. */
+  private moveRate = DRIVER_TUNING.mergeRate;
+  /** Brakes late for the red at the end of this lane (rolled per lane). */
+  private lateBrake = false;
+  /** Abrupt lane change under way: the lane it signals for, seconds signalling, side; rest before the next. */
+  private hopInto: Lane | null = null;
+  private hopWait = 0;
+  private hopSide: Blinker | null = null;
+  private hopCool = 0;
+  /** Seconds stuck behind a slow car (boulevards: time to go round it). */
+  private slowT = 0;
 
   constructor(
     private world: World,
@@ -245,6 +284,9 @@ export class LaneDriver {
     this.launchT = 0;
     this.clearedLane = -1;
     this.car.blinker = null;
+    this.hopInto = null;
+    this.hopSide = null;
+    this.lateBrake = false;
     this.chooseNext();
     this.buildPath();
     this.seg = 0;
@@ -391,6 +433,7 @@ export class LaneDriver {
       this.lane = this.next.lane;
       // A turn at a stop is for this pass only: a car looping the block meets the same lane again
       this.clearedLane = -1;
+      this.lateBrake = this.world.rng.chance(ERRATIC_TUNING.lateBrake * (0.5 + this.temper));
       this.chooseNext();
       this.buildPath();
       this.seg = 0;
@@ -437,13 +480,24 @@ export class LaneDriver {
     return this.clearedLane === this.lane.id;
   }
 
+  /** Set by `mustStopForSignal`: holding for a red it saw late. */
+  private lateRed = false;
+
   private mustStopForSignal(dStop: number, v: number): boolean {
+    this.lateRed = false;
     if (this.ignoreLights || dStop < 0) return false;
     const city = this.world.city;
     const node = city.nodes[this.lane.to];
     if (node.control === 'stop' && this.clearedLane !== this.lane.id && this.holdAtStop(node, dStop, v)) return true;
     const st = this.world.lights.state(node.id, this.lane.edgeId);
-    if (st === 'red') return dStop > -0.5;
+    if (st === 'red') {
+      // A late braker doesn't see it until it has to stand on the brakes (`drive` then stops it on a fixed decel)
+      if (this.lateBrake && this.car.kind === 'traffic') {
+        if (dStop > (v * v) / (2 * ERRATIC_TUNING.lateDecel) + this.car.halfL + 3) return false;
+        this.lateRed = true;
+      }
+      return dStop > -0.5;
+    }
     // Amber: stop if it can be done braking at this driver's comfort level (pushy drivers go through later),
     // or if the line is too far to reach before red anyway (a slow turning car would enter on red)
     if (st === 'yellow') return dStop > (v * v) / (2 * (4.5 - 1.2 * this.temper)) + 1 || dStop > v * AMBER_REACH;
@@ -611,13 +665,17 @@ export class LaneDriver {
       const ux = (b.x - a.x) / len;
       const uz = (b.z - a.z) / len;
       if (i === this.seg) acc = -((car.x - a.x) * ux + (car.z - a.z) * uz);
-      const t = clamp((p.x - a.x) * ux + (p.z - a.z) * uz, 0, len);
+      const raw = (p.x - a.x) * ux + (p.z - a.z) * uz;
+      const t = clamp(raw, 0, len);
       const qx = p.x - a.x - ux * t;
       const qz = p.z - a.z - uz * t;
       const d = qx * qx + qz * qz;
       if (d < bestD) {
         bestD = d;
-        best = { s: acc + t, lat: qx * uz - qz * ux, curve: this.next.turn !== 'straight' && i >= this.laneSegs && i < this.nextLaneSeg, ux, uz };
+        // Behind the start of the path: say how far behind (clamped to the start, a rider 25 m back off the
+        // inside of a turn read as just ahead and in the way, and the turner waited for it for ever)
+        const along = i === this.seg && raw < 0 ? raw : t;
+        best = { s: acc + along, lat: qx * uz - qz * ux, curve: this.next.turn !== 'straight' && i >= this.laneSegs && i < this.nextLaneSeg, ux, uz };
       }
       acc += len;
     }
@@ -660,6 +718,136 @@ export class LaneDriver {
       }
     }
     return out;
+  }
+
+  /**
+   * Double-parked cars (PRD 5.5) sticking into the path ahead: squeeze past with a nudge inside the lane, slowly,
+   * once there is room; else follow (stop behind) it. `riderNudge`: the way riders already push the car, if any.
+   */
+  private scanDoubleParked(turning: boolean, riderNudge: number): { gap: number; nudge: number; pass: number; creep: boolean } {
+    const car = this.car;
+    const E = ERRATIC_TUNING;
+    const out = { gap: Infinity, nudge: 0, pass: Infinity, creep: false };
+    let carLat: number | null = null;
+    for (const o of this.world.cars) {
+      if (!o.doubleParked || o.removed) continue;
+      if (Math.abs(o.pos.x - car.pos.x) > 40 || Math.abs(o.pos.z - car.pos.z) > 40) continue;
+      const q = this.onPath(o.pos);
+      const need = car.halfW + o.halfW + E.dpGap;
+      if (q.s < -car.halfL - o.halfL || q.s > 35 || Math.abs(q.lat) >= need) continue;
+      const nudge = q.lat > 0 ? q.lat - need : q.lat + need;
+      const conflict = (riderNudge !== 0 && Math.sign(nudge) !== Math.sign(riderNudge)) || (out.nudge !== 0 && Math.sign(nudge) !== Math.sign(out.nudge));
+      const canPass = !turning && !q.curve && !conflict && Math.abs(nudge) <= E.dpNudge;
+      if (canPass) {
+        if (Math.abs(nudge) > Math.abs(out.nudge)) out.nudge = nudge;
+        out.pass = E.dpPass;
+      }
+      carLat ??= this.onPath(car.pos).lat;
+      const clearNow = Math.abs(q.lat - carLat) >= car.halfW + o.halfW + 0.1;
+      if (q.s <= car.halfL || clearNow) continue;
+      const bumper = q.s - car.halfL - o.halfL;
+      if (!canPass) out.gap = Math.min(out.gap, Math.max(0.05, bumper - 1));
+      else {
+        // Room to go round but not over yet: a car can't move sideways standing still, so creep up on it while
+        // steering out (IDM keeps ~2.2 m: this lets it close to ~0.4 m) rather than stop and wait for ever
+        out.gap = Math.min(out.gap, Math.max(0.05, bumper + 1.95));
+        out.pass = Math.min(out.pass, 2.5);
+        out.creep = true;
+      }
+    }
+    // Creeping: aim a little wider than needed, so the nose gets out within the little room left
+    if (out.creep) out.nudge = Math.sign(out.nudge) * Math.min(E.dpNudge, Math.abs(out.nudge) + 0.35);
+    return out;
+  }
+
+  /**
+   * Boulevards (PRD 5.5): pick a lane beside this one to jump into, the side away from a car stopped ahead first.
+   * Never a coned lane, a lane that ends, or one with a fence or cones coming up.
+   */
+  private hopTarget(): Lane | null {
+    const city = this.world.city;
+    const e = city.edges[this.lane.edgeId];
+    const works = this.world.roadworks;
+    const ids = city.lanesLeaving(e, this.lane.from);
+    const sides = this.world.rng.chance(0.5) ? [1, -1] : [-1, 1];
+    for (const dk of sides) {
+      const id = ids.find((i) => city.lanes[i].index === this.lane.index + dk);
+      if (id === undefined) continue;
+      const into = city.lanes[id];
+      if (works) {
+        if (works.conedLane(id) || works.mergeLane(id)) continue;
+        const p = this.car.pos;
+        if (Math.min(works.barrierAhead(into, p), works.conesAhead(into, p)) < 90) continue;
+        if (works.mergeAhead(into, p)) continue;
+      }
+      return into;
+    }
+    return null;
+  }
+
+  /**
+   * Abrupt lane change (PRD 5.5): legal, signalled, just short on warning and on the gap it takes. Called once a
+   * step with the car ahead's gap and speed and the speed the driver wants.
+   */
+  private hop(gap: number, vLead: number, v: number, v0: number, dStop: number): void {
+    const E = ERRATIC_TUNING;
+    const dt = 1 / 60;
+    if (this.hopCool > 0) this.hopCool -= dt;
+    const e = this.world.city.edges[this.lane.edgeId];
+    // Rolling only: from a standstill behind a car the move takes so long the car sits across both lanes, still
+    // stuck behind the one it left, and the gap it checked in the other lane is long gone. Near the line only
+    // straight on (see `changeLane`).
+    const able =
+      this.car.kind === 'traffic' &&
+      !this.prefer &&
+      e.lanesPerDir > 1 &&
+      !this.pastLane &&
+      dStop > 20 &&
+      v > E.hopMinSpeed &&
+      this.mergeT <= 0 &&
+      !this.mergeSide &&
+      this.evadeT === 0 &&
+      this.yieldT === 0;
+    if (!able) {
+      this.hopInto = null;
+      // The blinker stays on while the car moves over
+      if (this.mergeT <= 0) this.hopSide = null;
+      this.slowT = 0;
+      return;
+    }
+    if (this.hopInto) {
+      this.hopWait += dt;
+      // ...and room to drive into: a car that moves over and then has to stop sits across both lanes, and the
+      // gap it checked behind is stale by the time it finishes the move
+      if (this.hopWait > E.hopSignal && this.mergeClear(this.hopInto, v, E.hopGap) && this.roomAhead(this.hopInto) > Math.max(12, v * 2)) {
+        this.changeLane(this.hopInto, true, dStop < 35);
+        this.hopInto = null;
+        this.hopCool = E.hopCool * (1.5 - this.temper);
+      } else if (this.hopWait > 3) {
+        this.hopInto = null;
+        this.hopSide = null;
+        this.hopCool = 2;
+      }
+      return;
+    }
+    if (this.mergeT <= 0) this.hopSide = null;
+    // Stuck behind something slow that isn't queueing for a red: the player sitting at a green, a truck
+    const red = this.world.lights.state(this.lane.to, this.lane.edgeId) === 'red';
+    const slow = gap < 25 && vLead < Math.max(1.5, v0 * E.hopSlow) && !red;
+    this.slowT = slow ? this.slowT + dt : Math.max(0, this.slowT - 2 * dt);
+    if (this.hopCool > 0) return;
+    const fed = this.slowT > E.hopAfter * (1.3 - 0.8 * this.temper);
+    const whim = !slow && v > 6 && this.temper > 0.6 && this.world.rng.chance(E.hopRandom * dt * (this.temper - 0.6) * 2.5);
+    if (!fed && !whim) return;
+    const into = this.hopTarget();
+    if (!into) {
+      this.hopCool = 1.5;
+      return;
+    }
+    this.hopInto = into;
+    this.hopWait = 0;
+    this.slowT = 0;
+    this.hopSide = dot({ x: into.start.x - this.lane.start.x, z: into.start.z - this.lane.start.z }, leftVec(this.lane.dir)) > 0 ? 'left' : 'right';
   }
 
   /**
@@ -735,7 +923,7 @@ export class LaneDriver {
    * Room to move into `into` beside the car: nobody in that lane too close ahead, and nobody behind who would
    * have to brake hard for us (the faster they come, the bigger the gap we wait for).
    */
-  private mergeClear(into: Lane, v: number): boolean {
+  private mergeClear(into: Lane, v: number, tight = 1): boolean {
     const car = this.car;
     const p = car.pos;
     const half = this.world.city.edges[into.edgeId].laneWidth * 0.65;
@@ -751,22 +939,113 @@ export class LaneDriver {
       if (Math.abs(lat) > half) continue;
       const vo = o.vel.x * into.dir.x + o.vel.z * into.dir.z;
       const room = Math.abs(along) - car.halfL - o.halfL;
-      if (along >= 0 ? room < 3 + v * 0.5 + Math.max(0, v - vo) * 1.2 : room < 4 + Math.max(0, vo - v) * 1.8 + vo * 0.4) return false;
+      if (along >= 0 ? room < (3 + v * 0.5 + Math.max(0, v - vo) * 1.2) * tight : room < (4 + Math.max(0, vo - v) * 1.8 + vo * 0.4) * tight) return false;
     }
     return true;
   }
 
+  /** Free road ahead of the car in lane `into` (m, nose to the next car's tail; up to 40). */
+  private roomAhead(into: Lane): number {
+    const car = this.car;
+    const half = this.world.city.edges[into.edgeId].laneWidth * 0.65;
+    const lx = into.dir.z;
+    const lz = -into.dir.x;
+    let room = 40;
+    for (const o of this.world.cars) {
+      if (o === car || o.removed) continue;
+      const along = (o.pos.x - car.pos.x) * into.dir.x + (o.pos.z - car.pos.z) * into.dir.z;
+      if (along <= 0 || along > 40 + car.halfL + o.halfL) continue;
+      if (Math.abs((o.pos.x - into.start.x) * lx + (o.pos.z - into.start.z) * lz) > half) continue;
+      room = Math.min(room, along - car.halfL - o.halfL);
+    }
+    return room;
+  }
+
   /** Move over into the next lane mid-block: the target line jumps, the offset eases the car across. */
-  private changeLane(into: Lane): void {
+  private changeLane(into: Lane, hop = false, straight = false): void {
     const pr = project(into.pts, into.cum, this.car.pos);
     this.lane = into;
     this.offset = pr.lateral;
     this.mergeT = DRIVER_TUNING.mergeTime;
-    MERGE_STATS.merges++;
+    this.moveRate = hop ? ERRATIC_TUNING.hopRate : DRIVER_TUNING.mergeRate;
+    if (hop) MERGE_STATS.hops++;
+    else MERGE_STATS.merges++;
     this.clearedLane = -1;
+    // Moved over just before the junction: no turning out of it from there
+    const keep = this.prefer;
+    if (straight) this.prefer = (opts) => opts.find((o) => o.turn === 'straight') ?? null;
     this.chooseNext();
+    this.prefer = keep;
     this.buildPath();
     this.seg = 0;
+  }
+
+  /**
+   * The car to follow: nearest one ahead whose footprint is in our way (in the heading frame, or on the path
+   * through a turn). Gap to it and its speed along our heading.
+   */
+  private leaderScan(f: Vec2, l: Vec2, inTurn: boolean, turning: boolean, alongPath: boolean, v: number): { gap: number; vLead: number; creep: boolean } {
+    const car = this.car;
+    const p = car.pos;
+    let gap = Infinity;
+    let vLead = 0;
+    let creep = false;
+    for (const o of this.world.cars) {
+      // Double-parked cars are `scanDoubleParked`'s: passed or followed there
+      if (o === car || o.removed || o.doubleParked) continue;
+      const r = { x: o.pos.x - p.x, z: o.pos.z - p.z };
+      const ahead = dot(r, f);
+      if (ahead <= 0 || ahead > 45) continue;
+      if (inTurn && this.passesOpposingTurner(o)) continue;
+      if (this.waitsForMyTurn(o)) continue;
+      // A parked car in front of the nose but off our path (stopped a little crooked after swerving): rolling,
+      // brake for it as usual; at a crawl, creep on and straighten up (stopping for it, a car that can't steer
+      // without moving waited behind the curb row for ever)
+      if (o.kind === 'parked' && v < 2.5 && ahead < 25) {
+        const q = this.onPath(o.pos);
+        const cp = Math.abs(fwd(o.yaw).x * q.ux + fwd(o.yaw).z * q.uz);
+        const sp = Math.sqrt(Math.max(0, 1 - cp * cp));
+        if (q.s <= 0 || Math.abs(q.lat) - (o.halfL * sp + o.halfW * cp) > car.halfW + 0.35) {
+          const cf = Math.abs(dot(fwd(o.yaw), f));
+          const sf = Math.sqrt(Math.max(0, 1 - cf * cf));
+          if (Math.abs(dot(r, l)) - (o.halfL * sf + o.halfW * cf) > car.halfW + 0.35) continue;
+          const g = ahead - car.halfL - (o.halfL * cf + o.halfW * sf) + 1.6;
+          if (g < gap) {
+            gap = g;
+            vLead = 0;
+            creep = true;
+          }
+          continue;
+        }
+      }
+      // Facing us: only in the way if it is on our path (the wrong way down our lane). In its own lane it is
+      // oncoming traffic, not a car to follow, though a car still swinging out of a turn can see it in its frame
+      const facing = dot(fwd(o.yaw), f);
+      if (facing < -0.7) {
+        const q = this.onPath(o.pos);
+        // Its whole footprint across the path: a turner swinging toward us has its nose well out of its lane
+        const cp = Math.abs(fwd(o.yaw).x * q.ux + fwd(o.yaw).z * q.uz);
+        const reach = o.halfL * Math.sqrt(Math.max(0, 1 - cp * cp)) + o.halfW * cp;
+        if (q.s <= -o.halfL || Math.abs(q.lat) - reach >= car.halfW + 0.6) continue;
+      }
+      // Its footprint in our frame (a car turning away still has its tail in our lane): half extents across / along
+      const c = Math.abs(facing);
+      const sn = Math.sqrt(Math.max(0, 1 - c * c));
+      const across = o.halfL * sn + o.halfW * c;
+      const along = o.halfL * c + o.halfW * sn;
+      let g = Infinity;
+      if (Math.abs(dot(r, l)) - across <= car.halfW + (turning && this.pastLane ? 0.85 : 0.35)) g = ahead - car.halfL - along;
+      if (alongPath && ahead < 25) {
+        const q = this.onPath(o.pos);
+        if (q.s > 0 && Math.abs(q.lat) < car.halfW + o.halfW + 0.3) g = Math.min(g, q.s - car.halfL - o.halfL);
+      }
+      if (g < gap) {
+        gap = g;
+        vLead = dot(o.vel, f);
+        creep = false;
+      }
+    }
+    return { gap, vLead, creep };
   }
 
   /** Compute inputs for this step. */
@@ -806,9 +1085,10 @@ export class LaneDriver {
     if (this.sirenBehind(f, l, v)) this.yieldT = 2.5;
     else this.yieldT = Math.max(0, this.yieldT - 1 / 60);
     const curbLane = this.lane.index === this.world.city.edges[this.lane.edgeId].lanesPerDir - 1;
-    let want = riders.nudge;
+    const dp = this.scanDoubleParked(turning && (this.pastLane || dStop < 15), riders.nudge);
+    let want = Math.abs(dp.nudge) > Math.abs(riders.nudge) ? dp.nudge : riders.nudge;
     // Moving over after a merge: a slower ease than the rider nudges
-    let rate = this.mergeT > 0 ? DRIVER_TUNING.mergeRate : 2.5;
+    let rate = this.mergeT > 0 ? this.moveRate : 2.5;
     this.mood = 'cruise';
     if (this.evadeT > 0) {
       this.mood = 'evade';
@@ -824,7 +1104,8 @@ export class LaneDriver {
 
     // Steering (pure pursuit), shifted sideways by the nudge
     // Short look-ahead through junction turns: a long one aims across the corner and cuts it
-    const Ld = turning && (this.pastLane || dStop < 6) ? clamp(2.5 + v * 0.3, 3, 6) : clamp(4 + v * 0.55, 5, 15);
+    // ...and creeping round a double-parked car: a short one to get the nose out in the little room there is
+    const Ld = (turning && (this.pastLane || dStop < 6)) || dp.creep ? clamp(2.5 + v * 0.3, 3, 6) : clamp(4 + v * 0.55, 5, 15);
     // Classic pure pursuit, from the rear axle (steering from the middle of the car lets the rear wheels cut
     // inside on tight turns); `lookahead` measures from the car's middle
     const rb = car.phys.spec.cgToRear;
@@ -845,6 +1126,7 @@ export class LaneDriver {
     const grade = Math.abs(nh[this.lane.to] - nh[this.lane.from]) / Math.max(1, this.lane.length);
     let v0 = limit * (1 - clamp(grade * 2.6, 0, 0.45));
     if (riders.pass < Infinity) v0 = Math.min(v0, riders.pass + PASS_DELTA);
+    if (dp.pass < Infinity) v0 = Math.min(v0, dp.pass);
     // Curb-side turns are tighter than turns across the junction: take them slower
     if (turning && (this.pastLane || dStop < 25)) v0 = Math.min(v0, this.next.turn === EASY_TURN ? this.turnSpeed * 0.75 : this.turnSpeed);
     if (this.yieldT > 0) v0 = Math.min(v0, limit * T.yieldSpeed);
@@ -857,45 +1139,31 @@ export class LaneDriver {
     // Turn signals: on approaching the junction, off once on the new road; toward the curb while pulling over
     if (this.forceBlinker) this.signal(this.forceBlinker);
     else if (this.mergeSide) this.signal(this.mergeSide);
+    else if (this.hopSide) this.signal(this.hopSide);
     else if (turning && (this.pastLane || (dStop >= 0 && dStop < T.signalAt))) this.signal(this.next.turn as Blinker);
     else if (this.yieldT > 0 && curbLane) this.signal(CURB_BLINKER);
     else this.signal(null);
 
     // IDM with leader + virtual stop-line leader
-    let gap = Infinity;
-    let vLead = 0;
     this.waiting = 'none';
     // Through a turn the car ahead is round the curve, off to the side of our heading: measure along the path
     const alongPath = turning && (this.pastLane || dStop < 12);
-    for (const o of this.world.cars) {
-      if (o === car || o.removed) continue;
-      const r = { x: o.pos.x - s.pos.x, z: o.pos.z - s.pos.z };
-      const ahead = dot(r, f);
-      if (ahead <= 0 || ahead > 45) continue;
-      if (inTurn && this.passesOpposingTurner(o)) continue;
-      if (this.waitsForMyTurn(o)) continue;
-      // Its footprint in our frame (a car turning away still has its tail in our lane): half extents across / along
-      const c = Math.abs(dot(fwd(o.yaw), f));
-      const sn = Math.sqrt(Math.max(0, 1 - c * c));
-      const across = o.halfL * sn + o.halfW * c;
-      const along = o.halfL * c + o.halfW * sn;
-      let g = Infinity;
-      if (Math.abs(dot(r, l)) - across <= car.halfW + (turning && this.pastLane ? 0.85 : 0.35)) g = ahead - car.halfL - along;
-      if (alongPath && ahead < 25) {
-        const q = this.onPath(o.pos);
-        if (q.s > 0 && Math.abs(q.lat) < car.halfW + o.halfW + 0.3) g = Math.min(g, q.s - car.halfL - o.halfL);
-      }
-      if (g < gap) {
-        gap = g;
-        vLead = dot(o.vel, f);
-        this.waiting = 'traffic';
-      }
-    }
+    const lead = this.leaderScan(f, l, inTurn, turning, alongPath, v);
+    let { gap, vLead } = lead;
+    if (lead.creep) v0 = Math.min(v0, 2);
+    if (gap < Infinity) this.waiting = 'traffic';
     if (riders.gap < gap) {
       gap = riders.gap;
       vLead = riders.vLead;
       this.waiting = 'traffic';
     }
+    if (dp.gap < gap) {
+      gap = dp.gap;
+      vLead = 0;
+      this.waiting = 'traffic';
+    }
+    // Boulevards: tired of the car in front (gap and speed of whoever is ahead in the lane)
+    this.hop(gap, vLead, v, v0, dStop);
     // A fence or a cone taper in our lane (a car that ended up there: relocated, re-attached): stop short of it
     // rather than drive through it (`chooseNext` never routes a car into either)
     const fenceD = works && !this.pastLane ? Math.min(works.barrierAhead(this.lane, s.pos), works.conesAhead(this.lane, s.pos)) : Infinity;
@@ -917,22 +1185,26 @@ export class LaneDriver {
       this.waiting = 'traffic';
       if (this.mood === 'cruise') this.mood = 'ped';
     }
-    if (this.mustStopForSignal(dStop, v)) {
-      const g = dStop - car.halfL - 0.5;
-      if (g < gap) {
-        gap = g;
-        vLead = 0;
-        this.waiting = 'light';
-      }
-    }
     const aMax = this.aMax;
     const bComf = 3.2;
     const s0 = 2.2;
-    let acc: number;
-    if (gap === Infinity) acc = aMax * (1 - (v / v0) ** 4);
-    else {
-      const sStar = s0 + v * this.headway + (v * (v - vLead)) / (2 * Math.sqrt(aMax * bComf));
-      acc = gap <= 0.2 ? -9 : aMax * (1 - (v / v0) ** 4 - (Math.max(0, sStar) / gap) ** 2);
+    const idm = (g: number, vl: number): number => {
+      if (g === Infinity) return aMax * (1 - (v / v0) ** 4);
+      const sStar = s0 + v * this.headway + (v * (v - vl)) / (2 * Math.sqrt(aMax * bComf));
+      return g <= 0.2 ? -9 : aMax * (1 - (v / v0) ** 4 - (Math.max(0, sStar) / g) ** 2);
+    };
+    let acc = idm(gap, vLead);
+    // The stop line on its own: a car following a leader through the amber must still brake for the line when
+    // that asks for more than the leader does (taking only the nearer of the two ignored a line 30 m off behind
+    // a car 15 m ahead, until it was too close to stop: a red run, common once the boulevards filled up)
+    if (this.mustStopForSignal(dStop, v)) {
+      const g = dStop - car.halfL - 0.5;
+      // Seen late: a firm, steady stop to the line instead of the long IDM approach
+      const a = this.lateRed && v > 3 ? (g <= 0.3 ? -9 : -(v * v) / (2 * g)) : idm(g, 0);
+      if (a <= acc) {
+        acc = a;
+        this.waiting = 'light';
+      }
     }
 
     // Reaction time: a car that was waiting at a standstill pulls away a moment after it could (queues

@@ -79,11 +79,11 @@ const GLOW = {
   /** Roof lamp with a fare aboard. */
 };
 /**
- * Capacity of the shared per-car buffers (shadows, headlight beams, stock wheels). Traffic alone reaches 82 at
- * RUSH HOUR, plus police and the parked cars of nearby lots (the gymkhana's 40, the airfield's 17...). A car
+ * Capacity of the shared per-car buffers (shadows, headlight beams, stock wheels). Traffic alone reaches 93 at
+ * GRIDLOCK, plus police and up to 70 curb-parked cars. A car
  * past it is still drawn, only without the extras that no longer fit.
  */
-const MAX_CARS = 160;
+const MAX_CARS = 200;
 /** Halos grow with distance (up to 2x) so lamps stay readable down the street. */
 const GLOW_GROW_DIST = 90;
 const FACE_FRONT = new THREE.Quaternion();
@@ -418,6 +418,16 @@ export class CarView implements ViewSystem {
           this.halo(v, v.signAt, FACE_BACK, lamp, grow);
         }
       }
+      if (car.blinkLit) {
+        // Hazards (a double-parked car): both sides at once
+        for (const i of car.hazards ? [0, 1] : [car.blinker === 'left' ? 0 : 1]) {
+          for (const g of [GLOW.blinkHalo, GLOW.blinkCore]) {
+            this.halo(v, v.blink.front[i], FACE_FRONT, g, grow);
+            this.halo(v, v.blink.rear[i], FACE_BACK, g, grow);
+          }
+          this.halo(v, v.blink.side[i], i === 0 ? FACE_LEFT : FACE_RIGHT, GLOW.blinkSide, grow);
+        }
+      }
       if (car.kind === 'parked') continue;
       const lights = car.lampsOn;
       if (above < 1.2 && lights && nB < MAX_CARS) {
@@ -431,14 +441,6 @@ export class CarView implements ViewSystem {
       const tail = car.braking ? GLOW.brake : car.reversing ? GLOW.reverse : lights ? GLOW.tail : null;
       if (lights) for (const at of v.headPos) this.halo(v, at, FACE_FRONT, GLOW.head, grow);
       if (tail) for (const at of v.tailPos) this.halo(v, at, FACE_BACK, tail, grow);
-      if (car.blinkLit) {
-        const i = car.blinker === 'left' ? 0 : 1;
-        for (const g of [GLOW.blinkHalo, GLOW.blinkCore]) {
-          this.halo(v, v.blink.front[i], FACE_FRONT, g, grow);
-          this.halo(v, v.blink.rear[i], FACE_BACK, g, grow);
-        }
-        this.halo(v, v.blink.side[i], i === 0 ? FACE_LEFT : FACE_RIGHT, GLOW.blinkSide, grow);
-      }
       if (v.barL && v.barR) {
         if (car.siren || car.lightBar) {
           const phase = Math.floor(this.time * 7) % 2 === 0;

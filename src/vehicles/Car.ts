@@ -53,6 +53,13 @@ export class Car {
   /** Turn signal. Not an offense; a taxi fare may tip for a proper one. `blinkT` restarts on each switch-on. */
   blinker: Blinker = null;
   blinkT = 0;
+  /** Both signals flashing (a double-parked car, PRD 5.5). */
+  hazards = false;
+  /**
+   * Parked in the street, a metre into the travel lane (`ParkedCars`, PRD 5.5): traffic squeezes past it
+   * (`LaneDriver`) instead of queueing behind it.
+   */
+  doubleParked = false;
   /** Seconds since last collision (for crash offense cooldowns etc.). */
   lastHit = 99;
   /** Seconds since the body last touched anything, however lightly (scraping along a wall, T34 audio). */
@@ -120,7 +127,7 @@ export class Car {
   }
   /** Turn signal lamp lit at this instant. */
   get blinkLit(): boolean {
-    return this.blinker !== null && this.blinkT % BLINK_PERIOD < BLINK_ON;
+    return (this.blinker !== null || this.hazards) && this.blinkT % BLINK_PERIOD < BLINK_ON;
   }
   get reversing(): boolean {
     return this.phys.state.gear === -1 && this.phys.state.speed < -0.1;
@@ -136,7 +143,7 @@ export class Car {
   step(dt: number): void {
     this.lastHit += dt;
     this.touch += dt;
-    if (this.blinker) this.blinkT += dt;
+    if (this.blinker || this.hazards) this.blinkT += dt;
     this.phys.step(this.input, dt);
   }
 

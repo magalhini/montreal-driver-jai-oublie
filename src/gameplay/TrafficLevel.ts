@@ -2,18 +2,20 @@ import { CONFIG } from '../config';
 
 /**
  * How busy the streets are: the game's difficulty, picked on the title (or pause) menu and saved. Scales the
- * civilian traffic target (`CONFIG.MAX_TRAFFIC` x `mul`); RUSH HOUR is twice NORMAL.
+ * civilian traffic target (`CONFIG.MAX_TRAFFIC` x `mul`). Montreal (PRD 5.5, Phase 8): the middle level is
+ * already a full boulevard and the default; QUIET stays for testing.
  */
 export const TRAFFIC_LEVELS = [
-  { name: 'QUIET', mul: 0.4, hint: 'Empty streets: the easiest' },
-  { name: 'LIGHT', mul: 0.7, hint: 'Light traffic' },
-  { name: 'NORMAL', mul: 1.2, hint: 'Normal traffic' },
-  { name: 'BUSY', mul: 1.75, hint: 'Busy streets' },
-  { name: 'RUSH HOUR', mul: 2.4, hint: 'Rush hour, twice the normal traffic: the hardest' },
+  { name: 'QUIET', mul: 0.25, hint: 'Empty streets: for testing' },
+  { name: 'LIGHT', mul: 0.55, hint: 'A Sunday morning' },
+  { name: 'BUSY', mul: 1, hint: 'A normal Montreal day: full boulevards' },
+  { name: 'RUSH HOUR', mul: 1.25, hint: 'Rush hour: worse' },
+  { name: 'GRIDLOCK', mul: 1.45, hint: 'Everybody is out, and in your lane: the hardest' },
 ] as const;
 
 export const DEFAULT_TRAFFIC_LEVEL = 2;
-const KEY = 'neonDriver.traffic';
+/** New key: a level saved under the old scale (`neonDriver.traffic`) meant a different number of cars. */
+const KEY = 'montrealDriver.traffic';
 
 /** Civilian cars kept around the player at this level. */
 export function trafficTarget(level: number): number {

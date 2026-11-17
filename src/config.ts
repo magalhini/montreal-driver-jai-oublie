@@ -21,7 +21,8 @@ export const CONFIG = {
   SPEEDING_MARGIN_KMH: 25,
 
   // Population
-  MAX_TRAFFIC: 36,
+  /** Civilian cars around the player at the default (BUSY) traffic level: PRD 5.5's rush hour as the new normal. */
+  MAX_TRAFFIC: 64,
   MAX_PEDS: 140,
   MAX_RIDERS: 12,
   PATROL_COPS: 4,

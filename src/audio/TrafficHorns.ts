@@ -16,6 +16,22 @@ const KEI_HORN = [620];
 const CITY_HORN = [523, 659];
 const TRUCK_HORN = [262, 330];
 
+/**
+ * Montreal patience (PRD 5.5, Phase 8): how long a car sits behind the player (stopped or crawling) before the
+ * first honk and before the long angry one (s), the gap between honks (s), and how far back down the queue the
+ * cars still join in (m). Cars further back count the time at `queueRate`.
+ */
+export const HORN_TUNING = {
+  first: 1.4,
+  angry: 6,
+  coolMin: 2.2,
+  coolMax: 4.5,
+  queue: 24,
+  queueRate: 0.5,
+  /** The player counts as sitting in the lane below this speed (m/s). */
+  crawl: 2.2,
+};
+
 interface Grudge {
   /** Seconds stuck behind the stopped player. */
   blocked: number;
@@ -66,6 +82,13 @@ export class TrafficHorns {
     const p = w.player;
     if (w.mode === 'menu' || w.controlLocked) return;
     const pSpeed = p.speed;
+    // Waiting at a red is not blocking anybody: nobody leans on the horn for that
+    let atRed = false;
+    if (pSpeed < HORN_TUNING.crawl) {
+      const near = w.city.nearestLanePoint(p.pos);
+      const l = near.lane;
+      atRed = near.dist < 3 && Math.hypot(l.end.x - p.pos.x, l.end.z - p.pos.z) < 25 && w.lights.state(l.to, l.edgeId) === 'red';
+    }
     for (const c of w.cars) {
       if (c.kind !== 'traffic' || c.removed) continue;
       const rx = p.pos.x - c.pos.x;
@@ -76,15 +99,24 @@ export class TrafficHorns {
       const ahead = dot({ x: rx, z: rz }, f);
       const side = Math.abs(dot({ x: rx, z: rz }, leftOf(c.yaw)));
       const g = this.grudge(c.id);
-      // Blocked: stopped right behind a stopped player
-      if (c.speed < 0.6 && pSpeed < 1 && ahead > 2 && ahead < c.halfL + p.halfL + 5 && side < 1.8) {
-        g.blocked += step;
-        if (g.blocked > 3 && g.cool <= 0) {
-          const angry = g.blocked > 9;
+      // Blocked: stuck behind the player sitting (or crawling) in the lane; the cars queued further back join in
+      const H = HORN_TUNING;
+      const near = ahead < c.halfL + p.halfL + 5;
+      // (pointing the way the player does: a car at its own red across the junction can have us in its sights)
+      const behind = dot(f, fwd(p.yaw)) > 0.8;
+      if (!atRed && behind && c.speed < 1 && pSpeed < H.crawl && ahead > 2 && ahead < H.queue && side < 1.8) {
+        g.blocked += near ? step : step * H.queueRate;
+        if (g.blocked > H.first && g.cool <= 0) {
+          const angry = g.blocked > H.angry;
           this.honk(c, angry ? [[0, 1.4]] : Math.random() < 0.5 ? [[0, 0.18], [0.28, 0.25]] : [[0, 0.4]]);
-          g.cool = angry ? 5 : 4 + Math.random() * 3;
+          g.cool = angry ? H.coolMin + 2 : H.coolMin + Math.random() * (H.coolMax - H.coolMin);
         }
       } else g.blocked = Math.max(0, g.blocked - step * 2);
+      // Nosing past the stopped player in the next lane: a parting toot
+      if (pSpeed < 1 && c.blinker && Math.abs(ahead) < 3 && side > 2 && side < 4.5 && c.speed > 1 && g.cool <= 0 && Math.random() < 0.5) {
+        this.honk(c, [[0, 0.25]]);
+        g.cool = 6;
+      }
       // Head-on in its lane
       if (ahead > 6 && ahead < 32 && side < 1.6 && g.cool <= 0) {
         const closing = c.speed - dot(p.vel, f);

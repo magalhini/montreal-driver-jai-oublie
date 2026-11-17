@@ -58,6 +58,8 @@ export interface SoakResult {
   fenceHits?: number;
   conesMoved?: number;
   merges?: number;
+  /** Abrupt boulevard lane changes (Phase 8), with `--closures`. */
+  hops?: number;
   /** One line per AI-vs-AI collision. */
   collisionLog: string[];
 }
@@ -167,7 +169,7 @@ export function soak(id: string, seed: number, seconds: number, withClosures = f
       return `${ed.cls[0]}${d.lane.index}->${city.edges[d.next.lane.edgeId].cls[0]}${d.next.lane.index} ${d.next.turn}`;
     };
     res.collisionLog.push(
-      `t=${world.time.toFixed(1)} ${ka.kind}/${kb.kind} impulse ${Math.round(e.impulse)} speeds ${(ka.phys.state.speed * 3.6).toFixed(0)}/${(kb.phys.state.speed * 3.6).toFixed(0)} km/h ${node ? `in junction ${node.gi},${node.gj}` : 'on road'} [${move(e.a)} | ${move(e.b!)}]`,
+      `t=${world.time.toFixed(1)} ${ka.kind}/${kb.kind} #${ka.id}/#${kb.id} impulse ${Math.round(e.impulse)} speeds ${(ka.phys.state.speed * 3.6).toFixed(0)}/${(kb.phys.state.speed * 3.6).toFixed(0)} km/h ${node ? `in junction ${node.gi},${node.gj}` : 'on road'} [${move(e.a)} | ${move(e.b!)}]`,
     );
   });
 
@@ -183,6 +185,7 @@ export function soak(id: string, seed: number, seconds: number, withClosures = f
   const steps = Math.round(seconds / CONFIG.STEP);
   const t0 = performance.now();
   const merges0 = MERGE_STATS.merges;
+  const hops0 = MERGE_STATS.hops;
   for (let k = 0; k < steps; k++) {
     for (const s of sims) s.update(CONFIG.STEP);
     for (const d of drivers()) {
@@ -194,7 +197,10 @@ export function soak(id: string, seed: number, seconds: number, withClosures = f
         const chasing = d.car.kind === 'police' && !!police.cops.get(d.car.id)?.chase;
         if (node.signalized && !chasing) {
           res.crossings++;
-          if (lights.state(node.id, d.lane.edgeId) === 'red') res.redRuns++;
+          if (lights.state(node.id, d.lane.edgeId) === 'red') {
+            res.redRuns++;
+            res.collisionLog.push(`t=${world.time.toFixed(1)} ${d.car.kind} #${d.car.id} ran the red at ${node.gi},${node.gj} at ${(d.car.speed * 3.6).toFixed(0)} km/h (${d.mood}/${d.waiting}, ${d.next.turn})`);
+          }
         } else if (node.control === 'stop' && !chasing && !d.ignoreLights) {
           res.stopCrossings++;
           if (!d.stopCleared) {
@@ -233,7 +239,10 @@ export function soak(id: string, seed: number, seconds: number, withClosures = f
   }
   res.msPerStep = (performance.now() - t0) / steps;
   if (cones) res.conesMoved = cones.scattered;
-  if (closures) res.merges = MERGE_STATS.merges - merges0;
+  if (closures) {
+    res.merges = MERGE_STATS.merges - merges0;
+    res.hops = MERGE_STATS.hops - hops0;
+  }
   res.offRoad = samples ? off / samples : 0;
   res.cars = carSum / Math.max(1, Math.round(steps / 60));
   return res;

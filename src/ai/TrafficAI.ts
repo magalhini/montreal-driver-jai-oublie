@@ -92,22 +92,26 @@ export class TrafficSystem implements SimSystem {
 
   /** Fill the ring right away (on game start). */
   populate(): void {
-    for (let k = 0; k < this.target * 3 && this.drivers.size < this.target; k++) this.trySpawn(25, true);
+    for (let k = 0; k < this.target * 6 && this.drivers.size < this.target; k++) this.trySpawn(25, true);
   }
 
-  private trySpawn(rMin: number, ignoreView = false): void {
+  /** One spawn attempt at a random lane point in the ring; most land somewhere unusable. True if a car came in. */
+  private trySpawn(rMin: number, ignoreView = false): boolean {
     const w = this.world;
     const pp = w.player.pos;
     const hit = w.city.randomLanePointNear(w.rng, pp, rMin, CONFIG.SPAWN_RADIUS);
-    if (!hit) return;
+    if (!hit) return false;
     // Nothing spawns on a fenced street or in a coned lane (it would only drive into the fence / the cones)
-    if (w.roadworks && (w.roadworks.closedEdge(hit.lane.edgeId) || w.roadworks.conedLane(hit.lane.id))) return;
+    if (w.roadworks && (w.roadworks.closedEdge(hit.lane.edgeId) || w.roadworks.conedLane(hit.lane.id))) return false;
     // ...nor in a lane that ends, too late to merge out of it
-    if (w.roadworks?.mergeLane(hit.lane.id) && (w.roadworks.mergeAhead(hit.lane, hit.pos)?.dist ?? 0) < 40) return;
+    if (w.roadworks?.mergeLane(hit.lane.id) && (w.roadworks.mergeAhead(hit.lane, hit.pos)?.dist ?? 0) < 40) return false;
+    // ...nor just before a light that isn't green: a car born at speed 15 m from an amber can't stop for it
+    if (w.lights.state(hit.lane.to, hit.lane.edgeId) !== 'green' && dist(hit.pos, hit.lane.end) < 45) return false;
     const d = dist(hit.pos, pp);
-    if (!ignoreView && this.inView(hit.pos, d)) return;
-    if (!this.clearAt(hit.pos, 14)) return;
+    if (!ignoreView && this.inView(hit.pos, d)) return false;
+    if (!this.clearAt(hit.pos, 14)) return false;
     this.spawnCar(hit.lane, hit.pos);
+    return true;
   }
 
   /** Over target (the level went down): take away one car the player can't see. */
@@ -143,7 +147,12 @@ export class TrafficSystem implements SimSystem {
     if (this.boost > 0) this.boost -= 1 / 60;
     if (this.spawnTimer <= 0) {
       this.spawnTimer = this.boost > 0 ? 0.05 : 0.25;
-      if (this.drivers.size < this.target) this.trySpawn(this.boost > 0 ? 45 : CONFIG.SPAWN_MIN);
+      if (this.drivers.size < this.target) {
+        // Montreal density (Phase 8): most attempts miss (in view, too close to a car), so a ring well short of
+        // its target tries a few points per tick
+        const tries = this.target - this.drivers.size > 6 ? 4 : 1;
+        for (let k = 0; k < tries && !this.trySpawn(this.boost > 0 ? 45 : CONFIG.SPAWN_MIN); k++);
+      }
       else if (this.drivers.size > this.target) this.dropOne();
     }
   }
