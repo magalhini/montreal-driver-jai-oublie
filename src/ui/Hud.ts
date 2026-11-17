@@ -57,6 +57,8 @@ export class Hud {
   /** Black screen fade 0..1 (under the HUD). */
   fade = 0;
   objective = '';
+  /** Mission clock under the objective (`m:ss`), null to hide it. */
+  clock: string | null = null;
   paused = false;
   /** Speed limiter cap in km/h while it is on, null while off. */
   limiter: number | null = null;
@@ -72,6 +74,8 @@ export class Hud {
 
   private speedEl: HTMLElement;
   private limiterEl: HTMLElement;
+  private clockEl: HTMLElement;
+  private shownClock: string | null = null;
   private limitEl: HTMLElement;
   private lightsEl: HTMLElement;
   private gearEl: HTMLElement;
@@ -111,6 +115,7 @@ export class Hud {
 
     this.cashEl = el('div', 'hud-panel hud-cash', root);
     this.objEl = el('div', 'hud-objective', root);
+    this.clockEl = el('div', 'hud-clock', root);
     this.bustEl = el(
       'div',
       'hud-bust',
@@ -159,6 +164,7 @@ export class Hud {
       this.shown.speeding = this.speeding;
       this.limitEl.textContent = String(this.speedLimit);
       this.limitEl.classList.toggle('over', this.speeding);
+      this.speedEl.classList.toggle('over', this.speeding);
     }
     const kmh = Math.round(Math.abs(s.speed) * 3.6);
     if (kmh !== this.shown.speed) {
@@ -195,6 +201,10 @@ export class Hud {
     if (this.cashFlash > 0) {
       this.cashFlash -= dt;
       if (this.cashFlash <= 0) this.cashEl.classList.remove('flash-good', 'flash-bad');
+    }
+    if (this.clock !== this.shownClock) {
+      this.shownClock = this.clock;
+      this.clockEl.textContent = this.clock ?? '';
     }
     if (this.objective !== this.shown.obj) {
       this.shown.obj = this.objective;

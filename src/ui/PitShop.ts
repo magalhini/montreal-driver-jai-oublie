@@ -2,6 +2,7 @@ import type * as THREE from "three";
 import type { GarageEvent } from "../audio/GarageAudio";
 import type { Input } from "../core/Input";
 import type { Builds } from "../gameplay/Builds";
+import { TIRE_CUES, type TireCue, type TireOffer } from "../gameplay/WinterTires";
 import { formatCash } from "../gameplay/Economy";
 import type { PostFX } from "../render/PostFX";
 import type { Tone } from "../types";
@@ -27,9 +28,11 @@ import { INTRO, PitGarage, type ShopShot } from "../world/PitGarage";
 import type { PitStop } from "../world/PitStops";
 import "./pitshop.css";
 
-type Tab = "repair" | PartKind | "burnout" | "wheels" | "paint" | "charm";
+type Tab = "tires" | "repair" | PartKind | "burnout" | "wheels" | "paint" | "charm";
 
 const TABS: { id: Tab; label: string; jp: string; shot: ShopShot }[] = [
+  // Only at the winter-tire drive's garage (`ShopHost.winterTires`), and then always first
+  { id: "tires", label: "TIRES", jp: "タイヤ", shot: "wheel" },
   { id: "repair", label: "REPAIR", jp: "修理", shot: "overview" },
   {
     id: "engine",
@@ -58,7 +61,7 @@ const TABS: { id: Tab; label: string; jp: string; shot: ShopShot }[] = [
   { id: "burnout", label: "BURNOUT", jp: "バーンアウト", shot: "rear" },
   { id: "wheels", label: "WHEELS", jp: "ホイール", shot: "wheel" },
   { id: "paint", label: "PAINT", jp: "塗装", shot: "side" },
-  { id: "charm", label: "CHARMS", jp: "お守り", shot: "bench" },
+  { id: "charm", label: "CHARMS", jp: "porte-bonheur", shot: "bench" },
 ];
 
 const isPart = (t: Tab): t is PartKind =>
@@ -97,6 +100,12 @@ export interface ShopHost {
   sound(kind: "move" | "ok" | "back"): void;
   /** The crew answers the menu with a recorded sound: previews, fits, the till, leaving (`audio/GarageAudio.ts`). */
   garage(ev: GarageEvent): void;
+  /** What the TIRES tab offers at this garage, or null for no tab. */
+  winterTires(stop: PitStop): TireOffer | null;
+  /** Put the winter set on (the drive's goal). Returns the prize paid, or null when the drive can't take it. */
+  installWinterTires(): number | null;
+  /** One tool of the tire swap. */
+  tireCue(step: TireCue): void;
 }
 
 type Phase = "idle" | "out" | "intro" | "menu" | "in" | "back";
@@ -152,6 +161,8 @@ export class PitShop {
   private holdT = 0;
   private padPrev = new Set<number>();
   private shownKey = "";
+  /** Tool sounds still to play for a tire swap, on the menu clock. */
+  private cues: { at: number; step: TireCue }[] = [];
 
   constructor(
     private readonly ui: HTMLElement,
@@ -256,6 +267,9 @@ export class PitShop {
     this.focus = "tabs";
     this.status = "";
     this.spent = 0;
+    this.cues = [];
+    // The winter-tire drive's garage: the cursor is already on INSTALL
+    if (this.host.winterTires(stop) === "ready") this.focus = "rows";
     this.host.pause(true);
     this.host.sound("ok");
   }
@@ -318,6 +332,8 @@ export class PitShop {
         return;
       case "menu":
         this.t += dt;
+        while (this.cues.length && this.t >= this.cues[0].at)
+          this.host.tireCue(this.cues.shift()!.step);
         this.fade = Math.max(0, this.fade - dt / 0.35);
         return;
       case "in":
@@ -355,7 +371,7 @@ export class PitShop {
       if (this.id) this.garage.setCar(builtLook(this.id, preview));
       else this.garage.setCar({ ...this.host.car().look });
       this.garage.setCharm(preview.charm);
-      const shot = this.phase === "intro" ? "overview" : TABS[this.tab].shot;
+      const shot = this.phase === "intro" ? "overview" : this.tabs()[this.tab].shot;
       this.garage.update(
         this.t,
         dt,
@@ -381,10 +397,10 @@ export class PitShop {
   /** The car's saved build, or the highlighted rim / paint / charm on top of it while browsing those. */
   private previewBuild(): CarBuild {
     if (!this.id)
-      return { ...STOCK_BUILD, charm: this.host.car().look.charm ?? "omamori" };
+      return { ...STOCK_BUILD, charm: this.host.car().look.charm ?? "cone" };
     const build = this.builds.of(this.id);
     if (this.phase !== "menu" || this.focus !== "rows") return build;
-    const tab = TABS[this.tab].id;
+    const tab = this.tabs()[this.tab].id;
     if (tab !== "wheels" && tab !== "paint" && tab !== "charm") return build;
     return this.rows()[this.row]?.preview ?? build;
   }
@@ -451,7 +467,7 @@ export class PitShop {
 
   /** Browsing paint and charms: a quick taste of what the row sounds like fitted. */
   private previewSound(): void {
-    const tab = TABS[this.tab].id;
+    const tab = this.tabs()[this.tab].id;
     const build = this.id ? this.builds.of(this.id) : null;
     if (!build) return;
     if (tab === "paint") {
@@ -466,7 +482,9 @@ export class PitShop {
   }
 
   private tabs(): typeof TABS {
-    return this.id ? TABS : TABS.slice(0, 1);
+    const tires = this.stop !== null && this.host.winterTires(this.stop) !== null;
+    const list = tires ? TABS : TABS.filter((t) => t.id !== "tires");
+    return this.id ? list : list.filter((t) => t.id === "tires" || t.id === "repair");
   }
 
   private selectTab(i: number): void {
@@ -481,7 +499,7 @@ export class PitShop {
     this.focus = "rows";
     this.row = this.startRow();
     this.host.sound("ok");
-    if (TABS[this.tab].id === "engine") this.host.garage({ kind: "hood" });
+    if (this.tabs()[this.tab].id === "engine") this.host.garage({ kind: "hood" });
   }
 
   private back(): void {
@@ -498,8 +516,8 @@ export class PitShop {
 
   /** Where the cursor lands in a tab: the next stage to buy, or what's fitted. */
   private startRow(): number {
-    const tab = TABS[this.tab].id;
-    if (!this.id || tab === "repair") return 0;
+    const tab = this.tabs()[this.tab].id;
+    if (!this.id || tab === "repair" || tab === "tires") return 0;
     const b = this.builds.of(this.id);
     if (tab === "burnout") return 0;
     if (isPart(tab))
@@ -557,8 +575,9 @@ export class PitShop {
   }
 
   private rows(): Row[] {
-    const tab = TABS[this.tab].id;
+    const tab = this.tabs()[this.tab].id;
     const id = this.id;
+    if (tab === "tires") return [this.tiresRow(id ? this.builds.of(id) : STOCK_BUILD)];
     if (tab === "repair" || !id)
       return [this.repairRow(id ? this.builds.of(id) : STOCK_BUILD)];
     const build = this.builds.of(id);
@@ -694,10 +713,7 @@ export class PitShop {
       const owned = this.builds.owns(c.id);
       return {
         name: `${c.name}  ${c.jp}`,
-        detail:
-          c.id === "none"
-            ? "A clear view in the mirror"
-            : "Hangs from the rearview mirror",
+        detail: "Hangs from the rearview mirror",
         tag: on ? "HANGING" : owned ? "OWNED" : formatCash(c.price),
         tagClass: on ? "fitted" : owned ? "owned" : "price",
         price: owned ? undefined : c.price,
@@ -710,15 +726,46 @@ export class PitShop {
           }
           this.fit({ ...build, charm: c.id });
           this.host.garage({ kind: "charm", id: c.id, fit: true });
-          this.say(
-            c.id === "none"
-              ? "Charm taken down"
-              : `${c.name} hung on the mirror`,
-            "good",
-          );
+          this.say(`${c.name} hung on the mirror`, "good");
         },
       };
     });
+  }
+
+  /** The winter set: free, and the end of the drive. */
+  private tiresRow(build: CarBuild): Row {
+    const offer = this.stop ? this.host.winterTires(this.stop) : null;
+    if (offer === "fitted")
+      return {
+        name: "WINTER TIRES",
+        detail: "On the car. Legal until April.",
+        tag: "FITTED",
+        tagClass: "fitted",
+        preview: build,
+        confirm: () => this.say("Already on", "warn"),
+      };
+    if (offer === "storage")
+      return {
+        name: "WINTER TIRES",
+        detail: "Still in storage on Ottawa: bring them here first.",
+        tag: "IN STORAGE",
+        tagClass: "locked",
+        preview: build,
+        confirm: () => this.say("Pick them up from storage first", "warn"),
+      };
+    return {
+      name: "INSTALL WINTER TIRES",
+      detail: "Off with the summer set, on with the winter tires from your trunk.",
+      tag: "FREE",
+      tagClass: "free",
+      preview: build,
+      confirm: () => {
+        const prize = this.host.installWinterTires();
+        if (prize === null) return;
+        this.cues = TIRE_CUES.map((c) => ({ at: this.t + c.at, step: c.step }));
+        this.say(`Winter tires on. You're legal! Prize: +${formatCash(prize)}`, "good");
+      },
+    };
   }
 
   private repairRow(build: CarBuild): Row {
@@ -746,7 +793,7 @@ export class PitShop {
 
   /** Redraw the menu (only when something on it changed). */
   private render(): void {
-    const tab = TABS[this.tab];
+    const tab = this.tabs()[this.tab];
     const rows = this.rows();
     const cash = this.host.cash();
     const id = this.id;
@@ -797,6 +844,10 @@ export class PitShop {
 
   /** What the tab list shows beside each tab: stage pips, damage, what's fitted. */
   private tabValue(tab: Tab, build: CarBuild | null): string {
+    if (tab === "tires") {
+      const offer = this.stop ? this.host.winterTires(this.stop) : null;
+      return offer === "fitted" ? "WINTER" : '<b class="warn">SUMMER</b>';
+    }
     if (tab === "repair") {
       const dmg = Math.round(Math.min(1, this.host.car().phys.state.damage) * 100);
       return dmg > 0 ? `<b class="warn">${dmg}%</b>` : "OK";
@@ -817,6 +868,7 @@ export class PitShop {
 
   private note(tab: Tab, build: CarBuild): string {
     const id = this.id!;
+    if (tab === "tires") return "";
     if (tab === "burnout")
       return "This car only. It is still fitted when you come back to it.";
     if (tab === "engine") return engineNote(id);

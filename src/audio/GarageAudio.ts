@@ -24,17 +24,12 @@ type CueOf<S extends Sound> = keyof (typeof GARAGE_SOUNDS)[S]['cues'];
 const rnd = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length)];
 
-/** Mirror charms by sound: suzu bells on the hanging ones, a squeak on the toys, the duck, the dice cup. */
+/** Mirror charms by sound: a squeak on the rubbery ones, a soft swing on the croissant, the cup's lid rattling. */
 const CHARM_CUES: Record<CharmId, CueOf<'charm'> | null> = {
-  omamori: 'suzuShake',
-  teru: 'suzuShake2',
-  daruma: 'suzuShake3',
-  panda: 'squeak',
-  shiba: 'squeak',
-  neko: 'squeak',
-  duck: 'duck',
-  dice: 'dice2',
-  none: null,
+  cone: 'squeak',
+  bagel: 'squeak',
+  croissant: 'suzuShake2',
+  timmies: 'dice2',
 };
 
 /** When the kneeling mechanic's impact wrench is buzzing (matches the arm animation in `PitGarage.place`). */

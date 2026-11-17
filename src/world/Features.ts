@@ -161,6 +161,8 @@ export interface CurbBay {
   s1: number;
   pos: Vec2;
   yaw: number;
+  /** The one bay where parking is allowed (the spawn, `MissionRoute.homeBay`): no ticket, no parked car, no cone. */
+  legal?: boolean;
 }
 
 /** A garden cut out of one block. The rest of the block keeps its street wall. */

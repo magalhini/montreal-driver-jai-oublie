@@ -3,6 +3,7 @@ import type { CityModel } from "./RoadGraph";
 import { buildingBase } from "./BuildingDetails";
 import { frameOf } from "./BuildingFrame";
 import { openingTop } from "./Interiors";
+import { hasMetro } from "./MetroEntrances";
 import type { Building, Facing } from "../types";
 
 /**
@@ -179,7 +180,7 @@ export function buildShopSigns(city: CityModel, scene: THREE.Scene): void {
     const floor = buildingBase(b).floor;
     for (const f of b.faces) {
       const face = frame.faceOf(f);
-      if (face.width < 7) continue;
+      if (face.width < 7 || hasMetro(city, b, f as Facing)) continue;
       const roll = hash(b.seed * 19.7 + f.charCodeAt(0) * 13.1);
       if (roll > rate) continue;
       const brand = Math.floor(

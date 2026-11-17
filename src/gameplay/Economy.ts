@@ -7,7 +7,8 @@ export interface KeyValueStore {
   setItem(key: string, value: string): void;
 }
 
-const CASH_KEY = 'neonDriver.cash';
+/** Renamed when the economy was rebalanced (2 500 $ start), so old 50 000 $ wallets start over. */
+const CASH_KEY = 'montrealDriver.cash';
 /** Dollar sign. `formatCash` places it after the number (`1 250 $`). */
 export const CURRENCY = '$';
 

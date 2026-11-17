@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import { Pathfinder, stitchRoute, type Route } from '../ai/Pathfinding';
-import { missionPins, storageStop } from './MissionRoute';
+import { HOME_BAY, missionPins, storageStop, westSpawn } from './MissionRoute';
 import type { AABB, Lane, OrientedBox, RoadEdge, StreetClass, Vec2 } from '../types';
 import { inDriveway } from '../world/Features';
 import type { Pothole } from '../world/Potholes';
@@ -266,7 +266,10 @@ export class Closures {
     // The winter-tire storage's block: its circle has to be reachable and clear
     const store = storageStop(city);
     keep.add(store.edge);
-    this.keepClear = store.edge;
+    this.keepClear.add(store.edge);
+    // The spawn's street: no cone line or lane merge in front of the car as it pulls out of its bay
+    const home = city.features.curb.find((b) => b.legal);
+    if (home) this.keepClear.add(home.edge);
     this.rollHard(rng, keep);
     this.ensureGpsHitsFence(rng, keep, anchors);
     this.finishHard(rng);
@@ -279,11 +282,21 @@ export class Closures {
       const t = Math.max(0, Math.min(1, ((p.x - store.pos.x) * (store.door.x - store.pos.x) + (p.z - store.pos.z) * (store.door.z - store.pos.z)) / ((store.door.x - store.pos.x) ** 2 + (store.door.z - store.pos.z) ** 2)));
       return Math.hypot(p.x - (store.pos.x + (store.door.x - store.pos.x) * t), p.z - (store.pos.z + (store.door.z - store.pos.z) * t)) < 6;
     };
-    for (let i = this.loose.length - 1; i >= 0; i--) if (near(this.loose[i])) this.loose.splice(i, 1);
+    // Nor in the home bay, or the curb lane ahead of it
+    const nearHome = (p: Vec2) => {
+      if (!home) return false;
+      const fx = Math.sin(home.yaw);
+      const fz = Math.cos(home.yaw);
+      const along = (p.x - home.pos.x) * fx + (p.z - home.pos.z) * fz;
+      const lat = Math.abs((p.x - home.pos.x) * fz - (p.z - home.pos.z) * fx);
+      const reach = (home.s1 - home.s0) / 2 + HOME_BAY.clearAhead + HOME_BAY.coneClear;
+      return along > -HOME_BAY.coneClear && along < reach && lat < HOME_BAY.coneClear;
+    };
+    for (let i = this.loose.length - 1; i >= 0; i--) if (near(this.loose[i]) || nearHome(this.loose[i])) this.loose.splice(i, 1);
   }
 
-  /** Edge no cone line or merge may take (the tire storage's block). */
-  private keepClear = -1;
+  /** Edges no cone line or merge may take (the tire storage's block, the spawn's street). */
+  private readonly keepClear = new Set<number>();
 
   /** Lane merges (`LaneMerge`), by edge and by the closed lane. */
   readonly merges: LaneMerge[] = [];
@@ -384,7 +397,7 @@ export class Closures {
       const where = rng.next();
       const obsLen = rng.range(T.obstacle[0], T.obstacle[1]);
       const kind: LaneMerge['kind'] = rng.chance(0.55) ? 'machine' : 'barricade';
-      if (!take || this.merges.length >= T.maxMerges || this.closed.has(e.id) || this.linesByEdge.has(e.id)) continue;
+      if (!take || this.merges.length >= T.maxMerges || this.closed.has(e.id) || this.keepClear.has(e.id) || this.linesByEdge.has(e.id)) continue;
       const f = frame(e);
       const ids = ab ? e.lanesAB : e.lanesBA;
       if (ids.length < 2) continue;
@@ -707,7 +720,7 @@ export class Closures {
       const nRun = rng.int(T.runCones[0], T.runCones[1]);
       const board = rng.chance(0.5);
       const boardLeft = rng.chance(0.5);
-      if (!take || this.closed.has(e.id) || e.id === this.keepClear || this.lines.length >= T.maxLines) continue;
+      if (!take || this.closed.has(e.id) || this.keepClear.has(e.id) || this.lines.length >= T.maxLines) continue;
       const f = frame(e);
       const ids = ab ? e.lanesAB : e.lanesBA;
       if (!ids.length || f.L < 2 * T.endGap + taper + 10) continue;
@@ -805,7 +818,7 @@ export class Closures {
     for (const b of f0.curb) {
       const take = rng.chance(T.bayCones);
       const two = rng.chance(0.5);
-      if (!take || this.closed.has(b.edge)) continue;
+      if (!take || b.legal || this.closed.has(b.edge)) continue;
       this.bays.add(bayKey(b.pos));
       const fw = { x: Math.sin(b.yaw), z: Math.cos(b.yaw) };
       if (two) for (const k of [-1.4, 1.4]) this.loose.push({ x: b.pos.x + fw.x * k, z: b.pos.z + fw.z * k });
@@ -842,7 +855,9 @@ export function closureSalt(): number {
  */
 export function defaultAnchors(city: CityModel): ClosureAnchors {
   const goal = eastGarage(city);
-  const start = westSpawn(city);
+  // The one legal curb bay, beside the west spawn lane; the lane itself on maps without one
+  const home = city.features.curb.find((b) => b.legal);
+  const start = home ? { pos: { ...home.pos }, heading: { x: Math.sin(home.yaw), z: Math.cos(home.yaw) } } : westSpawn(city);
   return { spawn: start.pos, heading: start.heading, goal };
 }
 
@@ -854,37 +869,3 @@ function eastGarage(city: CityModel): Vec2 {
   return { x: east.bay.x, z: east.bay.z };
 }
 
-/**
- * Eastbound lane in the northwest of the grid (Guy / Sherbrooke), mid-block so the car is not sitting in
- * a junction. Falls back to the northwestern-most eastbound lane if that corner has none.
- */
-function westSpawn(city: CityModel): { pos: Vec2; heading: Vec2 } {
-  const b = city.bounds;
-  const xMax = b.minX + (b.maxX - b.minX) * 0.22;
-  const zMax = b.minZ + (b.maxZ - b.minZ) * 0.32;
-  const along = (l: { start: Vec2; end: Vec2 }): Vec2 => ({
-    x: l.start.x + (l.end.x - l.start.x) * 0.45,
-    z: l.start.z + (l.end.z - l.start.z) * 0.45,
-  });
-  const eastbound = city.lanes.filter((l) => l.dir.x > 0.75 && l.length > 40);
-  const pool = eastbound.filter((l) => {
-    const p = along(l);
-    return p.x <= xMax && p.z <= zMax;
-  });
-  const lanes = pool.length ? pool : eastbound;
-  let best = lanes[0] ?? city.lanes[0];
-  let bestKey = Infinity;
-  for (const l of lanes) {
-    const p = along(l);
-    const key = p.x + p.z + l.index * 30;
-    if (key < bestKey) {
-      bestKey = key;
-      best = l;
-    }
-  }
-  const guess = along(best);
-  const hit = city.nearestLanePoint(guess);
-  const lane = hit.lane.id === best.id ? hit.lane : best;
-  const pos = hit.lane.id === best.id ? hit.pos : guess;
-  return { pos, heading: { x: lane.dir.x, z: lane.dir.z } };
-}

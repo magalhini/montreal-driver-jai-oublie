@@ -625,7 +625,7 @@ export class PitGarage {
     // Face the toy toward the bench shot's camera
     this.charm.rotation.y = Math.atan2(-(BENCH_CAM.x - (x - 0.15)), -(BENCH_CAM.z - z));
     this.charmPivot.add(this.charm);
-    this.setCharm('omamori');
+    this.setCharm('cone');
     // A little spot on the display
     const spot = new THREE.SpotLight(0xfff0dd, 6, 3, 0.5, 0.6, 1.5);
     spot.position.set(x - 0.6, 2.2, z + 0.5);

@@ -1,5 +1,5 @@
 import { CONFIG, KMH } from '../../config';
-import { STORAGE_STOP, storageStop } from '../../gameplay/MissionRoute';
+import { homeBay, STORAGE_STOP, storageStop } from '../../gameplay/MissionRoute';
 import { montrealRelief } from './Relief';
 import { leftVec, scale } from '../../core/math';
 import { Rng, hash01 } from '../../core/Rng';
@@ -256,6 +256,8 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   f.curb = f.curb.filter(
     (b) => b.edge !== store.edge || Math.abs((b.pos.x - store.pos.x) * along.x + (b.pos.z - store.pos.z) * along.z) > STORAGE_STOP.clearBays || (b.pos.x - store.pos.x) * store.curb.x + (b.pos.z - store.pos.z) * store.curb.z < -2,
   );
+  // The only legal spot in town, where every session starts, with clear curb ahead to pull out
+  f.curb = homeBay(city, f.curb);
   return city;
 }
 

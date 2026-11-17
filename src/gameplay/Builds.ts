@@ -93,7 +93,7 @@ function sanitize(b: Partial<CarBuild>): CarBuild {
     brakes: level(b.brakes),
     wheels: WHEELS.some((w) => w.id === b.wheels) ? b.wheels! : 'stock',
     paint: PAINTS.some((p) => p.color === b.paint) ? b.paint! : null,
-    charm: CHARMS.some((c) => c.id === b.charm) ? b.charm! : 'omamori',
+    charm: CHARMS.some((c) => c.id === b.charm) ? b.charm! : 'cone',
     burnout: b.burnout === true,
   };
 }

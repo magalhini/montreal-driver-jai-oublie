@@ -40,7 +40,7 @@ export const CONFIG = {
   LAMP_BREAK_KMH: 50,
 
   // Wallet. The bust fine is `FINE_TUNING` (dollars) in gameplay/Economy.ts.
-  START_CASH: 50000,
+  START_CASH: 2500,
 };
 
 export const KMH = 1 / 3.6;

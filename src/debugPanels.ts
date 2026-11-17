@@ -36,6 +36,8 @@ import { addDamage, repair } from './vehicles/Damage';
 import { equipCar, PLAYER_CAR } from './vehicles/Fleet';
 import { addSpecPanel } from './vehicles/SpecPanel';
 import type { Builds } from './gameplay/Builds';
+import type { WinterTires } from './gameplay/WinterTires';
+import type { StorageStop } from './gameplay/MissionRoute';
 import type { PitStop } from './world/PitStops';
 import { interiorAt, SIDE_OUT } from './world/Interiors';
 import { surfaceAt } from './world/Surfaces';
@@ -69,6 +71,8 @@ export interface DebugSystems {
   cones: Cones;
   chantier: Chantier;
   openPitShop: (stop: PitStop) => void;
+  mission: WinterTires;
+  storage: StorageStop;
 }
 
 /** Debug panel folders (cheats, tuning knobs, spawn buttons) and overlay watch lines. Call after `Debug.attach`. */
@@ -258,6 +262,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   Debug.watch('gps', () => (gps.target ? `${gps.route ? `${gps.remaining.toFixed(0)} m  ${gps.route.nodes.length} nodes` : 'no route'}` : 'no target'));
   addAlleyPanel(sys);
   addWorldPanel(sys);
+  addTeleportPanel(sys);
   return { adoptSpec };
 }
 
@@ -310,6 +315,45 @@ function addAlleyPanel({ city, player, camRig }: DebugSystems): void {
     const r = interiorAt(f.interiors, player.pos);
     return `${surfaceAt(city, player.pos)}${r ? `  ${r.id}${r.hidden ? ' (hidden)' : ''}` : ''}  ${f.alleys.length} alleys`;
   });
+}
+
+/**
+ * Teleports for checking the places the drive goes: every garage (dropped in its circle with the menu open),
+ * Jacques Pneu with the winter tires already in the trunk (the TIRES tab's INSTALL row), the storage circle on
+ * Ottawa, and the home bay.
+ */
+function addTeleportPanel({ city, player, camRig, openPitShop, mission, storage, events }: DebugSystems): void {
+  const folder = Debug.addFolder('Teleport');
+  const put = (p: Vec2, yaw: number) => {
+    player.teleport({ x: p.x, z: p.z }, yaw);
+    camRig.snap();
+  };
+  const garage = (s: PitStop) => {
+    put(s.bay, s.bay.yaw);
+    openPitShop(s);
+  };
+  for (const s of city.features.pitStops) folder.add({ go: () => garage(s) }, 'go').name(`garage: ${s.name}`);
+  const goal = mission.garage;
+  if (goal)
+    folder
+      .add(
+        {
+          go: () => {
+            if (!mission.active) {
+              events.message('Debug: start the winter-tire drive first (title > Winter tires).', 'warn');
+              return;
+            }
+            mission.loadTires();
+            garage(goal);
+          },
+        },
+        'go',
+      )
+      .name(`garage: ${goal.name}, tires in trunk`);
+  // A car length back from the circle, in the curb lane, so the stop is still yours to make
+  folder.add({ go: () => put({ x: storage.pos.x - Math.sin(storage.yaw) * 12, z: storage.pos.z - Math.cos(storage.yaw) * 12 }, storage.yaw) }, 'go').name('tire storage (short of the circle)');
+  const home = city.features.curb.find((b) => b.legal);
+  if (home) folder.add({ go: () => put(home.pos, home.yaw) }, 'go').name('home bay (the start)');
 }
 
 /** Bigger city (IMPROVEMENTS #20): draw distance / tiling stats, pit stops, the precinct. */

@@ -5,7 +5,7 @@ import type { Car } from '../vehicles/Car';
 import type { CurbBay } from '../world/Features';
 import { formatCash, type Economy } from './Economy';
 
-/** Parking-ticket gag (every painted curb stall is illegal). */
+/** Parking-ticket gag (every painted curb stall is illegal, except the green home bay the session starts in). */
 export const PARKING_TICKET_TUNING = {
   /** Seconds the car must sit between the lines before the agent is called. */
   wait: 3,
@@ -300,6 +300,8 @@ export class ParkingTicket implements SimSystem {
     let best: CurbBay | null = null;
     let bestD = 100;
     for (const bay of curbs) {
+      // The one spot in town where parking is allowed
+      if (bay.legal) continue;
       const dx = bay.pos.x - p.pos.x;
       const dz = bay.pos.z - p.pos.z;
       const d2 = dx * dx + dz * dz;

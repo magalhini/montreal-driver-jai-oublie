@@ -10,9 +10,9 @@ export const PIT_TUNING = {
   stopSpeed: 1.2,
   /** Seconds stopped in the service circle before the car goes in. */
   settle: 0.8,
-  /** Repair price for a fully wrecked car (scales with damage), and the least it costs. */
-  fullRepair: 18000,
-  minimum: 800,
+  /** Repair price for a fully wrecked car (scales with damage, never more), and the least it costs. */
+  fullRepair: 300,
+  minimum: 50,
   /** Damage (0..1) at which a message says where to get the car fixed; it re-arms once the car is below `rearm`. */
   adviseAt: 0.2,
   rearm: 0.1,
@@ -69,7 +69,7 @@ export class PitStopSystem implements SimSystem {
     if (dmg < 0.01) return 0;
     return Math.max(
       PIT_TUNING.minimum,
-      Math.round((dmg * PIT_TUNING.fullRepair) / 100) * 100,
+      Math.min(PIT_TUNING.fullRepair, Math.round((dmg * PIT_TUNING.fullRepair) / 10) * 10),
     );
   }
 

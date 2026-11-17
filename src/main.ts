@@ -27,7 +27,7 @@ import { BustSystem } from "./gameplay/Bust";
 import { Economy } from "./gameplay/Economy";
 import { Gps } from "./gameplay/Gps";
 import { Tires } from "./gameplay/Tires";
-import { WinterTires } from "./gameplay/WinterTires";
+import { formatClock, WinterTires } from "./gameplay/WinterTires";
 import { TirePickup } from "./gameplay/TirePickup";
 import { TirePickupView } from "./gameplay/TirePickupView";
 import { storageStop } from "./gameplay/MissionRoute";
@@ -102,9 +102,11 @@ import { buildRoads } from "./world/RoadMesh";
 import { buildStreetLamps } from "./world/StreetLamps";
 import { buildStreetProps } from "./world/StreetProps";
 import { buildShopSigns } from "./world/ShopSigns";
+import { buildMetroEntrances } from "./world/MetroEntrances";
 import { buildRoadSigns } from "./world/RoadSigns";
 import { buildStreetSigns } from "./world/StreetSigns";
 import { buildTireStorage } from "./world/TireStorage";
+import { buildHomeBay } from "./world/HomeBay";
 import { SteamVents } from "./world/SteamVents";
 import { TrafficLights } from "./world/TrafficLights";
 import { TrafficLightView } from "./world/TrafficLightView";
@@ -137,6 +139,8 @@ const roadMats = buildRoads(city, r.scene, map.markings);
 const buildings = buildBuildings(city.buildings, r.scene);
 // Montreal shop boards on some street faces (PRD 11B): IGA, Provigo, Starbucks, Tim Hortons, poutine
 buildShopSigns(city, r.scene);
+// STM metro entrances on corner buildings, the blue MÉTRO sign off each canopy
+buildMetroEntrances(city, r.scene);
 // Notre-Dame and the clock tower (their own meshes; their boxes are in `city.buildings` as colliders)
 buildLandmarks(city, r.scene);
 buildPoliceStation(city, r.scene);
@@ -208,7 +212,7 @@ world.roadworks = closures;
 signPosts.attach(events, statics);
 streetLamps.attach(events, statics);
 
-// West side of the grid, pointed east: the winter-tire spawn, and free roam's too (PRD Phase 11)
+// The legal curb bay on the west side of the grid, pointed east: the winter-tire spawn, and free roam's too
 const start = {
   pos: anchors.spawn,
   yaw: Math.atan2(anchors.heading.x, anchors.heading.z),
@@ -361,9 +365,11 @@ events.on("splash", (e) => {
 // The GPS plans through every fence (PRD 5.2: that absence is the design)
 const gps = new Gps(world, new Pathfinder(city));
 game.addSim(gps);
-const mission = new WinterTires(world, tires, gps, heat);
+const mission = new WinterTires(world, tires, gps, heat, economy);
 const tireStorage = buildTireStorage(r.scene, city, storageStop(city));
-mission.blocked = () =>
+// The one legal parking spot in Montreal: every session starts in it
+buildHomeBay(r.scene, city);
+const sceneBusy = () =>
   bust.phase !== "free" ||
   wreck.active ||
   breakdown.active ||
@@ -372,7 +378,7 @@ game.addSim(mission);
 // The storage stop on Ottawa: stop in its circle and the scene loads the tires into the trunk
 const pickup = new TirePickup(world, storageStop(city));
 pickup.armed = () => mission.needsTires;
-pickup.blocked = mission.blocked;
+pickup.blocked = sceneBusy;
 pickup.chased = () => police.pursuers > 0;
 pickup.onLoaded = () => mission.loadTires();
 game.addSim(pickup);
@@ -446,6 +452,9 @@ const shop = new PitShop(uiRoot, r.renderer, post, builds, {
   pause: (on) => game.setPaused("pitshop", on),
   sound: (kind) => uiSound(kind),
   garage: (ev) => audio.garage.event(ev),
+  winterTires: (stop) => mission.offer(stop),
+  installWinterTires: () => mission.install(),
+  tireCue: (step) => audio.garage.tire(step),
 });
 const orbitCenter = new THREE.Vector3();
 uiRoot.classList.add("on-title");
@@ -463,6 +472,7 @@ game.onFrame((dt) => {
     if (choice === "drive") {
       briefing.hide();
       world.controlLocked = false;
+      mission.startClock();
       events.message(
         "GPS set: tire storage first, then Jacques Pneu Garage. It does not know which streets are closed.",
         "info",
@@ -471,14 +481,10 @@ game.onFrame((dt) => {
     } else if (choice === "title") quitToTitle();
   }
   const arrived = briefingOn ? null : pitStops.take();
-  if (arrived) {
-    const kind = mission.arrival(arrived);
-    if (kind === "mount") mission.beginMount();
-    else shop.open(arrived);
-  }
+  if (arrived) shop.open(arrived);
   const shopOn = briefingOn ? false : shop.frame(dt, input, back);
-  if (!briefingOn && shopWas && !shop.active && mission.consumeMount())
-    mission.beginMount();
+  // Back on the street from the garage: the winter-tire debrief, if INSTALL was picked in there
+  if (shopWas && !shop.active) mission.leftGarage();
   shopWas = shop.active;
   if (briefingOn) {
     // The briefing owns confirm and escape until the car is released
@@ -605,6 +611,7 @@ game.addView({
     hud.immune = world.immune;
     hud.cash = economy.cash;
     if (world.mode === "free") hud.objective = mission.objective();
+    hud.clock = world.mode === "free" ? mission.clockText : null;
     hud.felony = heat.value;
     hud.evading = heat.evading;
     hud.bust = bust.progress;
@@ -660,6 +667,8 @@ adoptSpec = addDebugPanels({
   cones,
   chantier,
   openPitShop: (s) => shop.open(s),
+  mission,
+  storage: storageStop(city),
 }).adoptSpec;
 Debug.watch("mission", () => mission.status());
 const routeView = new RouteDebugView(
@@ -724,15 +733,12 @@ const audio: AudioSystem = new AudioSystem({
 });
 game.addView(audio);
 uiSound = (kind) => audio.ui(kind);
-mission.onCue = (step) => audio.garage.tire(step);
 mission.warm = () => audio.garage.warm();
-mission.onDone = (chased) =>
+mission.onDone = ({ chases, elapsed, reward }) =>
   hud.stunt(
     "WINTER TIRES",
-    chased
-      ? "The SPVM joined the drive. The GPS still thinks the way home is clear."
-      : "A clean run. The GPS still thinks the way home is clear.",
-    false,
+    `${formatClock(elapsed)} · ${chases === 0 ? "never chased" : chases === 1 ? "chased once" : `chased ${chases} times`}`,
+    reward,
     true,
   );
 const audioFolder = Debug.addFolder("Audio");

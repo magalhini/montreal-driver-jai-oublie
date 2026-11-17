@@ -100,6 +100,8 @@ export class ParkedCars implements SimSystem {
       run = [];
     };
     for (const b of f.curb) {
+      // The home bay is the player's (the session starts in it)
+      if (b.legal) continue;
       // Work zones take the curb lane too (PRD 5.3)
       // ...and some bays have cones standing in them
       if (world.roadworks && (world.roadworks.inWorkZone(b.pos, 4) || world.roadworks.reservedBay(b.pos))) continue;

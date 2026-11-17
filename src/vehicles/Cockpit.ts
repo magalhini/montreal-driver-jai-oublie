@@ -78,7 +78,7 @@ export class Cockpit {
       this.mount(car);
       this.builtKey = key;
     }
-    const charm = car.look.charm ?? 'omamori';
+    const charm = car.look.charm ?? 'cone';
     if (charm !== this.charmId) {
       this.charmId = charm;
       const g = charmGeometry(charm);

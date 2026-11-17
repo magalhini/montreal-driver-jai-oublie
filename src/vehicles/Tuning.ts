@@ -21,16 +21,7 @@ export type WheelId =
   | "steel"
   | "fan"
   | "deep";
-export type CharmId =
-  | "omamori"
-  | "panda"
-  | "shiba"
-  | "neko"
-  | "daruma"
-  | "dice"
-  | "duck"
-  | "teru"
-  | "none";
+export type CharmId = "cone" | "bagel" | "croissant" | "timmies";
 
 /** What the player has done to one car. Part levels count the stages bought (0 = stock). */
 export interface CarBuild {
@@ -53,7 +44,7 @@ export const STOCK_BUILD: Readonly<CarBuild> = {
   brakes: 0,
   wheels: "stock",
   paint: null,
-  charm: "omamori",
+  charm: "cone",
   burnout: false,
 };
 
@@ -103,8 +94,8 @@ export function resale(price: number): number {
   return Math.round((price * RESALE) / 100) * 100;
 }
 
-/** Clutch-dump burnout kit, before the car's scale. About ¥20,000 on an ordinary car. */
-const BURNOUT_PRICE = 20000;
+/** Clutch-dump burnout kit, before the car's scale. */
+const BURNOUT_PRICE = 500;
 
 /** Price of each stage before the car's scale. */
 const BASE_PRICE: Record<PartKind, number[]> = {
@@ -221,13 +212,8 @@ export const CHARMS: {
   jp: string;
   price: number;
 }[] = [
-  { id: "omamori", name: "Omamori", jp: "お守り", price: 0 },
-  { id: "panda", name: "Little panda", jp: "パンダ", price: 1200 },
-  { id: "shiba", name: "Shiba doggie", jp: "柴犬", price: 1200 },
-  { id: "neko", name: "Lucky cat", jp: "招き猫", price: 1500 },
-  { id: "daruma", name: "Daruma", jp: "だるま", price: 900 },
-  { id: "dice", name: "Fuzzy dice", jp: "サイコロ", price: 800 },
-  { id: "duck", name: "Rubber duck", jp: "アヒル", price: 700 },
-  { id: "teru", name: "Teru teru bōzu", jp: "てるてる坊主", price: 500 },
-  { id: "none", name: "Nothing", jp: "なし", price: 0 },
+  { id: "cone", name: "Traffic cone", jp: "cône orange", price: 0 },
+  { id: "bagel", name: "Bagel", jp: "sésame", price: 200 },
+  { id: "croissant", name: "Croissant", jp: "pur beurre", price: 200 },
+  { id: "timmies", name: "Tim Hortons cup", jp: "double-double", price: 200 },
 ];

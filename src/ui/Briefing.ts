@@ -32,6 +32,7 @@ export class Briefing {
         <p class="briefing-where">${DESTINATION_GARAGE} is across town.</p>
         <ol class="briefing-steps"></ol>
         <p class="briefing-body"></p>
+        <p class="briefing-tip"><b>TIP:</b> Press <kbd>L</kbd> to limit your speed so you don't accidentally speed near the police.</p>
         <div class="briefing-controls">
           <div class="briefing-kicker">CONTROLS</div>
           <dl>${CONTROLS.map(([keys, what]) => `<div><dt>${keys.map((k) => `<kbd>${k}</kbd>`).join('')}</dt><dd>${what}</dd></div>`).join('')}</dl>

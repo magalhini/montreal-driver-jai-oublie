@@ -1,6 +1,7 @@
 import type { Vec2 } from '../types';
 import { CONFIG } from '../config';
 import { travelHalf, type CityModel } from '../world/RoadGraph';
+import type { CurbBay } from '../world/Features';
 
 /**
  * The winter-tire GPS (a confident, slow one). Two stops, and the streets between them are pinned so the
@@ -134,4 +135,76 @@ export function garageVias(city: CityModel): Vec2[] {
  */
 export function missionPins(city: CityModel, goal: Vec2): Vec2[] {
   return [...storageVias(city), storagePoint(city), ...garageVias(city), { x: goal.x, z: goal.z }];
+}
+
+/**
+ * Eastbound lane in the northwest of the grid (Guy / Sherbrooke), mid-block so the car is not sitting in
+ * a junction. Falls back to the northwestern-most eastbound lane if that corner has none.
+ */
+export function westSpawn(city: CityModel): { pos: Vec2; heading: Vec2 } {
+  const b = city.bounds;
+  const xMax = b.minX + (b.maxX - b.minX) * 0.22;
+  const zMax = b.minZ + (b.maxZ - b.minZ) * 0.32;
+  const along = (l: { start: Vec2; end: Vec2 }): Vec2 => ({
+    x: l.start.x + (l.end.x - l.start.x) * 0.45,
+    z: l.start.z + (l.end.z - l.start.z) * 0.45,
+  });
+  const eastbound = city.lanes.filter((l) => l.dir.x > 0.75 && l.length > 40);
+  const pool = eastbound.filter((l) => {
+    const p = along(l);
+    return p.x <= xMax && p.z <= zMax;
+  });
+  const lanes = pool.length ? pool : eastbound;
+  let best = lanes[0] ?? city.lanes[0];
+  let bestKey = Infinity;
+  for (const l of lanes) {
+    const p = along(l);
+    const key = p.x + p.z + l.index * 30;
+    if (key < bestKey) {
+      bestKey = key;
+      best = l;
+    }
+  }
+  const guess = along(best);
+  const hit = city.nearestLanePoint(guess);
+  const lane = hit.lane.id === best.id ? hit.lane : best;
+  const pos = hit.lane.id === best.id ? hit.pos : guess;
+  return { pos, heading: { x: lane.dir.x, z: lane.dir.z } };
+}
+
+/** The legal bay and the clear curb ahead of it (m). */
+export const HOME_BAY = {
+  /** Bays whose near end is within this far ahead of the home bay's front are not painted: room to pull out. */
+  clearAhead: 14,
+  /** No loose cones within this far of the home bay, or of the curb lane ahead of it. */
+  coneClear: 6,
+};
+
+/**
+ * The one curb bay in Montreal where parking is legal: on the west spawn's street, on the curb side of its
+ * lane, nearest the spawn with room left before the next junction. The bays just ahead of it are dropped so
+ * there is clear curb lane to pull out into. Returns the bays with that one marked `legal`.
+ */
+export function homeBay(city: CityModel, bays: CurbBay[]): CurbBay[] {
+  const spawn = westSpawn(city);
+  const lane = city.nearestLanePoint(spawn.pos).lane;
+  const e = city.edges[lane.edgeId];
+  const heading = Math.atan2(spawn.heading.x, spawn.heading.z);
+  const f = { x: spawn.heading.x, z: spawn.heading.z };
+  const ahead = (b: CurbBay) => (b.pos.x - spawn.pos.x) * f.x + (b.pos.z - spawn.pos.z) * f.z;
+  const half = (b: CurbBay) => (b.s1 - b.s0) / 2;
+  // Same street, nose the way the lane drives (so: the curb side of it)
+  const row = bays.filter((b) => b.edge === e.id && Math.cos(b.yaw - heading) > 0.9);
+  if (!row.length) return bays;
+  const end = Math.max(...row.map((b) => ahead(b) + half(b)));
+  const fits = row.filter((b) => end - (ahead(b) + half(b)) >= HOME_BAY.clearAhead);
+  const pick = (fits.length ? fits : row).reduce((a, b) => (Math.abs(ahead(b)) < Math.abs(ahead(a)) ? b : a));
+  const front = ahead(pick) + half(pick);
+  const out: CurbBay[] = [];
+  for (const b of bays) {
+    if (b === pick) out.push({ ...b, legal: true });
+    else if (row.includes(b) && ahead(b) - half(b) >= front - 0.1 && ahead(b) - half(b) < front + HOME_BAY.clearAhead) continue;
+    else out.push(b);
+  }
+  return out;
 }

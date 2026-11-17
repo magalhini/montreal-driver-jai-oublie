@@ -103,6 +103,10 @@ body {
   color: var(--neon-cyan);
   text-shadow: 0 0 8px var(--neon-cyan), 0 0 22px rgba(62, 242, 255, 0.5);
 }
+.hud-speed.over {
+  color: #ff3b4a;
+  text-shadow: 0 0 8px #ff3b4a, 0 0 22px rgba(255, 46, 74, 0.55);
+}
 .hud-speed small {
   font-size: 22px;
   margin-left: 4px;
@@ -185,6 +189,20 @@ body {
   color: #fff;
   line-height: 1;
   text-shadow: 0 0 6px var(--neon-purple);
+}
+.hud-clock {
+  position: absolute;
+  left: 50%;
+  top: 52px;
+  transform: translateX(-50%);
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+.hud-clock:empty {
+  display: none;
 }
 .hud-objective:empty {
   display: none;
