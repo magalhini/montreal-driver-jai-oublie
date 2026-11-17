@@ -407,6 +407,7 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 1. White body, blue stripe, POLICE, Montréal, badge mark, lightbar, 9-1-1, fleet number as a simple digit pair.
 2. Bust copy and the fine formula in dollars from section 5.7. Heat and pursuit states stay.
 3. Confirm speeding, red light, sidewalk, and `chantier` all still feed the same meter.
+4. Replace instances of copy in the game, saying SPVM instead of police.
 
 **Done when:** A red light with a cruiser in sight starts the same chase as before, in a white and blue car, and the fine is in dollars.
 

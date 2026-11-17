@@ -1,9 +1,9 @@
-import type { World } from '../core/World';
-import type { Heat } from '../ai/Heat';
-import { WANTED_HEAT, type PoliceSystem } from '../ai/PoliceAI';
-import type { SimSystem } from '../types';
-import type { Closures, ConeLine } from './Closures';
-import type { Cones } from './Cones';
+import type { World } from "../core/World";
+import type { Heat } from "../ai/Heat";
+import { WANTED_HEAT, type PoliceSystem } from "../ai/PoliceAI";
+import type { SimSystem } from "../types";
+import type { Closures, ConeLine } from "./Closures";
+import type { Cones } from "./Cones";
 
 /**
  * The street works as rules (PRD 5.3, Phase 7). A cone taper is breached once, when the player has knocked
@@ -29,9 +29,9 @@ export const CHANTIER_TUNING = {
 };
 
 const STRIKE_TEXT = [
-  'Through the cones. Someone called it in.',
-  'That’s twice. The SPVM is bored enough.',
-  'Another line of cones. Someone is keeping count.',
+  "Through the cones. Someone called it in.",
+  "That’s twice. The SPVM is bored enough.",
+  "Another line of cones. Someone is keeping count.",
 ];
 
 export class Chantier implements SimSystem {
@@ -63,7 +63,7 @@ export class Chantier implements SimSystem {
   }
 
   private get live(): boolean {
-    return this.world.mode !== 'menu' && !this.world.controlLocked;
+    return this.world.mode !== "menu" && !this.world.controlLocked;
   }
 
   update(dt: number): void {
@@ -77,7 +77,8 @@ export class Chantier implements SimSystem {
     let set = this.hit.get(line);
     if (!set) this.hit.set(line, (set = new Set()));
     set.add(i);
-    if (set.size >= CHANTIER_TUNING.conesHit) this.breach(this.closures.lines[line]);
+    if (set.size >= CHANTIER_TUNING.conesHit)
+      this.breach(this.closures.lines[line]);
   }
 
   private breach(l: ConeLine): void {
@@ -86,9 +87,20 @@ export class Chantier implements SimSystem {
     this.breaches++;
     const n = this.breaches;
     // From the second line on, the meter lands past the chase threshold even if it drained since the first
-    const heat = n === 1 ? T.firstHeat : Math.max(T.nextHeat, WANTED_HEAT + T.wantedMargin - this.heat.value);
+    const heat =
+      n === 1
+        ? T.firstHeat
+        : Math.max(T.nextHeat, WANTED_HEAT + T.wantedMargin - this.heat.value);
     const pos = { x: this.world.player.pos.x, z: this.world.player.pos.z };
-    this.world.events.emit({ type: 'offense', kind: 'chantier', pos, witnessed: false, calledIn: true, heat, text: STRIKE_TEXT[Math.min(n, STRIKE_TEXT.length) - 1] });
+    this.world.events.emit({
+      type: "offense",
+      kind: "chantier",
+      pos,
+      witnessed: false,
+      calledIn: true,
+      heat,
+      text: STRIKE_TEXT[Math.min(n, STRIKE_TEXT.length) - 1],
+    });
     if (n >= 2 && !this.heat.inPursuit) this.police.respond(pos);
   }
 
@@ -102,10 +114,14 @@ export class Chantier implements SimSystem {
     const h = this.closures.hardOn(at.lane.edgeId);
     if (!h || this.toldFence.has(h.id)) return;
     const v = p.vel.x * at.lane.dir.x + p.vel.z * at.lane.dir.z;
-    if (v < T.fenceSpeed || this.closures.barrierAhead(at.lane, p.pos) > T.fenceWarn) return;
+    if (
+      v < T.fenceSpeed ||
+      this.closures.barrierAhead(at.lane, p.pos) > T.fenceWarn
+    )
+      return;
     this.toldFence.add(h.id);
     this.fenceCooldown = T.fenceCooldown;
-    this.world.events.message('Rue barrée. The GPS didn’t know.', 'warn');
+    this.world.events.message("Rue barrée, of course. Again.", "warn");
   }
 
   /** Lines breached (debug). */
