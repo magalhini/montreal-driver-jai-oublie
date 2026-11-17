@@ -35,7 +35,7 @@ export const POTHOLE_TUNING = {
   yank: 0.06,
   /** Suspension thump ("landing" speed, m/s) per m/s of car speed. Over 1.5 it is heard, over 2.5 the camera shakes. */
   thump: 0.25,
-  /** AI cars this close to the player bounce through pits too (visual only: no damage, no shove). */
+  /** AI cars this close to the player bounce through pits. Cruisers also take the kick and the damage. */
   aiRange: 140,
   /** Seconds before another pothole line can show. */
   messageCooldown: 25,
@@ -65,9 +65,10 @@ export interface PotholeHitInfo {
 }
 
 /**
- * Checks the cars' wheels against the pits after the physics step. The player's car gets the kick (pitch,
- * a shove and a steering yank toward the pit, the suspension thump) written into its `VehicleState`, and
- * `addDamage` by speed. Nearby AI cars only bounce. Nothing here touches the tire model.
+ * Checks the cars' wheels against the pits after the physics step. The player and the SPVM get the kick
+ * (pitch, a shove and a steering yank toward the pit, the suspension thump) written into `VehicleState`,
+ * and `addDamage` by speed. The pothole line is only for the player. Other nearby cars only bounce.
+ * Nothing here touches the tire model.
  */
 export class PotholeHits implements SimSystem {
   last: PotholeHitInfo | null = null;
@@ -101,13 +102,15 @@ export class PotholeHits implements SimSystem {
     for (const car of this.world.cars) {
       if (car.removed || car.parked || car.kind === 'parked') continue;
       if (car !== player && (car.pos.x - player.pos.x) ** 2 + (car.pos.z - player.pos.z) ** 2 > range2) continue;
-      this.check(car, car === player && this.world.mode !== 'menu');
+      const driving = car === player && this.world.mode !== 'menu';
+      this.check(car, driving || car.kind === 'police', driving);
     }
     // Forget cars that left the range or the world
     if (this.stepNo % 120 === 0) for (const [id, t] of this.tracks) if (this.stepNo - t.seen > 60) this.tracks.delete(id);
   }
 
-  private check(car: Car, full: boolean): void {
+  /** `hurt` applies the kick and the damage. `tell` is the player's HUD line and the debug last-hit. */
+  private check(car: Car, hurt: boolean, tell: boolean): void {
     const s = car.phys.state;
     let t = this.tracks.get(car.id);
     if (!t) {
@@ -156,12 +159,12 @@ export class PotholeHits implements SimSystem {
       const was = t.inPit[i];
       t.inPit[i] = hit ? hit.id : -1;
       if (!hit || hit.id === was) continue;
-      this.drop(car, full, i, hit, hitD, lx, lz, x1, z1);
+      this.drop(car, hurt, tell, i, hit, hitD, lx, lz, x1, z1);
     }
   }
 
   /** Wheel `i` just dropped into `p`, `d` m from its centre. */
-  private drop(car: Car, full: boolean, i: number, p: Pothole, d: number, lx: number, lz: number, wx: number, wz: number): void {
+  private drop(car: Car, hurt: boolean, tell: boolean, i: number, p: Pothole, d: number, lx: number, lz: number, wx: number, wz: number): void {
     const T = POTHOLE_TUNING;
     const s = car.phys.state;
     const speed = Math.hypot(s.vel.x, s.vel.z);
@@ -180,7 +183,7 @@ export class PotholeHits implements SimSystem {
     const f = Math.min(1.5, kmh / 60);
     // Front wheel in: the nose dips. Rear wheel: the tail drops and the nose comes up.
     s.pitch += (front ? -1 : 0.6) * T.pitch * f * k;
-    if (!full) return;
+    if (!hurt) return;
 
     // Toward the pit, by how far off the tire's line its centre is: dead centre is a straight thud, an edge pulls
     const off = clamp(((p.pos.x - wx) * lx + (p.pos.z - wz) * lz) / p.r, -1, 1);
@@ -190,6 +193,7 @@ export class PotholeHits implements SimSystem {
     if (front) s.steerAngle += off * T.yank * f * deep;
 
     const dmg = addDamage(car, damageFor(p.depth, kmh) * centre);
+    if (!tell) return;
     this.hits++;
     this.last = { kmh, damage: dmg, depth: p.depth };
     if (dmg > 0 && p.depth === 'big' && this.cooldown <= 0) {

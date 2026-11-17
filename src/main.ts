@@ -301,7 +301,7 @@ game.addSim(riderDodge);
 const dogs = new DogWalkers(world, peds);
 game.addSim(dogs);
 game.addSim({ update: (dt) => world.cars.forEach((c) => c.step(dt)) });
-// Wheels into the pits: the player's car is kicked and damaged, nearby traffic only bounces
+// Wheels into the pits: the player and the SPVM are kicked and damaged, nearby traffic only bounces
 const potholeHits = new PotholeHits(world, potholes);
 game.addSim(potholeHits);
 game.addSim({ update: () => world.compact() });
