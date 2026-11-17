@@ -140,7 +140,7 @@ export type EngineId = keyof typeof ENGINES;
 const BY_SPEC: Record<string, EngineId> = {
   '1972 Toyoda Karola': 'straightSix',
   '1973 Mame': 'cityFour',
-  'Police Cruiser': 'vEight',
+  'SPVM Cruiser': 'vEight',
   'Box Truck': 'diesel',
   'Kei Truck': 'triple',
   'Traffic Sedan': 'four',

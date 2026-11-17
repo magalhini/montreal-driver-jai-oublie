@@ -5,7 +5,7 @@ import { BODY_BEVEL, BODY_BEVEL_P, CAB_BEVEL, CAB_BEVEL_P, PROFILES, type BodyPr
 import { buildEnds } from './CarEnds';
 import { clip, extrude, inset, lerp2, mirrorX, onX, onXGrid, prep, rbox, refineSides, rrect, shade, slice, strip, taper, warpArrays, warpGeo, yAt, type V2, type Warp3 } from './CarGeometry';
 import { bake, Kit, lensGeo, look, type Base, type Look } from './CarKit';
-import { AMBER, BLACK, CHROME, CHROME_C, GLASS, GLASS_C, GLOW, MATTE, POLICE_BLACK, rgb, TRIM, WHITE } from './CarMaterial';
+import { AMBER, BLACK, CHROME, CHROME_C, GLASS, GLASS_C, GLOW, MATTE, rgb, SPVM_BLUE, TRIM, WHITE } from './CarMaterial';
 
 export interface BaseParts {
   base: Base;
@@ -165,6 +165,136 @@ function addSkinDetails(kit: Kit, st: BodyProfile, style: CarStyle, hw: number, 
   }
 }
 
+/** 5×7 bitmaps, row 0 at the top. Squares tile into a stroke. */
+const GLYPH: Record<string, string[]> = {
+  ' ': ['00000', '00000', '00000', '00000', '00000', '00000', '00000'],
+  A: ['01110', '10001', '10001', '11111', '10001', '10001', '10001'],
+  C: ['01111', '10000', '10000', '10000', '10000', '10000', '01111'],
+  E: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  É: ['11111', '10000', '10000', '11110', '10000', '10000', '11111'],
+  I: ['11111', '00100', '00100', '00100', '00100', '00100', '11111'],
+  L: ['10000', '10000', '10000', '10000', '10000', '10000', '11111'],
+  M: ['10001', '11011', '10101', '10001', '10001', '10001', '10001'],
+  N: ['10001', '11001', '10101', '10011', '10001', '10001', '10001'],
+  O: ['01110', '10001', '10001', '10001', '10001', '10001', '01110'],
+  P: ['11110', '10001', '10001', '11110', '10000', '10000', '10000'],
+  R: ['11110', '10001', '10001', '11110', '10100', '10010', '10001'],
+  T: ['11111', '00100', '00100', '00100', '00100', '00100', '00100'],
+  '1': ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+  '7': ['11111', '00001', '00010', '00100', '01000', '01000', '01000'],
+  '8': ['01110', '10001', '10001', '01110', '10001', '10001', '01110'],
+  '9': ['01110', '10001', '10001', '01111', '00001', '00001', '01110'],
+  '-': ['00000', '00000', '00000', '11111', '00000', '00000', '00000'],
+};
+
+/**
+ * Block letters on both flanks. Each side reads left to right for someone standing beside the car,
+ * so the nose-to-tail order is opposite on the two doors. Glyphs are squares, not mirrored shapes.
+ */
+function paintWord(kit: Kit, word: string, zc: number, yBase: number, x: number, h: number, ink: Look): void {
+  const cell = h / 7;
+  const advance = cell * 5.85;
+  const total = word.length * advance - cell * 0.85;
+  const half = cell * 0.52;
+  const quad = (z: number, y: number) =>
+    onX(
+      [
+        [z - half, y - half],
+        [z + half, y - half],
+        [z + half, y + half],
+        [z - half, y + half],
+      ],
+      x,
+    );
+  for (const side of [1, -1] as const) {
+    let z = zc + side * (total / 2 - advance / 2);
+    for (const ch of word) {
+      const rows = GLYPH[ch] ?? GLYPH[' '];
+      for (let r = 0; r < 7; r++) {
+        for (let c = 0; c < 5; c++) {
+          if (rows[r][c] !== '1') continue;
+          const zz = z - side * (c - 2) * cell;
+          const yy = yBase + (6 - r) * cell + cell / 2;
+          const g = quad(zz, yy);
+          kit.add(side > 0 ? g : mirrorX(g), ink);
+        }
+      }
+      if (ch === 'É') {
+        for (const c of [1, 2, 3]) {
+          const zz = z - side * (c - 2) * cell;
+          const g = quad(zz, yBase + 7 * cell + cell * 0.15);
+          kit.add(side > 0 ? g : mirrorX(g), ink);
+        }
+      }
+      z -= side * advance;
+    }
+  }
+}
+
+/**
+ * SPVM sedan (PRD 5.6): white body, one blue stripe, POLICE, Montréal, a geometric cross on the rear
+ * door, fleet digits, 9-1-1 on the rear quarter. Shapes and words only — not the crest from the photo.
+ */
+function addSpvmLivery(kit: Kit, st: BodyProfile, hw: number, R: number): void {
+  const blue = look(SPVM_BLUE);
+  const ink = look(rgb(0.94, 0.95, 0.97));
+  const x = hw + 0.0045;
+  const y0 = st.sill + 0.2;
+  const y1 = st.sill + 0.33;
+  const zFront = st.wf - R + 0.04;
+  const zRear = st.wr + R + 0.1;
+  const band = (zA: number, zB: number, a: number, b: number, px: number) =>
+    kit.both(
+      onXGrid(
+        [
+          [zA, a],
+          [zA, b],
+          [zB, b],
+          [zB, a],
+        ],
+        px,
+        0.12,
+      ),
+      blue,
+    );
+  band(zFront, zRear, y0, y1, x);
+  band(zFront, zRear, st.sill + 0.145, st.sill + 0.168, x);
+  const mid = st.doors[1] ?? st.doors[0];
+  const rear = st.doors[st.doors.length - 1];
+  const badgeTop = st.belt - 0.12;
+  band(mid - 0.02, rear + 0.06, y1, badgeTop, x);
+  const mark = (z: number, y: number, w: number, h: number, px: number, l: Look) =>
+    kit.both(
+      onX(
+        [
+          [z - w / 2, y - h / 2],
+          [z + w / 2, y - h / 2],
+          [z + w / 2, y + h / 2],
+          [z - w / 2, y + h / 2],
+        ],
+        px,
+      ),
+      l,
+    );
+  const cz = (mid + rear) / 2 + 0.08;
+  const cy = (y1 + badgeTop) / 2;
+  const s = 0.17;
+  const t = 0.042;
+  mark(cz, cy, t, s, x + 0.007, ink);
+  mark(cz, cy, s, t, x + 0.008, ink);
+  mark(cz, cy, t * 0.7, t * 0.7, x + 0.009, blue);
+  const frontDoor = (st.doors[0] + mid) / 2;
+  paintWord(kit, 'POLICE', frontDoor + 0.02, y1 + 0.016, x + 0.007, 0.098, blue);
+  paintWord(kit, 'MONTRÉAL', frontDoor, y0 + 0.016, x + 0.007, 0.048, ink);
+  paintWord(kit, '78', st.doors[0] - 0.2, y1 + 0.02, x + 0.007, 0.05, blue);
+  paintWord(kit, '78', rear + 0.14, (y0 + y1) / 2 - 0.02, x + 0.007, 0.062, ink);
+  paintWord(kit, '9-1-1', st.wr - R - 0.16, st.sill + 0.22, x + 0.007, 0.038, blue);
+  const hood = [st.nose[st.nose.length - 1], ...st.hood];
+  const hz1 = st.hood[0][0] - 0.12;
+  const hz0 = st.ws[0][0] + 0.2;
+  if (hz1 > hz0 + 0.25) kit.add(strip(slice(hood, hz1, hz0), -0.032, 0.032, 0.007), blue);
+}
+
 /** Shared geometry of one body style; paint is applied per color by paintBase(). */
 export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): BaseParts {
   const st = PROFILES[style];
@@ -172,13 +302,13 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   const hl = st.L / 2;
   const hw = st.W / 2;
   const police = style === 'police';
-  const body = police ? look(POLICE_BLACK) : look(1);
+  const body = police ? look(WHITE) : look(1);
   const upper = police ? look(WHITE) : body;
-  const seam = police ? look(rgb(0.004, 0.004, 0.006), MATTE) : look(0.3, MATTE);
+  const seam = police ? look(rgb(0.02, 0.022, 0.026), MATTE) : look(0.3, MATTE);
   const dark = look(BLACK, MATTE);
   const trim = look(TRIM, MATTE);
   const chrome = look(CHROME_C, CHROME);
-  const glass = look(GLASS_C, GLASS);
+  const glass = look(police ? rgb(0.012, 0.015, 0.02) : GLASS_C, GLASS);
   const brightTrim = style === 'coupe' || style === 'sedan' || style === 'city' ? chrome : trim;
   const heads: THREE.BufferGeometry[] = [];
   const tails: THREE.BufferGeometry[] = [];
@@ -267,24 +397,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   const sx = hw + 0.003;
   const sideFlat0 = st.sill + 0.075;
   const sideFlat1 = st.belt - BODY_BEVEL_P - 0.012;
-  if (police) {
-    // Japanese patrol car: white doors over a black body
-    const z0 = st.doors[0] + 0.05;
-    const z1 = Math.max(st.doors[st.doors.length - 1] - 0.02, st.wr + R + 0.01);
-    kit.both(
-      onXGrid(
-        [
-          [z0, sideFlat0 + 0.01],
-          [z0, sideFlat1 + 0.01],
-          [z1, sideFlat1 + 0.01],
-          [z1, sideFlat0 + 0.01],
-        ],
-        sx,
-        0.1,
-      ),
-      look(WHITE),
-    );
-  }
+  if (police) addSpvmLivery(kit, st, hw, R);
   for (const z of st.doors) {
     kit.both(
       onX(
@@ -346,10 +459,10 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
     kit.both(rbox(z - 0.05, z + 0.055, y - 0.035, y + 0.0, hw - 0.06, hw + 0.04, 0.012, 0.006), dark);
     // The glass, facing back at the driver
     kit.both(rbox(z - 0.052, z - 0.04, y - 0.032, y + 0.027, hw + 0.04, hw + 0.12, 0.004, 0.002), glass);
-  } else if (style === 'coupe' || style === 'wagon') {
+  } else if (style === 'coupe' || style === 'wagon' || style === 'police') {
     const z = st.ws[0][0] - 0.16;
     const y = st.belt + 0.07;
-    const m = style === 'coupe' ? chrome : trim;
+    const m = style === 'coupe' ? chrome : style === 'police' ? body : trim;
     kit.both(rbox(z - 0.05, z + 0.05, y - 0.035, y + 0.035, hw + 0.02, hw + 0.13, 0.025, 0.01), m);
     kit.both(prep(new THREE.BoxGeometry(0.05, 0.03, 0.03).translate(hw + 0.0, y - 0.02, z)), m);
     kit.both(rbox(z - 0.057, z - 0.045, y - 0.027, y + 0.027, hw + 0.03, hw + 0.12, 0.004, 0.002), glass);

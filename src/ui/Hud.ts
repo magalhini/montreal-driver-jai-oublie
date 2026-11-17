@@ -119,15 +119,15 @@ export class Hud {
     );
     this.bustFill = this.bustEl.querySelector('.fill')!;
     this.bustSpan = this.bustEl.querySelector('span')!;
-    this.bustedEl = el('div', 'hud-busted', root, '<div class="title">BUSTED</div>');
+    this.bustedEl = el('div', 'hud-busted', root, '<div class="title">SPVM</div>');
     this.fineEl = el('div', 'fine', this.bustedEl);
     this.pausedEl = el('div', 'hud-paused', root, 'PAUSED');
     this.stuntEl = el('div', 'hud-stunt', root);
   }
 
   /**
-   * Big center popup. `reward` null omits the yen line and draws the title as a failure
-   * (a smashed delivery, the clock running out, the police seeing you); false omits it, no failure.
+   * Big center popup. `reward` null omits the cash line and draws the title as a failure
+   * (a smashed delivery, the clock running out, the SPVM seeing you); false omits it, no failure.
    */
   stunt(title: string, detail: string, reward: number | null | false, hold = false): void {
     const pay = typeof reward === 'number' ? `<div class="reward">+${formatCash(reward)}</div>` : '';

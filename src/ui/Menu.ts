@@ -111,8 +111,8 @@ const TUTORIAL: [string, string[]][] = [
   [
     'FREE ROAM',
     [
-      'Drive downtown at your own pace, but the police are still watching.',
-      'When a police cruiser is nearby: keep to the speed limit, stay off the sidewalk and give pedestrians room.',
+      'Drive downtown at your own pace, but the SPVM is still watching.',
+      'When an SPVM cruiser is nearby: keep to the speed limit, stay off the sidewalk and give pedestrians room.',
       'Tip: press <kbd>L</kbd> to turn on the speed limiter.',
     ],
   ],
@@ -269,7 +269,7 @@ export class Menu {
       heading: '',
       sub: MAPS[CONFIG.MAP].sub,
       items: [
-        { label: 'FREE ROAM', hint: `Drive downtown Montreal. Garages, police, traffic. Wallet ${formatCash(this.host.cash())}`, run: () => this.host.start('free') },
+        { label: 'FREE ROAM', hint: `Drive downtown Montreal. Garages, the SPVM, traffic. Wallet ${formatCash(this.host.cash())}`, run: () => this.host.start('free') },
         ...this.trafficItem(),
         { label: 'QUICK TUTORIAL', hint: 'How the city works, in one minute', run: () => this.tutorial(this.host.traffic ? 2 : 1) },
         { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showTitle(), this.host.traffic ? 3 : 2) },

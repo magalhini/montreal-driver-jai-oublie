@@ -88,9 +88,9 @@ export class FullMap {
       ['you', 'player'],
       ['route', 'route'],
       ['waypoint', 'waypoint'],
-      ['station', 'police station'],
+      ['station', 'SPVM station'],
       ['alley', 'alley / underpass'],
-      ['police', 'police'],
+      ['police', 'SPVM'],
     ]
       .map(([cls, text]) => `<span><i class="${cls}"></i>${text}</span>`)
       .join('');
@@ -164,7 +164,7 @@ export class FullMap {
     if (station) {
       t.toScreen(station.dispatch, q);
       drawDispatch(ctx, q.x, q.y, 20 * dpr, station.color, station.glyph);
-      this.text('POLICE', q.x, q.y + 20 * dpr, 8, station.color, station.jp);
+      this.text(station.jp, q.x, q.y + 20 * dpr, 8, station.color, station.name);
     }
     const now = performance.now();
     for (const cop of this.police.cops.values()) {

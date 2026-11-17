@@ -8,7 +8,7 @@ export const CATEGORIES = {
   engine: { label: 'YOUR ENGINE', hint: "Your car's engine, starter, turn signal and gear clicks", def: 0.7 },
   tires: { label: 'TIRES & ROAD', hint: 'Your tires squealing, road and wind noise, scraping walls', def: 0.65 },
   traffic: { label: 'TRAFFIC', hint: 'Other cars driving by: engines and tires', def: 0.65 },
-  sirens: { label: 'SIRENS', hint: 'Police sirens', def: 0.7 },
+  sirens: { label: 'SIRENS', hint: 'SPVM sirens', def: 0.7 },
   horns: { label: 'HORNS', hint: 'Your horn and other drivers honking', def: 0.65 },
   crashes: { label: 'CRASHES', hint: 'Crashes, landings and splashes', def: 0.75 },
   weather: { label: 'RAIN & THUNDER', hint: 'Rain on the street, on roofs and on the car, distant thunder', def: 0.6 },
@@ -16,7 +16,7 @@ export const CATEGORIES = {
   life: { label: 'STREET LIFE', hint: 'Crowds, canal water, steam vents, crickets and the garage', def: 0.5 },
   distant: { label: 'DISTANT SOUNDS', hint: 'Far-off sirens and horns, trains, ships, bikes', def: 0.5 },
   music: { label: 'MUSIC', hint: 'Title screen pad', def: 0.55 },
-  alerts: { label: 'ALERTS & MENU', hint: 'Reward chimes, police radio, menu clicks', def: 0.7 },
+  alerts: { label: 'ALERTS & MENU', hint: 'Reward chimes, SPVM radio, menu clicks', def: 0.7 },
 } as const;
 
 export type Category = keyof typeof CATEGORIES;

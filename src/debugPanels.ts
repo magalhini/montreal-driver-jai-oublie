@@ -16,7 +16,7 @@ import { RIDER_TUNING, type Riders } from './ai/Riders';
 import { TRUCK_TUNING, type TrafficSystem } from './ai/TrafficAI';
 import { BUST_TUNING, type BustSystem } from './gameplay/Bust';
 import type { Wreck } from './gameplay/Wreck';
-import type { Economy } from './gameplay/Economy';
+import { FINE_TUNING, formatCash, type Economy } from './gameplay/Economy';
 import type { Gps } from './gameplay/Gps';
 import { TIRE_TUNING, type Tires } from './gameplay/Tires';
 import { PIT_TUNING, type PitStopSystem } from './gameplay/PitStop';
@@ -85,7 +85,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
       if (!on) return;
       police.callOff();
       heat.reset();
-      events.message('Immunity on: the police ignore you, no damage', 'info');
+      events.message('Immunity on: the SPVM ignores you, no damage', 'info');
     });
   cheats.add({ go: () => wreck.debugBoom() }, 'go').name('explode the car');
   cheats.add({ fix: () => repair(player) }, 'fix').name('repair car');
@@ -141,7 +141,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
       speeding: 'speed',
       wrongWay: 'wrong',
       carCrash: 'crash',
-      policeCrash: 'cop',
+      policeCrash: 'spvm',
       pedEndangered: 'ped',
       sidewalk: 'walk',
       chantier: 'cones',
@@ -158,9 +158,9 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   Debug.watch('police', () => {
     const seen = world.time - police.lastSeen;
     const modes = [...police.cops.values()].filter((c) => c.chase).map((c) => (c.chase!.mode === 'direct' ? 'D' : 'R'));
-    return `${police.cops.size} cops  ${police.pursuers}/${police.wantedUnits} pursuing [${modes.join('')}]  seen ${seen < 99 ? seen.toFixed(1) + ' s ago' : 'never'}`;
+    return `${police.cops.size} SPVM  ${police.pursuers}/${police.wantedUnits} pursuing [${modes.join('')}]  seen ${seen < 99 ? seen.toFixed(1) + ' s ago' : 'never'}`;
   });
-  const policeFolder = Debug.addFolder('Police');
+  const policeFolder = Debug.addFolder('SPVM');
   policeFolder.add(police, 'target', 0, 12, 1).name('patrols');
   policeFolder.add(police, 'witnessAll').name('witness everything');
   policeFolder.add(
@@ -172,7 +172,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
       },
     },
     'spawnAhead',
-  ).name('spawn cop ahead');
+  ).name('spawn a cruiser ahead');
   policeFolder.add(SIGHT_TUNING, 'lightsOff', 0.3, 1, 0.05).name('sight with headlights off (x)');
   policeFolder.add(SIGHT_TUNING, 'covered', 0.2, 1, 0.05).name('sight under a roof (x)');
   policeFolder.add(PURSUIT_TUNING, 'topSpeed', 20, 60, 1).name('pursuit top speed (m/s)');
@@ -214,6 +214,8 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   bustFolder.add(BUST_TUNING, 'speed', 0.5, 8, 0.5).name('stopped below (m/s)');
   bustFolder.add(BUST_TUNING, 'radius', 4, 20, 0.5).name('cop within (m)');
   bustFolder.add(BUST_TUNING, 'time', 0.5, 8, 0.5).name('for (s)');
+  bustFolder.add(FINE_TUNING, 'base', 0, 400, 5).name('fine base ($)');
+  bustFolder.add(FINE_TUNING, 'perHeat', 0, 600, 5).name('fine per heat ($)');
   bustFolder.add(economy, 'cash', 0, 200000, 100).listen();
   bustFolder.add(economy, 'reset').name('reset cash');
   const cars = Debug.addFolder('Cars');
@@ -336,9 +338,9 @@ function addWorldPanel({ city, player, camRig, tiles, pitStops, openPitShop }: D
     .name('teleport to nearest pit stop');
   folder.add({ go: () => addDamage(player, 0.4) }, 'go').name('damage car +40%');
   folder.add(PIT_TUNING, 'settle', 0.2, 5, 0.1).name('pit stop settle (s)');
-  folder.add(PIT_TUNING, 'fullRepair', 0, 50000, 500).name('pit stop full repair ¥');
+  folder.add(PIT_TUNING, 'fullRepair', 0, 50000, 500).name('pit stop full repair ($)');
   folder.add({ go: () => nearestStop() && openPitShop(nearestStop()) }, 'go').name('open the pit garage now');
-  Debug.watch('pit', () => (pitStops.current ? `${pitStops.current.name}  ${(pitStops.progress * 100).toFixed(0)}%  quote ¥${pitStops.quote()}` : 'no pit stop'));
+  Debug.watch('pit', () => (pitStops.current ? `${pitStops.current.name}  ${(pitStops.progress * 100).toFixed(0)}%  quote ${formatCash(pitStops.quote())}` : 'no pit stop'));
   const station = f.station;
   if (station) {
     folder
@@ -352,7 +354,7 @@ function addWorldPanel({ city, player, camRig, tiles, pitStops, openPitShop }: D
         },
         'go',
       )
-      .name('teleport to police station');
+      .name('teleport to the SPVM');
   }
 }
 

@@ -8,10 +8,24 @@ export interface KeyValueStore {
 }
 
 const CASH_KEY = 'neonDriver.cash';
-export const CURRENCY = '¥';
+/** Dollar sign. `formatCash` places it after the number (`1 250 $`). */
+export const CURRENCY = '$';
 
-/** `¥12,300` */
-export const formatCash = (amount: number): string => `${CURRENCY}${Math.round(amount).toLocaleString('en-US')}`;
+const GAP = '\u202f';
+
+/** `1 250 $` — narrow no-break spaces, dollar sign after the number. */
+export const formatCash = (amount: number): string => {
+  const n = Math.round(amount);
+  const body = Math.abs(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, GAP);
+  return `${n < 0 ? '-' : ''}${body} $`;
+};
+
+/** Bust fine in dollars (PRD 5.7): 75 $ plus 200 $ times heat, rounded to 5 $. */
+export const FINE_TUNING = {
+  base: 75,
+  perHeat: 200,
+  step: 5,
+};
 
 export function defaultStore(): KeyValueStore | null {
   try {
@@ -21,14 +35,16 @@ export function defaultStore(): KeyValueStore | null {
   }
 }
 
-/** Fine for getting busted at a given heat (0..1), rounded to 100 yen. */
+/** Fine for getting busted at a given heat (0..1), in dollars, rounded to `FINE_TUNING.step`. */
 export function bustFine(heat: number): number {
-  return Math.round((CONFIG.FINE_BASE + CONFIG.FINE_PER_HEAT * clamp(heat, 0, 1)) / 100) * 100;
+  const raw = FINE_TUNING.base + FINE_TUNING.perHeat * clamp(heat, 0, 1);
+  const step = FINE_TUNING.step;
+  return Math.round(raw / step) * step;
 }
 
 /**
- * The player's wallet, in yen, saved to `localStorage` on every change. Systems call `earn` / `charge`
- * directly (nothing else touches cash); the HUD reads `cash`.
+ * The player's wallet, saved to `localStorage` on every change. Systems call `earn` / `charge`
+ * directly (nothing else touches cash); the HUD, the garage and the bust screen read it through `formatCash`.
  */
 export class Economy {
   private value: number;

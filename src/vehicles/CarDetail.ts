@@ -51,7 +51,7 @@ function addTaxi(kit: Kit, st: BodyProfile): void {
   kit.both(rbox(-0.22, -0.08, top + 0.004, top + 0.028, 0.4, 0.52, 0.006, 0.003), look(AMBER, GLOW));
 }
 
-/** Metro cruiser: a push bar, steady corner lamps, a pillar spotlight, door badges and a second aerial. */
+/** Parked SPVM cruiser: a push bar, steady corner lamps, a pillar spotlight and a second aerial. The stripe and the words are on every police body. */
 function addPatrol(kit: Kit, st: BodyProfile): void {
   const hw = st.W / 2;
   const hl = st.L / 2;
@@ -80,11 +80,6 @@ function addPatrol(kit: Kit, st: BodyProfile): void {
   const out = (o: number) => face + driver * o;
   kit.add(rbox(gz - 0.02, gz + 0.012, gy - 0.026, gy + 0.026, Math.min(out(0.075), out(-0.04)), Math.max(out(0.075), out(-0.04)), 0.014, 0.006), chrome);
   kit.add(disc(0.022, out(0.04), gy, gz + 0.02, 1), look(rgb(0.95, 0.95, 0.88), GLOW));
-  const bz = (st.doors[0] + (st.doors[1] ?? st.doors[0])) / 2;
-  const by = st.belt - 0.22;
-  kit.both(onX(circle(bz, by, 0.06), hw + 0.012), chrome);
-  kit.both(onX(circle(bz, by, 0.04), hw + 0.016), dark);
-  kit.both(rbox(bz - 0.012, bz + 0.012, by - 0.028, by + 0.028, hw + 0.014, hw + 0.022, 0.003, 0.002), look(GOLD, CHROME));
   const az = -hl + 0.45;
   const ay = yAt(st.deck, az);
   kit.add(prep(new THREE.CylinderGeometry(0.003, 0.005, 0.5, 4).translate(0.4, ay + 0.26, az)), dark);

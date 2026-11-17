@@ -39,11 +39,8 @@ export const CONFIG = {
   /** Street lamp posts snap off at this speed or faster. The hit still damages the car. Signal poles do not. */
   LAMP_BREAK_KMH: 50,
 
-  // Economy (yen)
+  // Wallet. The bust fine is `FINE_TUNING` (dollars) in gameplay/Economy.ts.
   START_CASH: 50000,
-  /** Busted fine = FINE_BASE + FINE_PER_HEAT x heat (0..1). */
-  FINE_BASE: 5000,
-  FINE_PER_HEAT: 35000,
 };
 
 export const KMH = 1 / 3.6;

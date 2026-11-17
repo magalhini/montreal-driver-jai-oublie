@@ -153,7 +153,7 @@ export class PitStopSystem implements SimSystem {
     if (this.progress < 1) return;
     this.visited = true;
     if (this.police.pursuers > 0) {
-      w.events.message('Pit garage: "Not with the cops on your tail!"', "warn");
+      w.events.message('Pit garage: "Not with the SPVM on your tail!"', "warn");
       return;
     }
     this.arrived = stop;

@@ -91,7 +91,7 @@ export class Recovery implements SimSystem {
     const t = this.wet.get(c.id);
     if (t === undefined) {
       this.splash(c);
-      if (c.kind === 'police' && c.siren) this.world.events.message('A cop car went into the water!', 'good');
+      if (c.kind === 'police' && c.siren) this.world.events.message('An SPVM car went into the water!', 'good');
     }
     const nt = (t ?? 0) + dt;
     this.wet.set(c.id, nt);

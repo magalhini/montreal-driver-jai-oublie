@@ -20,7 +20,7 @@ export const OFFENSE_TEXT: Record<OffenseKind, string> = {
   speeding: 'Speeding!',
   wrongWay: 'Wrong way!',
   carCrash: 'Hit a car!',
-  policeCrash: 'Rammed a police car!',
+  policeCrash: 'Rammed an SPVM car!',
   pedEndangered: 'Endangered a pedestrian!',
   sidewalk: 'Driving on the sidewalk!',
   chantier: 'Through the cones. Someone called it in.',

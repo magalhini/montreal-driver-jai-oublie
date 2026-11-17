@@ -3,7 +3,7 @@ import type { CarStyle } from './Car';
 import type { BodyProfile } from './BodyProfiles';
 import { disc, extrude, fan, mirrorX, onX, onZ, prep, rbox, ring, rrect, shade, slice, strip, yAt, type V2, type XY } from './CarGeometry';
 import { look, type Kit, type Look } from './CarKit';
-import { AMBER, CHROME, GLASS, GLOW, GOLD, MATTE, PLATE_INK, PLATE_KEI, PLATE_TAXI, PLATE_WHITE, REFLECTOR, rgb } from './CarMaterial';
+import { AMBER, CHROME, GLASS, GLOW, GOLD, MATTE, PLATE_INK, PLATE_KEI, PLATE_TAXI, PLATE_WHITE, REFLECTOR, rgb, SPVM_BLUE } from './CarMaterial';
 
 /** Shared state while building one body style. */
 export interface BodyCtx {
@@ -109,7 +109,7 @@ export function buildEnds(c: BodyCtx): void {
     rect(0, 0.615, 0.76, 0.2, 0.02, zf + 0.003, 1, grille);
     rect(0, 0.615, 0.72, 0.165, 0.015, zf + 0.006, 1, dark);
     for (let i = -3; i <= 3; i++) rect(i * 0.1, 0.615, 0.012, 0.15, 0.003, zf + 0.009, 1, police ? trim : chrome);
-    kit.add(disc(police ? 0.04 : 0.028, 0, 0.615, zf + 0.012, 1), look(GOLD, CHROME));
+    kit.add(disc(police ? 0.04 : 0.028, 0, 0.615, zf + 0.012, 1), police ? look(SPVM_BLUE) : look(GOLD, CHROME));
     for (const s of [-1, 1]) {
       rect(s * 0.585, 0.615, 0.39, 0.175, 0.02, zf + 0.003, 1, chrome);
       rect(s * 0.585, 0.615, 0.365, 0.15, 0.015, zf + 0.006, 1, dark);

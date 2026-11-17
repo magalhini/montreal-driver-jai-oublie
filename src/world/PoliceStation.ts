@@ -54,7 +54,7 @@ export const STATION = {
 const OUT: Record<Facing, Vec2> = { N: { x: 0, z: -1 }, S: { x: 0, z: 1 }, E: { x: 1, z: 0 }, W: { x: -1, z: 0 } };
 const overlaps = (a: AABB, b: AABB, m = 0) => a.minX < b.maxX + m && a.maxX > b.minX - m && a.minZ < b.maxZ + m && a.maxZ > b.minZ - m;
 
-const CRUISER: CarLook = { style: 'police', color: 0x101014, detail: 'patrol' };
+const CRUISER: CarLook = { style: 'police', color: 0xf4f4f2, detail: 'patrol' };
 
 /**
  * Pick a downtown or shotengai block near the station's spot, clear of alleys and other curb cuts, and swap
@@ -142,10 +142,9 @@ function layout(city: CityModel, bl: Block, rng: Rng): PoliceStation {
   const mast = (x: number): AABB => ({ minX: x - 0.2, maxX: x + 0.2, minZ: rowZ + out.z * (D.bayDepth / 2 + 0.6) - 0.2, maxZ: rowZ + out.z * (D.bayDepth / 2 + 0.6) + 0.2 });
   return {
     block: bl.id,
-    name: 'NEO POLICE',
-    // Map label and sign glyph until the SPVM pass dresses the station (PRD Phase 9)
+    name: 'Montréal',
     jp: 'SPVM',
-    glyph: '★',
+    glyph: '+',
     color: '#6aa6ff',
     lot,
     building,

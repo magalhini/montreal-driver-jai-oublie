@@ -93,7 +93,7 @@ export const TRAFFIC_SEDAN: CarSpec = {
 
 export const POLICE_CRUISER: CarSpec = {
   ...KAROLA,
-  name: "Police Cruiser",
+  name: "SPVM Cruiser",
   mass: 1350,
   peakTorque: 300,
   gripFront: 1.32,

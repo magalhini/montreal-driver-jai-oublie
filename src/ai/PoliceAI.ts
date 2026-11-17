@@ -121,7 +121,7 @@ export class PoliceSystem implements SimSystem {
 
   /** Spawn a patrolling cop on a lane point. */
   spawn(lane: Lane, pos: Vec2): Cop {
-    const car = new Car('police', POLICE_CRUISER, { style: 'police', color: 0x111111 }, pos, Math.atan2(lane.dir.x, lane.dir.z));
+    const car = new Car('police', POLICE_CRUISER, { style: 'police', color: 0xf4f4f2 }, pos, Math.atan2(lane.dir.x, lane.dir.z));
     const v0 = this.world.city.edges[lane.edgeId].speedLimit * 0.7;
     car.phys.state.vel.x = lane.dir.x * v0;
     car.phys.state.vel.z = lane.dir.z * v0;
@@ -165,7 +165,7 @@ export class PoliceSystem implements SimSystem {
       if (w.time - this.lastSeen > PURSUIT_TUNING.loseTime && !w.controlLocked) {
         for (const cop of this.cops.values()) if (cop.state === 'pursuit') this.endPursuit(cop);
         w.events.emit({ type: 'escaped' });
-        w.events.message('You lost the police!', 'good');
+        w.events.message('You lost the SPVM!', 'good');
       } else {
         this.pingTimer -= dt;
         if (this.pingTimer <= 0) {
@@ -339,7 +339,7 @@ export class PoliceSystem implements SimSystem {
     if (first) {
       if (this.lastSeen < this.world.time) this.sawPlayer();
       this.world.events.emit({ type: 'pursuitStarted' });
-      this.world.events.message('Police pursuit!', 'warn');
+      this.world.events.message('SPVM pursuit!', 'warn');
     }
   }
 

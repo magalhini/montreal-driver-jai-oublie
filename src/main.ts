@@ -741,7 +741,7 @@ function greet(): void {
   );
   hint(
     9,
-    "Don't let the police see you drive too fast. Hit L for the speed limiter",
+    "Don't let the SPVM see you drive too fast. Hit L for the speed limiter",
   );
   if (city.features.pitStops.length)
     hint(16, "Garages are marked on the map: stop under a canopy to repair your car");

@@ -32,9 +32,9 @@ function limb(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Mate
 }
 
 /**
- * The officer of the busted sequence: Japanese police uniform (navy, peaked cap, white gloves,
- * reflective vest stripes, red light baton on the belt). Walks to the player's door, writes on a
- * notepad, then hands the ticket over. A dozen draw calls, only while a bust is running.
+ * The officer of the busted sequence: navy uniform, peaked cap, white gloves, a pale vest stripe,
+ * red light baton on the belt. Walks to the player's door, writes on a notepad, then hands the
+ * ticket over. A dozen draw calls, only while a bust is running.
  */
 export class OfficerView implements ViewSystem {
   private root = new THREE.Group();
@@ -64,7 +64,7 @@ export class OfficerView implements ViewSystem {
     this.root.add(new THREE.Mesh(torso, mat));
     // Reflective vest bands and the red light baton hanging from the belt.
     const bands = mergeGeometries([new THREE.BoxGeometry(0.44, 0.045, 0.28).translate(0, 1.06, 0), new THREE.BoxGeometry(0.44, 0.045, 0.28).translate(0, 1.3, 0)])!;
-    this.root.add(new THREE.Mesh(bands, glow(0xc8ff3a)));
+    this.root.add(new THREE.Mesh(bands, glow(0xb9d4ff)));
     const baton = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.022, 0.34, 6), glow(0xff2a2a));
     baton.position.set(-0.25, 0.74, 0.04);
     baton.rotation.z = 0.25;
@@ -74,11 +74,11 @@ export class OfficerView implements ViewSystem {
       box(0.22, 0.24, 0.22, 0, 0.12, 0, SKIN),
       box(0.27, 0.1, 0.27, 0, 0.29, 0, NAVY), // cap crown
       box(0.24, 0.035, 0.11, 0, 0.235, 0.16, 0x0c0c10), // brim
-      box(0.24, 0.025, 0.272, 0, 0.255, 0, 0xb8a060), // cap band
+      box(0.24, 0.025, 0.272, 0, 0.255, 0, 0x1a4a9c), // cap band
     ])!;
     this.head.position.y = 1.5;
     this.head.add(new THREE.Mesh(headGeo, mat));
-    this.head.add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.01).translate(0, 0.3, 0.14), glow(0xffd36a))); // badge
+    this.head.add(new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.05, 0.01).translate(0, 0.3, 0.14), glow(0x3e7bff))); // badge
     this.root.add(this.head);
 
     const legGeo = mergeGeometries([box(0.15, HIP_Y - 0.06, 0.17, 0, -(HIP_Y - 0.06) / 2, 0, NAVY), box(0.15, 0.08, 0.24, 0, -HIP_Y + 0.04, 0.03, 0x0a0a0c)])!;

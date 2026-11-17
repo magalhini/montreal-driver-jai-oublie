@@ -44,7 +44,8 @@ export const GLASS_C = rgb(0.1, 0.12, 0.16);
 export const CHROME_C = rgb(0.8, 0.8, 0.84);
 export const BLACK = rgb(0.02, 0.02, 0.024);
 export const TRIM = rgb(0.035, 0.035, 0.04);
-export const POLICE_BLACK = rgb(0.012, 0.012, 0.016);
+/** SPVM stripe and badge. A flat blue, not a scanned crest (PRD 5.6). */
+export const SPVM_BLUE = rgb(0.012, 0.1, 0.5);
 export const WHITE = rgb(0.86, 0.86, 0.88);
 export const PLATE_WHITE = rgb(0.8, 0.81, 0.76);
 export const PLATE_KEI = rgb(0.85, 0.66, 0.08);

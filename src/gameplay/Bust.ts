@@ -231,7 +231,7 @@ export class BustSystem implements SimSystem {
       this.pose('hand');
       this.paid = this.economy.charge(this.fine);
       const short = this.paid < this.fine ? ` (all you had: ${formatCash(this.paid)})` : '';
-      w.events.message(`Fined ${formatCash(this.fine)}${short}`, 'bad');
+      w.events.message(`SPVM fine ${formatCash(this.fine)}${short}`, 'bad');
     } else if (this.t >= WRITE_TIME + HAND_TIME) this.setPhase('fadeOut');
   }
 
