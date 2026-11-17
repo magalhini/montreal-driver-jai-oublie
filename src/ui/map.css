@@ -205,6 +205,11 @@
   background: #12182e;
   box-shadow: 0 0 6px #6aa6ff;
 }
+.fullmap-legend .metro {
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-sizing: border-box;
+  background: radial-gradient(circle, #0d47a6 26%, #fff 30%, #fff 42%, #0d47a6 46%);
+}
 .fullmap-legend .police {
   border-radius: 50%;
   background: #3e7bff;

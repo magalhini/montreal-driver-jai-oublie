@@ -532,6 +532,6 @@ function addClosurePanel(sys: DebugSystems): void {
   const partial = closures.hard.filter((h) => h.side !== 'both').length;
   Debug.watch('closures', () => {
     const route = gps.route && closures.routeHitsFence(gps.route) ? '  GPS route hits a fence' : '';
-    return `salt ${closures.salt}: ${closures.hard.length} fences (${partial} one-way), ${closures.lines.length} cone tapers, ${closures.merges.length} merges (${MERGE_STATS.merges} done), ${cones.cones.length} cones (${cones.scattered} moved)  breaches ${chantier.breaches}  answering ${police.responding}  test route ${closures.gpsHitsFence ? 'hits' : 'MISSES'} a fence (${closures.dropped} dropped)${route}`;
+    return `salt ${closures.salt}: ${closures.hard.length} fences (${partial} one-way), ${closures.lines.length} cone tapers, ${closures.merges.length} merges (${MERGE_STATS.merges} done), ${cones.cones.length} cones (${cones.scattered} moved)  breaches ${chantier.breaches}  answering ${police.responding}  test route ${closures.gpsHitsFence ? 'hits' : 'MISSES'} a fence, garage leg ${closures.garageLegFences}${closures.garageLegBoulevard ? ' (boulevard)' : ''} (${closures.dropped} dropped)${route}`;
   });
 }

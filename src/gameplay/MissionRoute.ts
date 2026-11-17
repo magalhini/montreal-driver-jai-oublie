@@ -58,6 +58,9 @@ const TO_STORAGE: { i: number; j: number }[] = [
   { i: 1, j: 11 },
 ];
 
+/** René-Lévesque, the downtown boulevard the garage leg runs along: the first choice for its fence. */
+export const MAIN_BOULEVARD_ROW = 4;
+
 /** Corners after the tires are in the car, before the garage bay. */
 const TO_GARAGE: { i: number; j: number }[] = [
   { i: 2, j: 8 },

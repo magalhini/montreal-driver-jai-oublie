@@ -171,6 +171,31 @@ export function drawDispatch(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.restore();
 }
 
+/** A métro entrance: the STM's white ring and down arrow on a blue square. `size` is the square's side (px). */
+export function drawMetro(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const h = size / 2;
+  ctx.save();
+  ctx.fillStyle = '#0d47a6';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.lineWidth = Math.max(1, size * 0.07);
+  ctx.fillRect(x - h, y - h, size, size);
+  ctx.strokeRect(x - h, y - h, size, size);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = Math.max(1, size * 0.1);
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.34, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.lineWidth = Math.max(1, size * 0.1);
+  ctx.beginPath();
+  ctx.moveTo(x, y - size * 0.24);
+  ctx.lineTo(x, y + size * 0.2);
+  ctx.moveTo(x - size * 0.17, y + size * 0.02);
+  ctx.lineTo(x, y + size * 0.2);
+  ctx.lineTo(x + size * 0.17, y + size * 0.02);
+  ctx.stroke();
+  ctx.restore();
+}
+
 /** Police blip color: flashing red / blue in pursuit, steady blue on patrol. */
 export function copColor(pursuit: boolean, timeMs: number): string {
   if (!pursuit) return MAP_INK.patrol;

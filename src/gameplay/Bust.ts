@@ -75,8 +75,8 @@ const doorPoint = (c: Car, side: number, along = DOOR_ALONG): Vec2 => carPoint(c
  * Bust rule and busted sequence. The player is busted after `BUST_TUNING.time` seconds below
  * `BUST_TUNING.speed` with a pursuing cop within `BUST_TUNING.radius` (`progress` fills the HUD ring).
  * Then the controls lock, an officer walks from the cop car to the player's door and writes a ticket,
- * the fine (by heat) is charged, the screen fades and the player respawns on a clear lane nearby with
- * heat reset, the pursuers gone and the car repaired.
+ * the fine (by heat) is charged, the screen fades and the player respawns at the SPVM station (on the apron
+ * of its empty bay, facing the street) with heat reset, the pursuers gone and the car repaired.
  */
 export class BustSystem implements SimSystem {
   /** 0..1 fill of the HUD "BUSTED" ring. */
@@ -326,7 +326,10 @@ export class BustSystem implements SimSystem {
     };
   }
 
-  /** Screen is black: pursuers leave, heat resets, the car is repaired (IMPROVEMENTS #10) and moved to a clear lane nearby. */
+  /**
+   * Screen is black: pursuers leave, heat resets, the car is repaired (IMPROVEMENTS #10) and released at the
+   * police station (a clear lane nearby on maps without one).
+   */
   private respawn(): void {
     const w = this.world;
     this.police.standDown();
@@ -334,9 +337,16 @@ export class BustSystem implements SimSystem {
     this.officer = null;
     this.progress = 0;
     const p = w.player;
-    const spot = this.respawnSpot(p.pos);
-    // Facing along the lane where it is (curved lanes turn)
-    p.teleport(spot.pos, yawOf(tangentAt(spot.lane.pts, spot.lane.cum, spot.t * spot.lane.length)));
+    const station = w.city.features.station;
+    if (station) {
+      // Released at the precinct: on the apron of its empty bay, nose to the street
+      p.teleport({ ...station.dispatch }, station.yaw);
+      w.events.message('Released at the SPVM station. Drive carefully out of the lot.', 'info', 6);
+    } else {
+      const spot = this.respawnSpot(p.pos);
+      // Facing along the lane where it is (curved lanes turn)
+      p.teleport(spot.pos, yawOf(tangentAt(spot.lane.pts, spot.lane.cum, spot.t * spot.lane.length)));
+    }
     if (p.phys.state.damage > 0.01) w.events.message('Your car was repaired', 'info');
     repair(p);
     this.onRespawn?.();

@@ -108,7 +108,8 @@ export function buildStreetSigns(city: CityModel, scene: THREE.Scene): AABB[] {
             const g = new THREE.PlaneGeometry(PLATE.w, PLATE.h);
             const uv = g.getAttribute('uv');
             for (let j = 0; j < uv.count; j++) uv.setX(j, flip ? 0.999 : (k + uv.getX(j)) / PLATE_KINDS);
-            g.translate(0, 0, flip ? -0.01 : 0.01);
+            // In front of the pole (radius 0.035): the face, and its back a hair behind it (the flip turns -z to +z)
+            g.translate(0, 0, flip ? -0.043 : 0.049);
             g.rotateY(yaw + (flip ? Math.PI : 0));
             g.translate(x, y + PLATE.top - PLATE.h / 2 - i * (PLATE.h + PLATE.gap), z);
             plateParts.push(g);

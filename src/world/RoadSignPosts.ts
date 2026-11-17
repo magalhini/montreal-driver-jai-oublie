@@ -27,6 +27,8 @@ export interface SignPost {
   collider: AABB;
 }
 
+/** Radius of the pole (m). The plates are bolted to its front. */
+const POLE_R = 0.035;
 /** The pole runs a little past the top face. */
 const POLE_OVER = 0.12;
 
@@ -132,14 +134,16 @@ export class RoadSignPosts implements SimSystem, ViewSystem {
   }
 
   private poleLocal(p: SignPost): THREE.Matrix4 {
-    return new THREE.Matrix4().makeScale(0.07, this.poleH(p), 0.07);
+    return new THREE.Matrix4().makeScale(2 * POLE_R, this.poleH(p), 2 * POLE_R);
   }
 
   /** A face (or its bare metal back) in the post's frame. */
   private faceLocal(p: SignPost, k: number, back: boolean): THREE.Matrix4 {
     const f = this.kinds[k];
     const y = f.y - this.poleH(p) / 2;
-    return new THREE.Matrix4().compose(new THREE.Vector3(0, y, back ? 0 : 0.03), back ? FLIP : new THREE.Quaternion(), new THREE.Vector3(f.w, f.h, 1));
+    // Bolted to the front of the pole (radius POLE_R): the face and, a hair behind it, its bare metal back
+    const z = POLE_R + (back ? 0.008 : 0.014);
+    return new THREE.Matrix4().compose(new THREE.Vector3(0, y, z), back ? FLIP : new THREE.Quaternion(), new THREE.Vector3(f.w, f.h, 1));
   }
 
   /** Start listening for knock-downs (the statics stop debris at walls). */

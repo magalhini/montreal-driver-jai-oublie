@@ -131,6 +131,14 @@ interface StopEntry {
 /** Who is at each stop junction, per world (the soak builds several worlds in one process). */
 const STOP_QUEUES = new WeakMap<World, Map<number, StopEntry[]>>();
 
+/**
+ * A car at one of this all-way stop's lines has been waiting at least `after` seconds, or was let through and
+ * is on its way across (the pedestrians give way to it, `Pedestrians.crossSpeed`).
+ */
+export function carsWaitingAtStop(world: World, nodeId: number, after: number): boolean {
+  return LaneDriver.waitingAtStop(world, nodeId, after);
+}
+
 /** Look into the junction for a stranded car this far before the stop line (m), and what counts as stranded (m/s). */
 const BOX_LOOK = 14;
 const BOX_STUCK_SPEED = 2.5;
@@ -200,6 +208,18 @@ export function turnType(d0: Vec2, d1: Vec2): TurnType {
 
 /** Lane-following AI that obeys signals, keeps distance (IDM) and yields on crossing turns. */
 export class LaneDriver {
+  /** See `carsWaitingAtStop`. */
+  static waitingAtStop(world: World, nodeId: number, after: number): boolean {
+    const q = STOP_QUEUES.get(world)?.get(nodeId);
+    if (!q) return false;
+    const now = world.time;
+    return q.some((e) => {
+      const d = e.driver;
+      if (d.car.removed || DRIVER_OF.get(d.car) !== d || d.lane.id !== e.lane) return false;
+      return e.going ? !d.pastLane : now - e.since >= after;
+    });
+  }
+
   lane: Lane;
   next!: NextLeg;
   path: Vec2[] = [];

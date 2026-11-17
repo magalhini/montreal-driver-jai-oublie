@@ -1,7 +1,7 @@
 import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import { Pathfinder, stitchRoute, type Route } from '../ai/Pathfinding';
-import { HOME_BAY, missionPins, storageStop, westSpawn } from './MissionRoute';
+import { garageVias, HOME_BAY, MAIN_BOULEVARD_ROW, missionPins, storageStop, westSpawn } from './MissionRoute';
 import type { AABB, Lane, OrientedBox, RoadEdge, StreetClass, Vec2 } from '../types';
 import { inDriveway } from '../world/Features';
 import type { Pothole } from '../world/Potholes';
@@ -12,8 +12,8 @@ import { laneOffset, type CityModel } from '../world/RoadGraph';
  * plus a run salt, then frozen.
  *
  * - Hard closures fence off the middle of one edge: a work zone between two barricade lines, curb to building
- *   line, with an excavator, a gravel pile or a trench inside. Boulevards close one direction only (the other
- *   half stays open, and driving it the wrong way is the wrong-way offense). Static colliders, real damage.
+ *   line, with an excavator, a gravel pile or a trench inside. Boulevards close all the way across, both
+ *   directions, so the way through is always another road. Static colliders, real damage.
  *   The AI pathfinder and traffic drop the whole edge; the GPS never hears about it.
  * - The sidewalk parts of a fence leave a gap on the pedestrians' walking line, too narrow for any car.
  * - Soft closures are cone tapers that close one lane, never more. Traffic does not drive into that lane (it
@@ -22,7 +22,8 @@ import { laneOffset, type CityModel } from '../world/RoadGraph';
  *   parking bays (nobody parks there), in parks and squares, in front of the fences. No line, no offense.
  *
  * Session rules (PRD 5.2): for the lane drivers, one way at a time, every junction still reaches every other
- * and no way into a junction is a dead end; the GPS route from the spawn to the garage (the long way: tire
+ * and no way into a junction is a dead end (so the player, who may also drive against one-ways, can always get
+ * everywhere: a closure that would cut part of the city off is not placed); the GPS route from the spawn to the garage (the long way: tire
  * storage, then through downtown) crosses at least one fence; and neither the spawn's nor the garage's edge
  * is ever closed.
  */
@@ -131,6 +132,9 @@ export interface ClosureAnchors {
 }
 
 /** How the roll treats each street class. Playtest numbers. */
+/** The GPS leg from the tire storage to the garage: this many fences on it, at the least. */
+export const GARAGE_LEG = { fences: 2 };
+
 export const CLOSURE_ROLL: Record<StreetClass, { hard: number; soft: number }> = {
   /** Chance that an edge gets a fence, and (otherwise) a cone line. Streets: about one block in six or seven. */
   boulevard: { hard: 0.05, soft: 0.1 },
@@ -246,6 +250,10 @@ export class Closures {
   readonly closed = new Set<number>();
   /** Did the GPS route from the anchors cross a fence (debug)? How many rolls were dropped by the rules? */
   gpsHitsFence = false;
+  /** Fences on the GPS route from the storage stop to the garage (at least `GARAGE_LEG.fences` when it can). */
+  garageLegFences = 0;
+  /** One of them is on a boulevard. */
+  garageLegBoulevard = false;
   dropped = 0;
   private readonly byEdge = new Map<number, HardClosure>();
   private readonly linesByEdge = new Map<number, ConeLine>();
@@ -271,6 +279,7 @@ export class Closures {
     const home = city.features.curb.find((b) => b.legal);
     if (home) this.keepClear.add(home.edge);
     this.rollHard(rng, keep);
+    this.ensureGarageLegFences(rng, keep, anchors);
     this.ensureGpsHitsFence(rng, keep, anchors);
     this.finishHard(rng);
     this.rollLines(rng);
@@ -486,7 +495,8 @@ export class Closures {
     for (const { e } of order) {
       if (this.closed.size >= CLOSURE_TUNING.maxHard) break;
       if (keep.has(e.id) || !rng.chance(CLOSURE_ROLL[e.cls].hard)) continue;
-      this.tryClose(rng, e, e.cls === 'boulevard' ? (rng.chance(0.5) ? 'ab' : 'ba') : 'both');
+      // Curb to curb, boulevards too: no half of the road left to slip along, the driver has to go around
+      this.tryClose(rng, e, 'both');
     }
   }
 
@@ -567,6 +577,43 @@ export class Closures {
   }
 
   /** The GPS (no closures) from the anchors: if its route misses every fence, close an edge on it. */
+  /**
+   * The drive after the tires are in the trunk (storage stop -> Jacques Pneu, the corners the GPS uses) crosses
+   * at least `GARAGE_LEG.fences` fences: one on the main boulevard (René-Lévesque, or another boulevard on the
+   * leg), the rest on other blocks of it, not next to one already there. Each still has to pass `tryClose`.
+   */
+  private ensureGarageLegFences(rng: Rng, keep: Set<number>, anchors: ClosureAnchors): void {
+    const city = this.city;
+    const store = storageStop(city);
+    const route = stitchRoute(new Pathfinder(city), [store.pos, ...garageVias(city), anchors.goal], { x: Math.sin(store.yaw), z: Math.cos(store.yaw) });
+    if (!route) return;
+    const on = this.routeEdges(route)
+      .slice(1, -1)
+      .filter((x) => !keep.has(x.e.id));
+    const hits = () => on.filter((x) => this.closed.has(x.e.id));
+    const main = (e: RoadEdge) => e.cls === 'boulevard' && e.axis === 'x' && city.nodes[e.a].gj === MAIN_BOULEVARD_ROW;
+    const touches = (e: RoadEdge) => hits().some((h) => h.e.a === e.a || h.e.a === e.b || h.e.b === e.a || h.e.b === e.b);
+    /** Close the first that takes, in a random order (`bias` pushes some to the back). */
+    const closeOne = (cands: { e: RoadEdge }[], bias: (e: RoadEdge) => number = () => 0): boolean => {
+      const order = cands.filter((x) => !this.closed.has(x.e.id)).map((x) => ({ e: x.e, r: rng.next() + bias(x.e) })).sort((p, q) => p.r - q.r);
+      for (const { e } of order) {
+        // At the cap, the newest closure off this leg makes room
+        if (this.closed.size >= CLOSURE_TUNING.maxHard) {
+          const drop = [...this.hard].reverse().find((h) => !on.some((x) => x.e.id === h.edge));
+          if (drop) this.remove(drop);
+        }
+        if (this.tryClose(rng, e, 'both')) return true;
+      }
+      return false;
+    };
+    // The main boulevard first; another boulevard on the leg only if it can't take one
+    if (!hits().some((x) => main(x.e)) && !closeOne(on.filter((x) => main(x.e))) && !hits().some((x) => x.e.cls === 'boulevard'))
+      closeOne(on.filter((x) => x.e.cls === 'boulevard'));
+    while (hits().length < GARAGE_LEG.fences) if (!closeOne(on, (e) => (touches(e) ? 1 : 0))) break;
+    this.garageLegFences = hits().length;
+    this.garageLegBoulevard = hits().some((x) => x.e.cls === 'boulevard');
+  }
+
   private ensureGpsHitsFence(rng: Rng, keep: Set<number>, anchors: ClosureAnchors): void {
     // The same corners WinterTires gives the GPS, so the fence is on the drive, not on the short avenue hop.
     const route = stitchRoute(new Pathfinder(this.city), [anchors.spawn, ...missionPins(this.city, anchors.goal)], anchors.heading);

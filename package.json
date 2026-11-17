@@ -1,7 +1,7 @@
 {
   "name": "montreal-driver",
   "private": true,
-  "version": "1.0.51",
+  "version": "1.0.58",
   "type": "module",
   "scripts": {
     "dev": "vite",

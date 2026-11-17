@@ -4,6 +4,7 @@ import type { World } from '../core/World';
 import type { Block, DistrictType, SimSystem, Vec2 } from '../types';
 import { ALLRED_T, YELLOW_T } from '../world/TrafficLights';
 import { DOG_SHARE, DOG_TUNING } from './DogWalkers';
+import { carsWaitingAtStop } from './LaneDriver';
 import { dodgeState, PANIC_PACE, PedestrianDodge, type DodgeState } from './PedestrianDodge';
 
 /** Distance of the walking line from the curb (matches crosswalk centerlines). */
@@ -80,6 +81,11 @@ const CAR_WAIT_MAX = 2.5;
  * car's half length): the car that took its turn gets across first. Cars waiting at the line sit further back.
  */
 const STOP_CROSS_CLEAR = 2;
+/**
+ * All-way stops: once a car has waited this long at a line (s), peds at the curb let it go before stepping off,
+ * so a steady trickle of walkers can't hold the junction. Nobody waits longer than `maxWait` for it, though.
+ */
+export const PED_YIELD = { after: 1, maxWait: 8 };
 
 /** Sidewalk loops around blocks joined by signal-controlled crosswalks. */
 export class WalkGraph {
@@ -210,6 +216,8 @@ export class Pedestrians implements SimSystem {
   private near: number[] = [];
   private nearCenter: Vec2 | null = null;
   private lastPlayerPos: Vec2 | null = null;
+  /** When the player's car came to a stop (sim time), or -1 while it's moving. */
+  private playerStill = -1;
 
   constructor(private world: World) {
     this.graph = new WalkGraph(world);
@@ -342,7 +350,11 @@ export class Pedestrians implements SimSystem {
   /** Can a ped start crossing now, and at what speed? Returns 0 if it must wait. */
   private crossSpeed(p: Ped, e: WalkEdge): number {
     const c = e.crossing!;
-    if (this.world.city.nodes[c.node].control === 'stop' && this.carOnCrossing(e)) return 0;
+    const node = this.world.city.nodes[c.node];
+    if (node.control === 'stop') {
+      if (this.carOnCrossing(e)) return 0;
+      if (p.waitTime < PED_YIELD.maxWait && this.carsWaiting(node.id)) return 0;
+    }
     // Cross while this approach is red and another one is in its green
     const greenLeft = this.world.lights.walkLeft(c.node, c.edge);
     if (greenLeft <= 0) return 0;
@@ -374,6 +386,15 @@ export class Pedestrians implements SimSystem {
     p.waiting = !!e.crossing;
     p.waitTime = 0;
     p.speed = p.baseSpeed;
+  }
+
+  /** A car (traffic, or the player) has been sitting at this all-way stop long enough that the peds let it go. */
+  private carsWaiting(nodeId: number): boolean {
+    if (carsWaitingAtStop(this.world, nodeId, PED_YIELD.after)) return true;
+    const pl = this.world.player;
+    if (!pl || this.playerStill < 0 || this.world.time - this.playerStill < PED_YIELD.after) return false;
+    const n = this.world.city.nodes[nodeId];
+    return Math.hypot(pl.pos.x - n.pos.x, pl.pos.z - n.pos.z) < Math.max(n.hx, n.hz) + 10;
   }
 
   /** A car on or right at this crosswalk (all-way stops: wait for it to get through). */
@@ -410,6 +431,10 @@ export class Pedestrians implements SimSystem {
   }
 
   update(dt: number): void {
+    const pl = this.world.player;
+    if (pl && !pl.removed && pl.speed < 0.8) {
+      if (this.playerStill < 0) this.playerStill = this.world.time;
+    } else this.playerStill = -1;
     const pp = this.world.player.pos;
     const g = this.graph;
     const rng = this.world.rng;

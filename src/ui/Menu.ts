@@ -1,10 +1,10 @@
-import { CONFIG } from '../config';
-import { formatCash } from '../gameplay/Economy';
-import { MAPS } from '../maps/catalog';
-import { VERSION } from '../version';
-import './menu.css';
+import { CONFIG } from "../config";
+import { formatCash } from "../gameplay/Economy";
+import { MAPS } from "../maps/catalog";
+import { VERSION } from "../version";
+import "./menu.css";
 
-export type PlayMode = 'mission' | 'free';
+export type PlayMode = "mission" | "free";
 
 /** What the menus can do to the game (implemented in main.ts). */
 export interface MenuHost {
@@ -16,7 +16,7 @@ export interface MenuHost {
   /** Mode of the running session (pause screen). */
   mode(): PlayMode;
   /** Menu feedback sounds (T34). */
-  sound?(kind: 'move' | 'ok' | 'back'): void;
+  sound?(kind: "move" | "ok" | "back"): void;
   /** Volume sliders for the AUDIO page (T34). */
   volumes?: VolumeHost;
   /** On/off picture options for the GRAPHICS page. */
@@ -58,75 +58,74 @@ export interface Page {
   back?: () => void;
 }
 
-const MODE_NAME: Record<PlayMode, string> = { mission: 'WINTER TIRES', free: 'FREE ROAM' };
+const MODE_NAME: Record<PlayMode, string> = {
+  mission: "WINTER TIRES",
+  free: "FREE ROAM",
+};
 
 const KEYBOARD: [string, string][] = [
-  ['W S / ↑ ↓', 'throttle / brake, reverse'],
-  ['A D / ◀ ▶', 'steer'],
-  ['SPACE', 'handbrake'],
-  ['SHIFT', 'burnout launch (hold, if fitted)'],
-  ['H', 'horn'],
-  ['Q E', 'turn signals'],
-  ['L', 'speed limiter'],
-  ['K', 'headlights'],
-  ['I', 'engine on / off (park)'],
-  ['C', 'camera'],
-  ['R', 'look back (hold)'],
-  ['M', 'map'],
-  ['F', 'skip the garage intro'],
-  ['P / ESC', 'pause'],
-  ['~', 'debug panel'],
+  ["W S / ↑ ↓", "throttle / brake, reverse"],
+  ["A D / ◀ ▶", "steer"],
+  ["SPACE", "handbrake"],
+  ["SHIFT", "burnout launch (hold, if fitted)"],
+  ["H", "horn"],
+  ["Q E", "turn signals"],
+  ["L", "speed limiter"],
+  ["K", "headlights"],
+  ["I", "engine on / off (park)"],
+  ["C", "camera"],
+  ["R", "look back (hold)"],
+  ["M", "map"],
+  ["F", "skip the garage intro"],
+  ["P / ESC", "pause"],
+  ["~", "debug panel"],
 ];
 const GAMEPAD: [string, string][] = [
-  ['RT / LT', 'throttle / brake'],
-  ['L STICK', 'steer'],
-  ['A', 'handbrake'],
-  ['LB', 'burnout launch (hold, if fitted)'],
-  ['B', 'horn'],
-  ['D-PAD ◀ ▶', 'turn signals'],
-  ['D-PAD ↑', 'speed limiter'],
-  ['D-PAD ↓', 'headlights'],
-  ['L3', 'engine on / off (park)'],
-  ['Y', 'camera'],
-  ['RB', 'look back (hold)'],
-  ['VIEW', 'map'],
-  ['X', 'skip the garage intro'],
-  ['START', 'pause'],
+  ["RT / LT", "throttle / brake"],
+  ["L STICK", "steer"],
+  ["A", "handbrake"],
+  ["LB", "burnout launch (hold, if fitted)"],
+  ["B", "horn"],
+  ["D-PAD ◀ ▶", "turn signals"],
+  ["D-PAD ↑", "speed limiter"],
+  ["D-PAD ↓", "headlights"],
+  ["L3", "engine on / off (park)"],
+  ["Y", "camera"],
+  ["RB", "look back (hold)"],
+  ["VIEW", "map"],
+  ["X", "skip the garage intro"],
+  ["START", "pause"],
 ];
 
 const keyList = (title: string, rows: [string, string][]) =>
-  `<div class="menu-keys"><div class="menu-keys-title">${title}</div>${rows.map(([k, v]) => `<div><kbd>${k}</kbd><span>${v}</span></div>`).join('')}</div>`;
-const CONTROLS_HTML = `<div class="menu-controls">${keyList('KEYBOARD', KEYBOARD)}${keyList('GAMEPAD', GAMEPAD)}</div>`;
+  `<div class="menu-keys"><div class="menu-keys-title">${title}</div>${rows.map(([k, v]) => `<div><kbd>${k}</kbd><span>${v}</span></div>`).join("")}</div>`;
+const CONTROLS_HTML = `<div class="menu-controls">${keyList("KEYBOARD", KEYBOARD)}${keyList("GAMEPAD", GAMEPAD)}</div>`;
 
 /** QUICK TUTORIAL: the basics, one card per topic. */
 const TUTORIAL: [string, string[]][] = [
   [
-    'FREE ROAM',
+    "FREE ROAM",
     [
-      'Drive downtown at your own pace, but the SPVM is still watching.',
-      'When an SPVM cruiser is nearby: keep to the speed limit, stay off the sidewalk and give pedestrians room.',
-      'Tip: press <kbd>L</kbd> to turn on the speed limiter.',
+      "Drive downtown at your own pace, but the SPVM is still watching.",
+      "When an SPVM cruiser is nearby: keep to the speed limit, stay off the sidewalk and give pedestrians room.",
+      "Tip: press <kbd>L</kbd> to turn on the speed limiter.",
     ],
   ],
   [
-    'CONTROLS',
+    "CONTROLS",
     [
-      '<kbd>W A S D</kbd> drive &nbsp; <kbd>SPACE</kbd> handbrake',
-      '<kbd>M</kbd> city map: click a destination on it and the GPS routes you there',
-      '<kbd>L</kbd> speed limiter &nbsp; <kbd>C</kbd> change camera',
-      '<kbd>Q</kbd> <kbd>E</kbd> blinkers',
+      "<kbd>W A S D</kbd> drive &nbsp; <kbd>SPACE</kbd> handbrake",
+      "<kbd>M</kbd> city map: click a destination on it and the GPS routes you there",
+      "<kbd>L</kbd> speed limiter &nbsp; <kbd>C</kbd> change camera",
+      "<kbd>Q</kbd> <kbd>E</kbd> blinkers",
     ],
   ],
-  [
-    'GARAGES',
-    [
-      'Stop under a garage canopy (GARAGE on the map) to repair your car.',
-    ],
-  ],
+  ["GARAGES", ["Stop under a garage (GARAGE on the map) to repair your car."]],
 ];
 const TUTORIAL_HTML = `<div class="menu-tutorial">${TUTORIAL.map(
-  ([title, lines]) => `<div class="menu-tut-card"><div class="menu-keys-title">${title}</div><ul>${lines.map((l) => `<li>${l}</li>`).join('')}</ul></div>`,
-).join('')}</div>`;
+  ([title, lines]) =>
+    `<div class="menu-tut-card"><div class="menu-keys-title">${title}</div><ul>${lines.map((l) => `<li>${l}</li>`).join("")}</ul></div>`,
+).join("")}</div>`;
 
 function activePad(): Gamepad | null {
   const pads = navigator.getGamepads ? navigator.getGamepads() : [];
@@ -156,7 +155,7 @@ export class Menu {
   private readonly listEl: HTMLElement;
   private readonly hintEl: HTMLElement;
   private page: Page | null = null;
-  private pageCls = '';
+  private pageCls = "";
   private sel = 0;
   private padPrev = new Set<number>();
   private stickDir = 0;
@@ -168,8 +167,8 @@ export class Menu {
     parent: HTMLElement,
     private readonly host: MenuHost,
   ) {
-    this.root = document.createElement('div');
-    this.root.className = 'menu';
+    this.root = document.createElement("div");
+    this.root.className = "menu";
     this.root.innerHTML = `
       <div class="menu-logo"><div class="word">MONTREAL</div><div class="word driver">DRIVER</div></div>
       <div class="menu-head"></div><div class="menu-sub"></div><div class="menu-body"></div>
@@ -177,14 +176,14 @@ export class Menu {
       <div class="menu-foot"><span><kbd>↑ ↓</kbd> select</span><span><kbd>ENTER</kbd> confirm</span><span><kbd>ESC</kbd> back</span></div>
       <div class="menu-version">${VERSION}</div>`;
     const q = (c: string) => this.root.querySelector<HTMLElement>(c)!;
-    this.headEl = q('.menu-head');
-    this.subEl = q('.menu-sub');
-    this.bodyEl = q('.menu-body');
-    this.listEl = q('.menu-list');
-    this.hintEl = q('.menu-hint');
+    this.headEl = q(".menu-head");
+    this.subEl = q(".menu-sub");
+    this.bodyEl = q(".menu-body");
+    this.listEl = q(".menu-list");
+    this.hintEl = q(".menu-hint");
     parent.appendChild(this.root);
     this.syncLook();
-    window.addEventListener('keydown', (e) => this.onKey(e));
+    window.addEventListener("keydown", (e) => this.onKey(e));
   }
 
   get open(): boolean {
@@ -193,29 +192,29 @@ export class Menu {
 
   /** True while the title screen (not the pause menu) is up. */
   get onTitle(): boolean {
-    return this.open && this.root.classList.contains('title');
+    return this.open && this.root.classList.contains("title");
   }
 
   showTitle(): void {
-    this.setClass('title');
+    this.setClass("title");
     this.show(this.titlePage());
   }
 
   showPause(): void {
-    this.setClass('pause');
+    this.setClass("pause");
     this.show(this.pausePage());
   }
 
   hide(): void {
     this.page = null;
-    this.setClass('');
-    this.root.classList.remove('show', 'vol-page', 'gfx-page', 'tut-page');
+    this.setClass("");
+    this.root.classList.remove("show", "vol-page", "gfx-page", "tut-page");
   }
 
   /** Esc / P / Start / gamepad B. */
   back(): void {
     if (!this.page?.back) return;
-    this.host.sound?.('back');
+    this.host.sound?.("back");
     this.page.back();
   }
 
@@ -258,13 +257,29 @@ export class Menu {
 
   private titlePage(): Page {
     return {
-      heading: '',
+      heading: "",
       sub: MAPS[CONFIG.MAP].sub,
       items: [
-        { label: 'WINTER TIRES', hint: 'December 1st. Summer tires. The garage is across town.', run: () => this.host.start('mission') },
-        { label: 'FREE ROAM', hint: `Winter tires, no destination. The same city. Wallet ${formatCash(this.host.cash())}`, run: () => this.host.start('free') },
-        { label: 'QUICK TUTORIAL', hint: 'How the city works, in one minute', run: () => this.tutorial(2) },
-        { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showTitle(), 3) },
+        {
+          label: "MISSION: PUT ON WINTER TIRES",
+          hint: "December 1st, and you forgot to change your summer tires. Avoid the SPVM.",
+          run: () => this.host.start("mission"),
+        },
+        {
+          label: "FREE ROAM: DRIVE THROUGH MONTREAL",
+          hint: `No destination, drive through Montreal. Careful with the potholes.`,
+          run: () => this.host.start("free"),
+        },
+        {
+          label: "QUICK TUTORIAL",
+          hint: "How the city works, in one minute",
+          run: () => this.tutorial(2),
+        },
+        {
+          label: "CONTROLS",
+          hint: "Keyboard and gamepad",
+          run: () => this.controls(() => this.showTitle(), 3),
+        },
         ...this.audioItem(() => this.showTitle(), 4),
         ...this.graphicsItem(() => this.showTitle(), 5),
       ],
@@ -273,14 +288,22 @@ export class Menu {
 
   private pausePage(): Page {
     return {
-      heading: 'PAUSED',
+      heading: "PAUSED",
       sub: `${MODE_NAME[this.host.mode()]} · ${formatCash(this.host.cash())}`,
       items: [
-        { label: 'RESUME', hint: '', run: () => this.host.resume() },
-        { label: 'CONTROLS', hint: 'Keyboard and gamepad', run: () => this.controls(() => this.showPause(), 1) },
+        { label: "RESUME", hint: "", run: () => this.host.resume() },
+        {
+          label: "CONTROLS",
+          hint: "Keyboard and gamepad",
+          run: () => this.controls(() => this.showPause(), 1),
+        },
         ...this.audioItem(() => this.showPause(), 2),
         ...this.graphicsItem(() => this.showPause(), 3),
-        { label: 'QUIT TO TITLE', hint: 'Your cash and car upgrades are saved', run: () => this.host.quit() },
+        {
+          label: "QUIT TO TITLE",
+          hint: "Your cash and car upgrades are saved",
+          run: () => this.host.quit(),
+        },
       ],
       back: () => this.host.resume(),
     };
@@ -289,34 +312,46 @@ export class Menu {
   /** Controls help; going back returns to `from` with item `index` selected. */
   private controls(from: () => void, index: number): void {
     const back = () => (from(), this.select(index));
-    this.show({ heading: 'CONTROLS', body: CONTROLS_HTML, items: [{ label: 'BACK', hint: '', run: back }], back });
+    this.show({
+      heading: "CONTROLS",
+      body: CONTROLS_HTML,
+      items: [{ label: "BACK", hint: "", run: back }],
+      back,
+    });
   }
 
   /** Quick tutorial; going back returns to the title with item `index` selected. */
   private tutorial(index: number): void {
     const back = () => (this.showTitle(), this.select(index));
-    this.show({ heading: 'QUICK TUTORIAL', body: TUTORIAL_HTML, items: [{ label: 'BACK', hint: '', run: back }], back });
-    this.root.classList.add('tut-page');
+    this.show({
+      heading: "QUICK TUTORIAL",
+      body: TUTORIAL_HTML,
+      items: [{ label: "BACK", hint: "", run: back }],
+      back,
+    });
+    this.root.classList.add("tut-page");
   }
 
   /** The AUDIO entry (if the host has volumes); its page returns to `from` with item `index` selected. */
   private audioItem(from: () => void, index: number): Item[] {
     const v = this.host.volumes;
     if (!v) return [];
-    return [{ label: 'AUDIO', hint: 'Volume', run: () => this.audio(v, from, index) }];
+    return [
+      { label: "AUDIO", hint: "Volume", run: () => this.audio(v, from, index) },
+    ];
   }
 
   private audio(v: VolumeHost, from: () => void, index: number): void {
     const back = () => (from(), this.select(index));
     const bar = (x: number) => {
       const n = Math.round(x * 10);
-      return `<span class="vol-bar"><b data-adj="-1">◀</b><i>${'▮'.repeat(n)}<s>${'▮'.repeat(10 - n)}</s></i><b data-adj="1">▶</b></span>`;
+      return `<span class="vol-bar"><b data-adj="-1">◀</b><i>${"▮".repeat(n)}<s>${"▮".repeat(10 - n)}</s></i><b data-adj="1">▶</b></span>`;
     };
     const items: Item[] = v.sliders.map((sl) => {
       const item: Item = {
         label: sl.label,
         hint: sl.hint,
-        html: '',
+        html: "",
         run: () => item.adjust!(1),
         adjust: (dir) => {
           v.set(sl.key, Math.min(1, Math.max(0, v.get(sl.key) + dir * 0.1)));
@@ -327,23 +362,29 @@ export class Menu {
       item.html = `<span class="vol-label">${sl.label}</span>${bar(v.get(sl.key))}<span class="vol-pct">${Math.round(v.get(sl.key) * 100)}%</span>`;
       return item;
     });
-    items.push({ label: 'BACK', hint: '', run: back });
-    this.show({ heading: 'AUDIO', sub: '◀ ▶ to change', items, back });
-    this.listEl.classList.add('vol-list');
-    this.root.classList.add('vol-page');
+    items.push({ label: "BACK", hint: "", run: back });
+    this.show({ heading: "AUDIO", sub: "◀ ▶ to change", items, back });
+    this.listEl.classList.add("vol-list");
+    this.root.classList.add("vol-page");
   }
 
   /** The GRAPHICS entry; its page returns to `from` with item `index` selected. */
   private graphicsItem(from: () => void, index: number): Item[] {
     const g = this.host.graphics;
     if (!g) return [];
-    return [{ label: 'GRAPHICS', hint: 'Scanlines, glow, the retro look', run: () => this.graphics(g, from, index) }];
+    return [
+      {
+        label: "GRAPHICS",
+        hint: "Scanlines, glow, the retro look",
+        run: () => this.graphics(g, from, index),
+      },
+    ];
   }
 
   private graphics(g: GraphicsHost, from: () => void, index: number): void {
     const back = () => (from(), this.select(index));
     const mark = (on: boolean) =>
-      `<span class="city-name"><b data-adj="-1">◀</b><em class="${on ? '' : 'off'}">${on ? 'ON' : 'OFF'}</em><b data-adj="1">▶</b></span>`;
+      `<span class="city-name"><b data-adj="-1">◀</b><em class="${on ? "" : "off"}">${on ? "ON" : "OFF"}</em><b data-adj="1">▶</b></span>`;
     const items: Item[] = g.options.map((opt) => {
       let item: Item;
       const apply = (on: boolean) => {
@@ -359,21 +400,21 @@ export class Menu {
         html: `${opt.label}${mark(g.get(opt.key))}`,
         run: () => {
           apply(!g.get(opt.key));
-          this.host.sound?.('move');
+          this.host.sound?.("move");
         },
         adjust: (dir) => apply(dir > 0),
       };
       return item;
     });
-    items.push({ label: 'BACK', hint: '', run: back });
-    this.show({ heading: 'GRAPHICS', sub: '◀ ▶ to toggle', items, back });
-    this.root.classList.add('gfx-page');
+    items.push({ label: "BACK", hint: "", run: back });
+    this.show({ heading: "GRAPHICS", sub: "◀ ▶ to toggle", items, back });
+    this.root.classList.add("gfx-page");
   }
 
   /** Title-screen scanlines follow the SCANLINES toggle (the city itself is the post pass). */
   private syncLook(): void {
-    const on = this.host.graphics?.get('scanlines') ?? true;
-    this.root.classList.toggle('scanlines', on);
+    const on = this.host.graphics?.get("scanlines") ?? true;
+    this.root.classList.toggle("scanlines", on);
   }
 
   /** Step the selected slider (no-op on other items). */
@@ -381,7 +422,7 @@ export class Menu {
     const it = this.page?.items[this.sel];
     if (!it?.adjust) return;
     it.adjust(dir);
-    this.host.sound?.('move');
+    this.host.sound?.("move");
   }
 
   /** Screen style class: 'title', 'pause' or a `showPage` class ('' for none). */
@@ -399,13 +440,13 @@ export class Menu {
       this.stickDir = 0;
     }
     this.page = page;
-    this.root.classList.add('show');
-    this.root.classList.toggle('has-body', !!page.body);
+    this.root.classList.add("show");
+    this.root.classList.toggle("has-body", !!page.body);
     this.headEl.textContent = page.heading;
-    this.subEl.textContent = page.sub ?? '';
-    this.bodyEl.innerHTML = page.body ?? '';
-    this.listEl.classList.remove('vol-list');
-    this.root.classList.remove('vol-page', 'gfx-page', 'tut-page');
+    this.subEl.textContent = page.sub ?? "";
+    this.bodyEl.innerHTML = page.body ?? "";
+    this.listEl.classList.remove("vol-list");
+    this.root.classList.remove("vol-page", "gfx-page", "tut-page");
     this.syncLook();
     this.sel = 0;
     this.renderList();
@@ -415,16 +456,18 @@ export class Menu {
   private renderList(): void {
     const page = this.page;
     if (!page) return;
-    this.listEl.innerHTML = '';
+    this.listEl.innerHTML = "";
     page.items.forEach((it, i) => {
-      const e = document.createElement('div');
-      e.className = 'menu-item';
-      if (it.disabled) e.classList.add('locked');
+      const e = document.createElement("div");
+      e.className = "menu-item";
+      if (it.disabled) e.classList.add("locked");
       if (it.html) e.innerHTML = it.html;
       else e.textContent = it.label;
-      e.addEventListener('mouseenter', () => this.select(i));
-      e.addEventListener('click', (ev) => {
-        const adj = (ev.target as HTMLElement).closest<HTMLElement>('[data-adj]');
+      e.addEventListener("mouseenter", () => this.select(i));
+      e.addEventListener("click", (ev) => {
+        const adj = (ev.target as HTMLElement).closest<HTMLElement>(
+          "[data-adj]",
+        );
         if (adj && it.adjust) {
           this.select(i);
           this.adjust(Number(adj.dataset.adj) as -1 | 1);
@@ -439,7 +482,9 @@ export class Menu {
     if (!this.page) return;
     const n = this.page.items.length;
     this.sel = ((i % n) + n) % n;
-    Array.from(this.listEl.children).forEach((e, k) => e.classList.toggle('sel', k === this.sel));
+    Array.from(this.listEl.children).forEach((e, k) =>
+      e.classList.toggle("sel", k === this.sel),
+    );
     this.hintEl.textContent = this.page.items[this.sel].hint;
     this.reveal();
   }
@@ -451,50 +496,51 @@ export class Menu {
     const list = this.listEl.getBoundingClientRect();
     const box = el.getBoundingClientRect();
     if (box.top < list.top) this.listEl.scrollTop -= list.top - box.top;
-    else if (box.bottom > list.bottom) this.listEl.scrollTop += box.bottom - list.bottom;
+    else if (box.bottom > list.bottom)
+      this.listEl.scrollTop += box.bottom - list.bottom;
   }
 
   private move(d: number): void {
     this.select(this.sel + d);
-    this.host.sound?.('move');
+    this.host.sound?.("move");
   }
 
   private activate(i: number): void {
     const it = this.page?.items[i];
     if (!it) return;
     if (it.disabled) {
-      this.host.sound?.('back');
+      this.host.sound?.("back");
       return;
     }
-    if (!it.adjust) this.host.sound?.('ok');
+    if (!it.adjust) this.host.sound?.("ok");
     it.run();
   }
 
   private onKey(e: KeyboardEvent): void {
     if (!this.open) return;
     switch (e.code) {
-      case 'ArrowUp':
-      case 'KeyW':
+      case "ArrowUp":
+      case "KeyW":
         this.move(-1);
         break;
-      case 'ArrowDown':
-      case 'KeyS':
+      case "ArrowDown":
+      case "KeyS":
         this.move(1);
         break;
-      case 'Enter':
-      case 'NumpadEnter':
-      case 'Space':
+      case "Enter":
+      case "NumpadEnter":
+      case "Space":
         if (!e.repeat) this.activate(this.sel);
         break;
-      case 'ArrowLeft':
-      case 'KeyA':
+      case "ArrowLeft":
+      case "KeyA":
         this.adjust(-1);
         break;
-      case 'ArrowRight':
-      case 'KeyD':
+      case "ArrowRight":
+      case "KeyD":
         this.adjust(1);
         break;
-      case 'Backspace':
+      case "Backspace":
         this.back();
         break;
       default:

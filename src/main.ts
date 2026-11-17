@@ -328,9 +328,7 @@ game.addSim(wreck);
 // Past 120% damage the wheels come off: towed back repaired for a fee
 const breakdown = new Breakdown(world, economy, heat, police);
 breakdown.blocked = () =>
-  bust.phase !== "free" ||
-  wreck.active ||
-  recovery.active;
+  bust.phase !== "free" || wreck.active || recovery.active;
 breakdown.onRespawn = () => camRig.snap();
 game.addSim(breakdown);
 game.addSim(new OffenseDetector(world));
@@ -346,9 +344,7 @@ const parkingTickets = new ParkingTicket(world, economy);
 game.addSim(parkingTickets);
 const recovery = new Recovery(world, economy);
 recovery.blocked = () =>
-  bust.phase !== "free" ||
-  wreck.active ||
-  breakdown.active;
+  bust.phase !== "free" || wreck.active || breakdown.active;
 wreck.onRespawn = () => camRig.snap();
 recovery.onRespawn = () => camRig.snap();
 game.addSim(recovery);
@@ -371,10 +367,7 @@ const tireStorage = buildTireStorage(r.scene, city, storageStop(city));
 // The one legal parking spot in Montreal: every session starts in it
 buildHomeBay(r.scene, city);
 const sceneBusy = () =>
-  bust.phase !== "free" ||
-  wreck.active ||
-  breakdown.active ||
-  recovery.active;
+  bust.phase !== "free" || wreck.active || breakdown.active || recovery.active;
 game.addSim(mission);
 // The storage stop on Ottawa: stop in its circle and the scene loads the tires into the trunk
 const pickup = new TirePickup(world, storageStop(city));
@@ -471,7 +464,13 @@ game.onFrame((dt) => {
   // Escape skips the storage scene instead of pausing
   if (pickup.playing && input.pressed("escape") && !menu.open) pickup.skip();
   intro.update(dt);
-  if (intro.playing && (input.pressed("escape") || input.pressed("interact") || input.pressed("handbrake"))) intro.skip();
+  if (
+    intro.playing &&
+    (input.pressed("escape") ||
+      input.pressed("interact") ||
+      input.pressed("handbrake"))
+  )
+    intro.skip();
   const briefingOn = briefing.open;
   if (briefingOn) {
     const choice = briefing.poll(input.pressed("escape"));
@@ -510,7 +509,8 @@ game.onFrame((dt) => {
     game.setPaused("menu", true);
     menu.showPause();
   }
-  minimap.visible = !fullMap.open && world.mode !== "menu" && !briefing.open && !intro.playing;
+  minimap.visible =
+    !fullMap.open && world.mode !== "menu" && !briefing.open && !intro.playing;
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
@@ -524,11 +524,7 @@ game.onFrame((dt) => {
     if (input.pressed("limiter")) limiter.on = !limiter.on;
     if (input.pressed("headlights") && !game.paused)
       player.headlights = !player.headlights;
-    if (
-      input.pressed("ignition") &&
-      !world.controlLocked &&
-      !game.paused
-    )
+    if (input.pressed("ignition") && !world.controlLocked && !game.paused)
       ignition.toggle();
     if (!world.controlLocked && !game.paused && player.phys.engineOn) {
       if (input.pressed("blinkLeft")) signals.toggle("left");
@@ -553,7 +549,14 @@ const riderView = new RiderView(world, r.scene, city.terrain, r.camera);
 game.addView(riderView);
 game.addView(new OfficerView(bust, r.scene, city.terrain));
 game.addView(new TicketAgentView(parkingTickets, r.scene, city.terrain));
-const pickupView = new TirePickupView(pickup, player, tireStorage, r.scene, city.terrain, () => carView.bodyOf(player.id));
+const pickupView = new TirePickupView(
+  pickup,
+  player,
+  tireStorage,
+  r.scene,
+  city.terrain,
+  () => carView.bodyOf(player.id),
+);
 game.addView(pickupView);
 let pickupCam = false;
 const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
@@ -609,7 +612,11 @@ game.addView({
     post.boost.bloom = 0.55 * wreck.fx;
     post.boost.aberration = 0.0035 * wreck.fx;
     steam.rain = weather.rain;
-    const inCabin = camRig.interior && !breakdown.playing && !pickup.cinematic && !intro.playing;
+    const inCabin =
+      camRig.interior &&
+      !breakdown.playing &&
+      !pickup.cinematic &&
+      !intro.playing;
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     hud.paused = game.pausedBy("debug") && !menu.open && !fullMap.open;
@@ -835,16 +842,13 @@ function greet(): void {
       () => world.mode !== "menu" && events.message(text, "info"),
       s * 1000,
     );
-  hint(
-    3,
-    "Press M for the city map: click a destination on it and the GPS routes you there",
-  );
+  hint(3, "Press M for the city map: the GPS routes you.");
   hint(
     9,
     "Don't let the SPVM see you drive too fast. Hit L for the speed limiter",
   );
   if (city.features.pitStops.length)
-    hint(16, "Garages are marked on the map: stop under a canopy to repair your car");
+    hint(16, "Garages are marked on the map: you can repair your car");
 }
 
 /** Yaw of the screen's up direction on the ground (camera forward + up, projected), for the heading-up minimap. */

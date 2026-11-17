@@ -4,7 +4,8 @@ import type { Input } from '../core/Input';
 import type { Gps } from '../gameplay/Gps';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
-import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawMetro, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { metroSites, type MetroSite } from '../world/MetroEntrances';
 import { mapLabels, streetLabels, type MapImage, type MapLabel, type StreetLabel } from './MapImage';
 import './map.css';
 
@@ -44,6 +45,8 @@ export class FullMap {
   private readonly ctx: CanvasRenderingContext2D;
   private readonly infoEl: HTMLElement;
   private readonly labels: MapLabel[];
+  /** Métro entrances: icon always, the station name when it fits. */
+  private readonly metro: MetroSite[];
   private readonly streets: StreetLabel[];
   private readonly landmarksFirst: MapLabel[];
   private readonly t = new MapTransform();
@@ -65,6 +68,7 @@ export class FullMap {
     private readonly input: Input,
   ) {
     this.labels = mapLabels(city);
+    this.metro = metroSites(city);
     this.streets = streetLabels(city);
     this.landmarksFirst = [...this.labels.filter((l) => l.kind === 'landmark'), ...this.labels.filter((l) => l.kind === 'district')];
     this.root = document.createElement('div');
@@ -89,6 +93,7 @@ export class FullMap {
       ['route', 'route'],
       ['waypoint', 'waypoint'],
       ['station', 'SPVM station'],
+      ['metro', 'métro'],
       ['alley', 'alley / underpass'],
       ['police', 'SPVM'],
     ]
@@ -160,6 +165,10 @@ export class FullMap {
     const route = this.gps.route;
     if (route) strokeRoute(ctx, t, route.points, 4 * dpr);
 
+    for (const m of this.metro) {
+      t.toScreen(m.pos, q);
+      drawMetro(ctx, q.x, q.y, 14 * dpr);
+    }
     const station = this.city.features.station;
     if (station) {
       t.toScreen(station.dispatch, q);
@@ -200,6 +209,19 @@ export class FullMap {
     if (this.city.features.station) {
       t.toScreen(this.city.features.station.dispatch, q);
       placed.push({ x0: q.x - 48 * dpr, y0: q.y - 13 * dpr, x1: q.x + 48 * dpr, y1: q.y + 38 * dpr });
+    }
+    // Métro icons, and the station names under them when there is room
+    for (const m of this.metro) {
+      t.toScreen(m.pos, q);
+      const icon = { x0: q.x - 9 * dpr, y0: q.y - 9 * dpr, x1: q.x + 9 * dpr, y1: q.y + 9 * dpr };
+      placed.push(icon);
+      if (zoom < 0.35) continue;
+      // Just under the icon (the box clears the icon's own)
+      const y = q.y + 20 * dpr;
+      const box = this.labelBox(m.name.toUpperCase(), undefined, q.x, y, 7);
+      if (placed.some((b) => b.x0 < box.x1 && box.x0 < b.x1 && b.y0 < box.y1 && box.y0 < b.y1)) continue;
+      placed.push(box);
+      this.text(m.name.toUpperCase(), q.x, y, 7, 'rgba(160, 196, 255, 0.95)');
     }
     // Zoomed out the district names win; zoomed in the specific landmarks do
     const order = zoom > 1.2 ? this.landmarksFirst : this.labels;

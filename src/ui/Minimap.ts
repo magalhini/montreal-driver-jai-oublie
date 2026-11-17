@@ -4,7 +4,8 @@ import type { Gps } from '../gameplay/Gps';
 import type { ViewSystem, Vec2 } from '../types';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
-import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawMetro, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { metroSites } from '../world/MetroEntrances';
 import { streetLabels, type MapImage, type StreetLabel } from './MapImage';
 import './map.css';
 
@@ -92,6 +93,8 @@ export class Minimap implements ViewSystem {
 
     const now = performance.now();
     const rim = R - 7 * dpr;
+    // Métro entrances in reach (no rim pins: they aren't somewhere you need to go)
+    for (const m of metroSites(this.city)) if (this.place(m.pos, rim)) drawMetro(ctx, q.x, q.y, 9 * dpr);
     // Precinct (always shown), then patrol cops (only inside the radar), pursuers (pinned to the rim)
     const station = this.city.features.station;
     if (station) drawDispatch(ctx, q.x, q.y, (this.place(station.dispatch, rim) ? 13 : 9) * dpr, station.color, station.glyph);

@@ -69,7 +69,10 @@ export class PitStopSystem implements SimSystem {
     if (dmg < 0.01) return 0;
     return Math.max(
       PIT_TUNING.minimum,
-      Math.min(PIT_TUNING.fullRepair, Math.round((dmg * PIT_TUNING.fullRepair) / 10) * 10),
+      Math.min(
+        PIT_TUNING.fullRepair,
+        Math.round((dmg * PIT_TUNING.fullRepair) / 10) * 10,
+      ),
     );
   }
 
@@ -109,7 +112,7 @@ export class PitStopSystem implements SimSystem {
     );
     const d = Math.hypot(near.bay.x - p.pos.x, near.bay.z - p.pos.z);
     w.events.message(
-      `Your car is damaged. Repair it at ${near.name}, ${formatDistance(d)} ${heading(p.pos, near.bay)} (PIT STOP on the map): stop in the circle under the canopy`,
+      `Your car is damaged. Repair it at ${near.name}, ${formatDistance(d)} ${heading(p.pos, near.bay)} (GARAGE on the map)`,
       "warn",
       PIT_TUNING.adviseSeconds,
     );
