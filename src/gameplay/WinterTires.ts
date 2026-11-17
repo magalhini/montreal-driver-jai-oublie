@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import type { Heat } from '../ai/Heat';
 import { dist } from '../core/math';
 import type { World } from '../core/World';
@@ -7,17 +6,9 @@ import { DESTINATION_GARAGE, type PitStop } from '../world/PitStops';
 import { GPS_TUNING, type Gps } from './Gps';
 import { garageVias, storagePoint, storageVias } from './MissionRoute';
 import type { Tires } from './Tires';
-=======
-import type { Heat } from "../ai/Heat";
-import type { World } from "../core/World";
-import type { SimSystem } from "../types";
-import { DESTINATION_GARAGE, type PitStop } from "../world/PitStops";
-import type { Gps } from "./Gps";
-import type { Tires } from "./Tires";
->>>>>>> Stashed changes
 
 /** Forecourt sounds for the tire mount, in order (PRD 5.1). */
-export type TireCue = "jack" | "wrench" | "ratchet" | "hood";
+export type TireCue = 'jack' | 'wrench' | 'ratchet' | 'hood';
 
 /**
  * How long the bay holds the car, and when each tool plays. The last cue finishes before the car is released.
@@ -27,10 +18,10 @@ export const WINTER_TUNING = {
   /** Seconds from the lock until the winter tires are on and the car is yours again. */
   mount: 8.4,
   cues: [
-    { at: 0.35, step: "jack" },
-    { at: 2.3, step: "wrench" },
-    { at: 4.7, step: "ratchet" },
-    { at: 6.9, step: "hood" },
+    { at: 0.35, step: 'jack' },
+    { at: 2.3, step: 'wrench' },
+    { at: 4.7, step: 'ratchet' },
+    { at: 6.9, step: 'hood' },
   ] as { at: number; step: TireCue }[],
 };
 
@@ -90,12 +81,8 @@ export class WinterTires implements SimSystem {
     this.garage =
       pits.find((p) => p.name === DESTINATION_GARAGE) ??
       (pits.length ? pits.reduce((a, p) => (p.bay.x > a.bay.x ? p : a)) : null);
-<<<<<<< Updated upstream
     this.storage = storagePoint(world.city);
     world.events.on('busted', () => {
-=======
-    world.events.on("busted", () => {
->>>>>>> Stashed changes
       if (this.active && !this.done) this.chased = true;
     });
   }
@@ -113,17 +100,8 @@ export class WinterTires implements SimSystem {
     this.pendingMount = false;
     this.mountT = 0;
     this.played = 0;
-<<<<<<< Updated upstream
     this.tires.set = 'summer';
     this.aimStorage();
-=======
-    this.tires.set = "summer";
-    const g = this.garage;
-    if (g) {
-      this.gps.setDestination({ x: g.bay.x, z: g.bay.z }, true);
-      this.gps.destName = "JACQUES PNEU";
-    }
->>>>>>> Stashed changes
     this.warm?.();
   }
 
@@ -153,28 +131,22 @@ export class WinterTires implements SimSystem {
    * The player stopped in a bay. The destination offers a paid repair first when the car is hurt, then the
    * free mount. Any other bay is the repair shop only.
    */
-<<<<<<< Updated upstream
   arrival(stop: PitStop): 'mount' | 'repair' | 'shop' {
     if (this.waitingOnStorage(stop)) {
       this.world.events.message('The winter tires are still in storage.', 'info');
       return 'shop';
     }
     if (!this.isGoal(stop)) return 'shop';
-=======
-  arrival(stop: PitStop): "mount" | "repair" | "shop" {
-    if (!this.isGoal(stop)) return "shop";
->>>>>>> Stashed changes
     if (this.world.player.phys.state.damage >= 0.01) {
       this.pendingMount = true;
-      return "repair";
+      return 'repair';
     }
-    return "mount";
+    return 'mount';
   }
 
   /** The destination shop just closed. True once, when the mount is still owed. */
   consumeMount(): boolean {
-    const owed =
-      this.pendingMount && this.active && !this.done && !this.mounting;
+    const owed = this.pendingMount && this.active && !this.done && !this.mounting;
     this.pendingMount = false;
     return owed;
   }
@@ -188,37 +160,23 @@ export class WinterTires implements SimSystem {
     this.played = 0;
     this.world.controlLocked = true;
     const name = this.garage?.name ?? DESTINATION_GARAGE;
-    this.world.events.message(`${name}: winter tires going on.`, "info");
+    this.world.events.message(`${name}: winter tires going on.`, 'info');
   }
 
   /** HUD line for the current session. */
   objective(): string {
-    if (!this.active) return "Free roam: explore the city";
-    if (this.mounting) return "Winter tires going on";
+    if (!this.active) return 'Free roam: explore the city';
+    if (this.mounting) return 'Winter tires going on';
     if (this.done) return "Winter tires on. The street isn't.";
-<<<<<<< Updated upstream
     if (!this.pickedUp) return 'Pick up the winter tires';
     return 'Get to Jacques Pneu Garage';
-=======
-    return "Get to Jacques Pneu Garage";
->>>>>>> Stashed changes
   }
 
   /** Debug overlay. */
   status(): string {
-<<<<<<< Updated upstream
     if (!this.active) return 'off';
     const phase = this.mounting ? `mount ${this.mountT.toFixed(1)}s` : this.done ? 'done' : this.pickedUp ? 'to the garage' : 'to storage';
     return `${phase}  ${this.tires.set}  ${this.chased ? 'chased' : 'clean'}`;
-=======
-    if (!this.active) return "off";
-    const phase = this.mounting
-      ? `mount ${this.mountT.toFixed(1)}s`
-      : this.done
-        ? "done"
-        : "driving";
-    return `${phase}  ${this.tires.set}  ${this.chased ? "chased" : "clean"}`;
->>>>>>> Stashed changes
   }
 
   update(dt: number): void {
@@ -226,7 +184,7 @@ export class WinterTires implements SimSystem {
     this.watchStorage();
     if (!this.mounting) return;
     // A bust or a tow takes the car. The drive stays on; the bay will mount the tires the next time.
-    if (this.blocked() || this.world.mode !== "free") {
+    if (this.blocked() || this.world.mode !== 'free') {
       this.mounting = false;
       this.mountT = 0;
       this.played = 0;
@@ -250,7 +208,6 @@ export class WinterTires implements SimSystem {
   }
 
   private isGoal(stop: PitStop): boolean {
-<<<<<<< Updated upstream
     return this.pickedUp && this.active && !this.done && !this.mounting && !this.pendingMount && stop === this.garage;
   }
 
@@ -273,38 +230,18 @@ export class WinterTires implements SimSystem {
     this.pickedUp = true;
     this.aimGarage();
     this.world.events.message('Winter tires are in the car. Jacques Pneu is on the other side of town.', 'good', 7);
-=======
-    return (
-      this.active &&
-      !this.done &&
-      !this.mounting &&
-      !this.pendingMount &&
-      stop === this.garage
-    );
->>>>>>> Stashed changes
   }
 
   private finish(): void {
     this.mounting = false;
     this.done = true;
-    this.tires.set = "winter";
+    this.tires.set = 'winter';
     // The pin was the drive. Free roam, and the map click, get the GPS back.
     this.gps.setDestination(null);
-    if (this.world.mode === "free" && !this.blocked())
-      this.world.controlLocked = false;
-    const run = this.chased
-      ? "The SPVM joined you there for a bit."
-      : "A clean run!";
-    this.world.events.message(
-      "Winter tires. You're legal. The street isn't.",
-      "good",
-      8,
-    );
-    this.world.events.message(
-      `${run} You deserve the best lax bagel.`,
-      "info",
-      8,
-    );
+    if (this.world.mode === 'free' && !this.blocked()) this.world.controlLocked = false;
+    const run = this.chased ? 'The SPVM joined you there for a bit.' : 'A clean run!';
+    this.world.events.message("Winter tires. You're legal. The street isn't.", 'good', 8);
+    this.world.events.message(`${run} You deserve the best lax bagel.`, 'info', 8);
     this.onDone?.(this.chased);
   }
 }
