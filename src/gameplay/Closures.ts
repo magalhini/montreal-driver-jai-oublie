@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
-import { Pathfinder, type Route } from '../ai/Pathfinding';
+import { Pathfinder, stitchRoute, type Route } from '../ai/Pathfinding';
+import { missionPins } from './MissionRoute';
 import type { AABB, Lane, OrientedBox, RoadEdge, StreetClass, Vec2 } from '../types';
 import { inDriveway } from '../world/Features';
 import type { Pothole } from '../world/Potholes';
@@ -21,8 +22,9 @@ import { laneOffset, type CityModel } from '../world/RoadGraph';
  *   parking bays (nobody parks there), in parks and squares, in front of the fences. No line, no offense.
  *
  * Session rules (PRD 5.2): for the lane drivers, one way at a time, every junction still reaches every other
- * and no way into a junction is a dead end; the GPS route from the spawn to the garage crosses at least one
- * fence; and neither the spawn's nor the garage's edge is ever closed.
+ * and no way into a junction is a dead end; the GPS route from the spawn to the garage (the long way: tire
+ * storage, then through downtown) crosses at least one fence; and neither the spawn's nor the garage's edge
+ * is ever closed.
  */
 export type ClosureSide = 'both' | 'ab' | 'ba';
 export type ClosureSign = 'rueBarree' | 'voieBarree' | 'detourLeft' | 'detourRight' | 'locale';
@@ -540,7 +542,8 @@ export class Closures {
 
   /** The GPS (no closures) from the anchors: if its route misses every fence, close an edge on it. */
   private ensureGpsHitsFence(rng: Rng, keep: Set<number>, anchors: ClosureAnchors): void {
-    const route = new Pathfinder(this.city).findRoute(anchors.spawn, anchors.goal, { heading: anchors.heading });
+    // The same corners WinterTires gives the GPS, so the fence is on the drive, not on the short avenue hop.
+    const route = stitchRoute(new Pathfinder(this.city), [anchors.spawn, ...missionPins(this.city, anchors.goal)], anchors.heading);
     if (!route) return;
     if (this.routeHitsFence(route)) {
       this.gpsHitsFence = true;

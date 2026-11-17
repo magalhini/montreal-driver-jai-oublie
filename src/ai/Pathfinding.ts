@@ -355,3 +355,34 @@ export class Pathfinder {
     return top;
   }
 }
+
+/**
+ * One route through `points` in order (the player, then the corners the GPS insists on, then the stop).
+ * Each leg is a normal search; the next leg leaves in the direction the previous one arrived, so a
+ * corner is a turn and not a U-turn. Null when any leg has no road.
+ */
+export function stitchRoute(finder: Pathfinder, points: Vec2[], heading?: Vec2): Route | null {
+  if (points.length < 2) return null;
+  const nodes: number[] = [];
+  const poly: Vec2[] = [];
+  let head = heading;
+  let cost = 0;
+  for (let i = 0; i < points.length - 1; i++) {
+    const leg = finder.findRoute(points[i], points[i + 1], { heading: head });
+    if (!leg || leg.points.length < 2) return null;
+    const prev = poly[poly.length - 1];
+    const start = prev && Math.hypot(leg.points[0].x - prev.x, leg.points[0].z - prev.z) < 1 ? 1 : 0;
+    for (let k = start; k < leg.points.length; k++) poly.push(leg.points[k]);
+    for (const id of leg.nodes) {
+      if (nodes.length === 0 || nodes[nodes.length - 1] !== id) nodes.push(id);
+    }
+    cost += leg.cost;
+    const a = leg.points[leg.points.length - 2];
+    const b = leg.points[leg.points.length - 1];
+    const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+    head = { x: (b.x - a.x) / len, z: (b.z - a.z) / len };
+  }
+  let length = 0;
+  for (let i = 1; i < poly.length; i++) length += Math.hypot(poly[i].x - poly[i - 1].x, poly[i].z - poly[i - 1].z);
+  return { nodes, points: poly, length, cost };
+}

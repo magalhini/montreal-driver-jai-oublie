@@ -1,6 +1,7 @@
 import { CONFIG } from '../config';
 import type { Block, DistrictType, RoadEdge, Vec2 } from '../types';
 import { inner } from '../world/Features';
+import { storagePoint } from '../gameplay/MissionRoute';
 import { DESTINATION_GARAGE } from '../world/PitStops';
 import type { CityModel } from '../world/RoadGraph';
 
@@ -384,6 +385,8 @@ export function mapLabels(city: CityModel): MapLabel[] {
   f.kinds.forEach((k, id) => {
     if (k === 'lot') out.push({ text: 'PARKING', pos: center(city.blocks[id]), kind: 'landmark' });
   });
+  const store = storagePoint(city);
+  out.push({ text: 'TIRE STORAGE', sub: 'winter tires', pos: { x: store.x, z: store.z - 36 }, kind: 'landmark' });
   for (const s of f.pitStops) {
     const jacques = s.name === DESTINATION_GARAGE;
     out.push({

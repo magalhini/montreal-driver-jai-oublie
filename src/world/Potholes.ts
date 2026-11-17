@@ -28,11 +28,12 @@ export interface Pothole {
 export const POTHOLE_ROLL: Record<StreetClass, { empty: number; max: number; cluster: number; bigShare: number; maxR: number; extra: number }> = {
   /**
    * Share of edges with no holes at all, most holes on a 150 m block, chance of a cluster, share of big ones,
-   * largest radius, and a share of holes added on top (playtest: boulevards like Peel and Wellington, +20%).
+   * largest radius, and a share of holes added on top. About 20% more than the previous roll (boulevards
+   * were already at +20%, so their extra is 0.44).
    */
-  boulevard: { empty: 0.6, max: 2, cluster: 0.05, bigShare: 0.3, maxR: 2.2, extra: 0.2 },
-  street: { empty: 0.3, max: 3, cluster: 0.14, bigShare: 0.4, maxR: 2.0, extra: 0 },
-  cobble: { empty: 0.2, max: 5, cluster: 0.22, bigShare: 0.35, maxR: 1.5, extra: 0 },
+  boulevard: { empty: 0.6, max: 2, cluster: 0.05, bigShare: 0.3, maxR: 2.2, extra: 0.44 },
+  street: { empty: 0.3, max: 3, cluster: 0.14, bigShare: 0.4, maxR: 2.0, extra: 0.2 },
+  cobble: { empty: 0.2, max: 5, cluster: 0.22, bigShare: 0.35, maxR: 1.5, extra: 0.2 },
 };
 
 const SALT = 0x9071e;

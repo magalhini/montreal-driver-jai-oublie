@@ -48,6 +48,32 @@
   color: var(--neon-cyan);
 }
 
+.briefing-steps {
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  counter-reset: step;
+}
+
+.briefing-steps li {
+  counter-increment: step;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
+  margin: 0 0 12px;
+  font-size: 22px;
+  line-height: 1.35;
+  color: #fff;
+}
+
+.briefing-steps li::before {
+  content: counter(step);
+  flex: 0 0 auto;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 12px;
+  color: var(--neon-amber);
+}
+
 .briefing-body {
   margin: 0;
   font-size: 26px;

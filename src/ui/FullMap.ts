@@ -300,7 +300,8 @@ export class FullMap {
     let html = 'No waypoint: click a street to set one';
     if (target) {
       const m = this.gps.route?.length ?? Math.hypot(target.x - this.player.pos.x, target.z - this.player.pos.z);
-      const kind = target === this.gps.destination ? (this.gps.destName === 'SUSPECT' ? 'SUSPECT' : 'DESTINATION') : 'WAYPOINT';
+      const named = this.gps.destName !== 'DEST' && this.gps.destName !== 'SUSPECT';
+      const kind = target === this.gps.destination ? (this.gps.destName === 'SUSPECT' ? 'SUSPECT' : named ? this.gps.destName : 'DESTINATION') : 'WAYPOINT';
       html = `${kind} <b>${formatDistance(m)}</b>`;
     }
     if (this.infoEl.innerHTML !== html) this.infoEl.innerHTML = html;

@@ -1,8 +1,10 @@
 import type { Heat } from '../ai/Heat';
+import { dist } from '../core/math';
 import type { World } from '../core/World';
-import type { SimSystem } from '../types';
+import type { SimSystem, Vec2 } from '../types';
 import { DESTINATION_GARAGE, type PitStop } from '../world/PitStops';
-import type { Gps } from './Gps';
+import { GPS_TUNING, type Gps } from './Gps';
+import { garageVias, storagePoint, storageVias } from './MissionRoute';
 import type { Tires } from './Tires';
 
 /** Forecourt sounds for the tire mount, in order (PRD 5.1). */
@@ -27,16 +29,25 @@ export const WINTER_TUNING = {
 export const MISSION_BRIEF =
   "It's December 1st and you forgot to change to your winter tires. Your goal: make it to the garage to change your tires in the other side of the city. The SPVM is watching: drive too fast, run a red light or a STOP sign and they'll be on your tail. Be careful about potholes: drive over them too fast and your car will be severely damaged.";
 
+/** The two stops on the briefing card, in order. */
+export const MISSION_STEPS = [
+  'Pick up your winter tires from storage',
+  'Drive to Jacques Pneu Garage to swap them',
+];
+
 /**
- * The winter-tire run (PRD 5.1, Phase 11). One drive: summer tires, a fixed GPS pin on Jacques Pneu Garage,
- * and the mount in that bay. A bust or a breakdown puts you back on the street with the drive still on.
- * There is no clock. Free roam never arms this.
+ * The winter-tire run (PRD 5.1, Phase 11). One drive: summer tires, a fixed GPS course that stops for the
+ * tires in Griffintown and then takes the long way through downtown to Jacques Pneu, and the mount in that
+ * bay. The garage will not fit them until the storage stop is done. A bust or a breakdown puts you back on
+ * the street with the drive still on. There is no clock. Free roam never arms this.
  */
 export class WinterTires implements SimSystem {
   /** The drive from the title screen is on (until the tires are on, or you quit). */
   active = false;
   /** The winter set is on. The bay is an ordinary garage after this. */
   done = false;
+  /** The storage stop is done. The garage is the pin only after this. */
+  pickedUp = false;
   /** A chase or a bust happened on this drive. The debrief says so. */
   chased = false;
   /** The car is locked in the bay while the tires go on. */
@@ -57,6 +68,8 @@ export class WinterTires implements SimSystem {
 
   /** Eastern garage, the one named Jacques Pneu. Null only if the city has no pit stops. */
   readonly garage: PitStop | null;
+  /** De la Montagne & Ottawa, where the winter tires are stored. */
+  private readonly storage: Vec2;
 
   constructor(
     private readonly world: World,
@@ -68,29 +81,27 @@ export class WinterTires implements SimSystem {
     this.garage =
       pits.find((p) => p.name === DESTINATION_GARAGE) ??
       (pits.length ? pits.reduce((a, p) => (p.bay.x > a.bay.x ? p : a)) : null);
+    this.storage = storagePoint(world.city);
     world.events.on('busted', () => {
       if (this.active && !this.done) this.chased = true;
     });
   }
 
   /**
-   * Title -> this drive. Summer tires, the pin fixed on the garage. The caller locks the car until the
+   * Title -> this drive. Summer tires, the pin fixed on the storage stop. The caller locks the car until the
    * briefing is dismissed, and puts the car on the west spawn.
    */
   arm(): void {
     this.active = true;
     this.done = false;
+    this.pickedUp = false;
     this.chased = false;
     this.mounting = false;
     this.pendingMount = false;
     this.mountT = 0;
     this.played = 0;
     this.tires.set = 'summer';
-    const g = this.garage;
-    if (g) {
-      this.gps.setDestination({ x: g.bay.x, z: g.bay.z }, true);
-      this.gps.destName = 'JACQUES PNEU';
-    }
+    this.aimStorage();
     this.warm?.();
   }
 
@@ -98,6 +109,7 @@ export class WinterTires implements SimSystem {
   clear(): void {
     this.active = false;
     this.done = false;
+    this.pickedUp = false;
     this.chased = false;
     this.mounting = false;
     this.pendingMount = false;
@@ -107,6 +119,7 @@ export class WinterTires implements SimSystem {
 
   /** Canopy line while the drive is on and this bay is the goal. Null keeps the usual repair line. */
   bayHint(stop: PitStop): string | null {
+    if (this.waitingOnStorage(stop)) return `${stop.name}: the winter tires are still in storage.`;
     if (!this.isGoal(stop)) return null;
     const hurt = this.world.player.phys.state.damage >= 0.01;
     return hurt
@@ -119,6 +132,10 @@ export class WinterTires implements SimSystem {
    * free mount. Any other bay is the repair shop only.
    */
   arrival(stop: PitStop): 'mount' | 'repair' | 'shop' {
+    if (this.waitingOnStorage(stop)) {
+      this.world.events.message('The winter tires are still in storage.', 'info');
+      return 'shop';
+    }
     if (!this.isGoal(stop)) return 'shop';
     if (this.world.player.phys.state.damage >= 0.01) {
       this.pendingMount = true;
@@ -136,7 +153,7 @@ export class WinterTires implements SimSystem {
 
   /** Lock the car and play the tire change. */
   beginMount(): void {
-    if (!this.active || this.done || this.mounting || this.blocked()) return;
+    if (!this.active || !this.pickedUp || this.done || this.mounting || this.blocked()) return;
     this.pendingMount = false;
     this.mounting = true;
     this.mountT = 0;
@@ -151,18 +168,20 @@ export class WinterTires implements SimSystem {
     if (!this.active) return 'Free roam: explore the city';
     if (this.mounting) return 'Winter tires going on';
     if (this.done) return "Winter tires on. The street isn't.";
+    if (!this.pickedUp) return 'Pick up the winter tires';
     return 'Get to Jacques Pneu Garage';
   }
 
   /** Debug overlay. */
   status(): string {
     if (!this.active) return 'off';
-    const phase = this.mounting ? `mount ${this.mountT.toFixed(1)}s` : this.done ? 'done' : 'driving';
+    const phase = this.mounting ? `mount ${this.mountT.toFixed(1)}s` : this.done ? 'done' : this.pickedUp ? 'to the garage' : 'to storage';
     return `${phase}  ${this.tires.set}  ${this.chased ? 'chased' : 'clean'}`;
   }
 
   update(dt: number): void {
     if (this.active && !this.done && this.heat.inPursuit) this.chased = true;
+    this.watchStorage();
     if (!this.mounting) return;
     // A bust or a tow takes the car. The drive stays on; the bay will mount the tires the next time.
     if (this.blocked() || this.world.mode !== 'free') {
@@ -184,8 +203,33 @@ export class WinterTires implements SimSystem {
     if (this.mountT >= WINTER_TUNING.mount) this.finish();
   }
 
+  private waitingOnStorage(stop: PitStop): boolean {
+    return this.active && !this.done && !this.pickedUp && stop === this.garage;
+  }
+
   private isGoal(stop: PitStop): boolean {
-    return this.active && !this.done && !this.mounting && !this.pendingMount && stop === this.garage;
+    return this.pickedUp && this.active && !this.done && !this.mounting && !this.pendingMount && stop === this.garage;
+  }
+
+  /** The first pin: down Lucien-L'Allier to the storage corner. */
+  private aimStorage(): void {
+    this.gps.setCourse(storageVias(this.world.city), this.storage, 'STORAGE');
+  }
+
+  /** The second pin, only once the tires are in the car: through downtown to Jacques Pneu. */
+  private aimGarage(): void {
+    const g = this.garage;
+    if (!g) return;
+    this.gps.setCourse(garageVias(this.world.city), { x: g.bay.x, z: g.bay.z }, 'JACQUES PNEU');
+  }
+
+  /** Driving through the storage corner loads the tires and retargets the GPS. */
+  private watchStorage(): void {
+    if (!this.active || this.done || this.pickedUp || this.mounting) return;
+    if (dist(this.world.player.pos, this.storage) >= GPS_TUNING.arrive) return;
+    this.pickedUp = true;
+    this.aimGarage();
+    this.world.events.message('Winter tires are in the car. Jacques Pneu is on the other side of town.', 'good', 7);
   }
 
   private finish(): void {

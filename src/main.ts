@@ -99,6 +99,7 @@ import { buildStreetProps } from "./world/StreetProps";
 import { buildShopSigns } from "./world/ShopSigns";
 import { buildRoadSigns } from "./world/RoadSigns";
 import { buildStreetSigns } from "./world/StreetSigns";
+import { buildStorageBeacon } from "./world/StorageBeacon";
 import { SteamVents } from "./world/SteamVents";
 import { TrafficLights } from "./world/TrafficLights";
 import { TrafficLightView } from "./world/TrafficLightView";
@@ -353,6 +354,7 @@ events.on("splash", (e) => {
 const gps = new Gps(world, new Pathfinder(city));
 game.addSim(gps);
 const mission = new WinterTires(world, tires, gps, heat);
+const storageBeacon = buildStorageBeacon(r.scene, city);
 mission.blocked = () =>
   bust.phase !== "free" ||
   wreck.active ||
@@ -445,7 +447,7 @@ game.onFrame((dt) => {
       briefing.hide();
       world.controlLocked = false;
       events.message(
-        "GPS set: Jacques Pneu Garage. It does not know which streets are closed.",
+        "GPS set: tire storage first, then Jacques Pneu Garage. It does not know which streets are closed.",
         "info",
         7,
       );
@@ -577,6 +579,7 @@ game.addView({
     hud.immune = world.immune;
     hud.cash = economy.cash;
     if (world.mode === "free") hud.objective = mission.objective();
+    storageBeacon.visible = mission.active && !mission.pickedUp;
     hud.felony = heat.value;
     hud.evading = heat.evading;
     hud.bust = bust.progress;

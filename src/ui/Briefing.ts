@@ -1,5 +1,5 @@
 import { DESTINATION_GARAGE } from '../world/PitStops';
-import { MISSION_BRIEF } from '../gameplay/WinterTires';
+import { MISSION_BRIEF, MISSION_STEPS } from '../gameplay/WinterTires';
 import './briefing.css';
 
 /**
@@ -20,6 +20,7 @@ export class Briefing {
         <div class="briefing-kicker">WINTER TIRES</div>
         <h1>December 1st</h1>
         <p class="briefing-where">${DESTINATION_GARAGE} is across town.</p>
+        <ol class="briefing-steps"></ol>
         <p class="briefing-body"></p>
         <div class="briefing-actions">
           <button type="button" class="briefing-drive">DRIVE</button>
@@ -27,6 +28,12 @@ export class Briefing {
         </div>
         <div class="briefing-hint"><kbd>ENTER</kbd> drive <kbd>ESC</kbd> title</div>
       </div>`;
+    const steps = this.root.querySelector('.briefing-steps')!;
+    for (const step of MISSION_STEPS) {
+      const li = document.createElement('li');
+      li.textContent = step;
+      steps.appendChild(li);
+    }
     this.root.querySelector('.briefing-body')!.textContent = MISSION_BRIEF;
     this.root.querySelector('.briefing-drive')!.addEventListener('click', () => {
       this.choice = 'drive';
