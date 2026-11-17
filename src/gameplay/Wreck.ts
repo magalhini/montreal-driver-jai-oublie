@@ -12,8 +12,8 @@ type Impact = Extract<GameEvent, { type: 'impact' }>;
 
 /** Above this, a head-on impact totals the car (IMPROVEMENTS #24). */
 export const WRECK_SPEED = 130 * KMH;
-/** Yen to put a fresh car down nearby after the blast. */
-export const WRECK_FEE = 2000;
+/** Dollars to put a fresh car down nearby after the blast. */
+export const WRECK_FEE = 400;
 /** Sim runs at this scale during the shot, so the world and the debris crawl. */
 const WRECK_SLOW = 0.34;
 /** Sim seconds of the breakup. At `WRECK_SLOW` that is about five and a half real seconds. */

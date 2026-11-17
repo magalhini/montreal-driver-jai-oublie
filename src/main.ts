@@ -64,6 +64,7 @@ import { Hud } from "./ui/Hud";
 import { buildMapImage } from "./ui/MapImage";
 import { Menu, type PlayMode } from "./ui/Menu";
 import { Briefing } from "./ui/Briefing";
+import { IntroCutscene } from "./ui/IntroCutscene";
 import { currentMap } from "./maps";
 import { Messages } from "./ui/Messages";
 import { Minimap } from "./ui/Minimap";
@@ -397,6 +398,9 @@ const fullMap = new FullMap(uiRoot, mapImage, city, gps, player, police, input);
 // T30: title screen (the city keeps running behind it under the orbit camera) and pause menu
 let session: PlayMode = "free";
 const briefing = new Briefing(uiRoot);
+// Ten seconds of Montreal before either mode starts (ESC / F / Space skip it)
+const intro = new IntroCutscene(uiRoot, world, closures, potholes);
+let introCam = false;
 const menu = new Menu(uiRoot, {
   cash: () => economy.cash,
   start: startSession,
@@ -466,6 +470,8 @@ game.onFrame((dt) => {
   const back = input.pressed("pause") || input.pressed("escape");
   // Escape skips the storage scene instead of pausing
   if (pickup.playing && input.pressed("escape") && !menu.open) pickup.skip();
+  intro.update(dt);
+  if (intro.playing && (input.pressed("escape") || input.pressed("interact") || input.pressed("handbrake"))) intro.skip();
   const briefingOn = briefing.open;
   if (briefingOn) {
     const choice = briefing.poll(input.pressed("escape"));
@@ -498,11 +504,13 @@ game.onFrame((dt) => {
   ) {
     fullMap.toggle();
     game.setPaused("map", fullMap.open);
+  } else if (intro.playing) {
+    // The intro owns the keys until it hands over to the briefing or the car
   } else if (back && !fullMap.open && !pickup.playing) {
     game.setPaused("menu", true);
     menu.showPause();
   }
-  minimap.visible = !fullMap.open && world.mode !== "menu" && !briefing.open;
+  minimap.visible = !fullMap.open && world.mode !== "menu" && !briefing.open && !intro.playing;
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
@@ -589,17 +597,19 @@ game.addView({
     orbitCenter.set(player.pos.x, 0, player.pos.z);
     if (wreck.playing) wreckView.aim(r.camera);
     else if (breakdown.playing) breakdownView.aim(r.camera);
+    else if (intro.playing) intro.aim(r.camera);
     else if (pickup.cinematic) pickupView.aim(r.camera, dt);
     else {
-      if (pickupCam) camRig.snap();
+      if (pickupCam || introCam) camRig.snap();
       camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
     }
     pickupCam = pickup.cinematic;
+    introCam = intro.playing;
     // Post FX on top of the tuned settings: the wreck's punch
     post.boost.bloom = 0.55 * wreck.fx;
     post.boost.aberration = 0.0035 * wreck.fx;
     steam.rain = weather.rain;
-    const inCabin = camRig.interior && !breakdown.playing && !pickup.cinematic;
+    const inCabin = camRig.interior && !breakdown.playing && !pickup.cinematic && !intro.playing;
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     hud.paused = game.pausedBy("debug") && !menu.open && !fullMap.open;
@@ -622,6 +632,7 @@ game.addView({
       wreck.fade,
       breakdown.fade,
       shop.fade,
+      intro.fade,
       pickup.fade,
     );
     hud.update(player, dt);
@@ -723,6 +734,7 @@ const audio: AudioSystem = new AudioSystem({
       wreck.fade,
       breakdown.fade,
       shop.fade,
+      intro.fade,
       pickup.fade,
     ),
   hornHeld: () => input.isHeld("horn"),
@@ -763,15 +775,18 @@ function startSession(mode: PlayMode): void {
   menu.hide();
   game.setPaused("menu", false);
   uiRoot.classList.remove("on-title");
-  if (mode === "mission") {
-    mission.arm();
-    world.controlLocked = true;
-    briefing.show();
-  } else {
-    tires.set = "winter";
-    world.controlLocked = false;
-    greet();
-  }
+  world.controlLocked = true;
+  if (mode === "mission") mission.arm();
+  else tires.set = "winter";
+  // The intro first, then the briefing card (mission) or the car (free roam)
+  intro.play(() => {
+    if (session !== mode || world.mode !== "free") return;
+    if (mode === "mission") briefing.show();
+    else {
+      world.controlLocked = false;
+      greet();
+    }
+  });
   hud.objective = mission.objective();
 }
 

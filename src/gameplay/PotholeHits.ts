@@ -11,8 +11,8 @@ import type { Pothole, Potholes } from '../world/Potholes';
  * under both wheels of one side costs twice, and the rear axle finds it again a moment later.
  */
 export const POTHOLE_TUNING = {
-  /** Below this a pit only jolts the car. */
-  safeKmh: 20,
+  /** Below this a pit only jolts the car (no damage). */
+  safeKmh: 32,
   /** Above this a big pit takes a serious chunk. */
   hardKmh: 50,
   /** Damage per wheel (share of the bar) from safeKmh up to hardKmh. */
@@ -217,7 +217,7 @@ export class PotholeHits implements SimSystem {
   }
 }
 
-/** Damage for one wheel through a pit's centre at `kmh` (PRD 5.4: none under 20, small to 50, serious above). */
+/** Damage for one wheel through a pit's centre at `kmh` (PRD 5.4: none under `safeKmh`, small to `hardKmh`, serious above). */
 export function damageFor(depth: Pothole['depth'], kmh: number): number {
   const T = POTHOLE_TUNING;
   if (kmh < T.safeKmh) return 0;

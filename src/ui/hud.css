@@ -489,6 +489,22 @@ body {
   78% { opacity: 1; }
   100% { opacity: 0; }
 }
+/* The game's intro: a sign-shop caption, white on the métro's blue */
+.intro-cine .cine-caption .name {
+  font-family: 'Press Start 2P', monospace;
+  font-style: normal;
+  font-size: 34px;
+  color: #ffffff;
+  text-shadow: 0 0 16px #1f63d6, 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+.intro-cine .cine-caption .jp {
+  font-family: inherit;
+  letter-spacing: 2px;
+  font-size: 20px;
+  color: var(--neon-cyan);
+  margin-top: 10px;
+}
+
 .cine-skip {
   position: absolute;
   right: 3vw;
