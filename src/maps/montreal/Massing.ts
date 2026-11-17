@@ -201,5 +201,7 @@ export function placeBasilica(city: CityModel): void {
     part(minX + t, maxX - t, minZ, minZ + t, S.ridge + 4, 1826),
     part(minX + 1.5, maxX - 1.5, minZ + t, maxZ, S.ridge, 1827),
   );
-  city.features.basilica = { minX, maxX, minZ, maxZ, tower: t, towerH: S.towerH, eaves: S.eaves, ridge: S.ridge, y: CONFIG.CURB_HEIGHT };
+  // On the ground at its front steps (Vieux-Montréal is level, but the hill starts a block north)
+  const y = city.terrain.base(cx, minZ - 1) + CONFIG.CURB_HEIGHT;
+  city.features.basilica = { minX, maxX, minZ, maxZ, tower: t, towerH: S.towerH, eaves: S.eaves, ridge: S.ridge, y };
 }

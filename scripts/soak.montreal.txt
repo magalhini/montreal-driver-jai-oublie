@@ -1,3 +1,3 @@
-seed 1000: red runs 0/292, stop runs 0/125, AI collisions 0, parked hits 0, stalls 0, off-road 0.00%, cars 35.8
-seed 1001: red runs 0/268, stop runs 0/133, AI collisions 0, parked hits 0, stalls 0, off-road 0.00%, cars 34.0
-seed 1002: red runs 0/277, stop runs 0/143, AI collisions 0, parked hits 0, stalls 0, off-road 0.00%, cars 36.5
+seed 1000: red runs 0/296, stop runs 0/125, AI collisions 0, parked hits 0, stalls 0, off-road 0.00%, cars 35.5
+seed 1001: red runs 0/316, stop runs 0/140, AI collisions 0, parked hits 0, stalls 0, off-road 0.00%, cars 37.3
+seed 1002: red runs 0/251, stop runs 0/119, AI collisions 0, parked hits 0, stalls 1, off-road 0.00%, cars 38.6

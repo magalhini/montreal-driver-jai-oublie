@@ -31,6 +31,8 @@ export interface CarParts {
   /** Lens centers on the body surface, for glow halos. */
   headPos: [number, number, number][];
   tailPos: [number, number, number][];
+  /** Number plates (cars only; trucks leave this empty): center and facing (+1 front, -1 rear). */
+  platePos?: { at: [number, number, number]; dir: 1 | -1 }[];
   wheelRadius: number;
   length: number;
   width: number;
@@ -71,6 +73,7 @@ export function buildCarParts(style: BodyStyle, color: number, detail?: CarDetai
     ],
     headPos: b.headPos,
     tailPos: b.tailPos,
+    platePos: b.platePos,
     wheelRadius: st.r,
     length: st.L,
     width: st.W,

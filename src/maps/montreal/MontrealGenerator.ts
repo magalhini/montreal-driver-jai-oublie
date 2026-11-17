@@ -1,4 +1,5 @@
 import { CONFIG, KMH } from '../../config';
+import { montrealRelief } from './Relief';
 import { leftVec, scale } from '../../core/math';
 import { Rng, hash01 } from '../../core/Rng';
 import type { Block, Building, Lane, RoadEdge, RoadNode, StreetClass, StreetName, Vec2 } from '../../types';
@@ -33,7 +34,6 @@ const OUTER = 28;
 export function generateMontreal(seed = CONFIG.SEED): CityModel {
   const rng = new Rng(seed);
   const city = new CityModel();
-  city.flatGround = true;
   const GX = X_RAW.length - 1;
   const GZ = Z_RAW.length - 1;
   const xMid = (X_RAW[0] + X_RAW[GX]) / 2;
@@ -235,6 +235,8 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   city.bounds = { minX: x0 - sw, minZ: z0 - sw, maxX: x1 + sw, maxZ: city.waterZ };
   canalWalls(city);
   layPort(city);
+  // The hill from the river up to Sherbrooke, rolling block to block (`Relief.ts`)
+  city.relief = montrealRelief(city);
   city.terrain = new Terrain(city, f);
   settleBuildings(city);
   planAlleys(city, seed + 19);

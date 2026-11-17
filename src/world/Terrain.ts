@@ -9,8 +9,11 @@ import { RAISED, surfaceAt } from './Surfaces';
 
 /** Flat stretch before every junction (crosswalk + stop line stay level). */
 export const FLAT = CONFIG.STOP_OFFSET + 1.5;
-/** Length of the parabolic vertical curve at each end of a slope: shorter = sharper crests = more air. */
-const EASE = 8;
+/**
+ * Length of the parabolic vertical curve at each end of a slope: shorter = sharper crests = more air. A crest
+ * that changes the grade by G throws a car at about sqrt(9.81 * EASE / G) m/s (5 m, 10%: 80 km/h).
+ */
+const EASE = 5;
 export const MAX_GRADE = 0.17;
 const HARBOR_WATER = -0.6;
 
@@ -177,6 +180,7 @@ function spanIndex(arr: number[], v: number): number {
 export function computeNodeHeights(city: CityModel): number[] {
   const nx = city.nx;
   const nz = city.nz;
+  if (city.relief) return relaxGrades(city, [...city.relief]);
   if (city.flatGround) return new Array<number>(nx * nz).fill(0);
   const h = new Array<number>(nx * nz).fill(0);
   // The hill grows with the grid (tuned on 10 x 10 blocks)
@@ -192,8 +196,12 @@ export function computeNodeHeights(city: CityModel): number[] {
       h[j * nx + i] = Math.max(0, dome + bounce) + Math.max(0, ridge);
     }
   }
-  // Relax edges steeper than MAX_GRADE over their sloped run
-  for (let it = 0; it < 40; it++) {
+  return relaxGrades(city, h);
+}
+
+/** Relax edges steeper than MAX_GRADE over their sloped run (heights stay >= 0, rounded to 10 cm). */
+export function relaxGrades(city: CityModel, h: number[]): number[] {
+  for (let it = 0; it < 60; it++) {
     let worst = 0;
     for (const e of city.edges) {
       const a = city.nodes[e.a];

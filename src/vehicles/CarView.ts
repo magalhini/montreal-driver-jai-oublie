@@ -6,6 +6,7 @@ import { LOOK } from '../render/Look';
 import { sharedGlow } from '../world/textures';
 import type { Car } from './Car';
 import { buildCarParts, carMaterial } from './CarModel';
+import { PLATE_H, PLATE_W, PLAYER_PLATE, plateMaterial } from './Plate';
 import { wheelPair } from './CarWheel';
 import type { WheelId } from './Tuning';
 
@@ -131,6 +132,8 @@ function batch(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Materia
 function lookKey(car: Car): string {
   return `${car.look.style}_${car.look.color}_${car.look.detail ?? ''}`;
 }
+
+const PLATE_GEO = new THREE.PlaneGeometry(PLATE_W, PLATE_H);
 
 interface Visual {
   key: string;
@@ -304,6 +307,15 @@ export class CarView implements ViewSystem {
       v.barL = new THREE.Mesh(p.barL, MAT.barOff);
       v.barR = new THREE.Mesh(p.barR, MAT.barOff);
       body.add(v.barL, v.barR);
+    }
+    // The player's own plates read POUT1NE (a Quebec plate laid over the body's plain one)
+    if (car.kind === 'player') {
+      for (const pl of p.platePos ?? []) {
+        const m = new THREE.Mesh(PLATE_GEO, plateMaterial(PLAYER_PLATE));
+        m.position.set(pl.at[0], pl.at[1], pl.at[2] + pl.dir * 0.006);
+        if (pl.dir < 0) m.rotation.y = Math.PI;
+        body.add(m);
+      }
     }
     if (p.sign) {
       v.sign = new THREE.Mesh(p.sign, MAT.taxiFree);

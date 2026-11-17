@@ -55,8 +55,10 @@ export class CityModel {
   /** Where the session starts (the car is put in the nearest lane). */
   startPos: Vec2 = { x: 0, z: 0 };
   waterZ = 0;
-  /** Junctions stay at height 0. Tokyo leaves this off and keeps its hills. */
+  /** Junctions stay at height 0 (unless `relief` gives them heights). */
   flatGround = false;
+  /** The map's own junction heights (m, by node id), set before the terrain is built; relaxed to `MAX_GRADE`. */
+  relief: number[] | null = null;
   features!: CityFeatures;
   terrain!: CityGround;
   private edgeMap = new Map<string, RoadEdge>();

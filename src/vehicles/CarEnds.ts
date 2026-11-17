@@ -24,14 +24,17 @@ export interface BodyCtx {
   tails: THREE.BufferGeometry[];
   headPos: [number, number, number][];
   tailPos: [number, number, number][];
+  /** Plate centers on the body (x, y, z) and which way each faces (+1 front, -1 rear). */
+  platePos: { at: [number, number, number]; dir: 1 | -1 }[];
 }
 
 /** Front and rear ends: grilles, lamps (lenses go to heads / tails), bumpers, plates, exhausts, plus the coupe hood bulge and wagon roof rails. */
 export function buildEnds(c: BodyCtx): void {
-  const { kit, st, style, taxi, police, hl, hw, ghw, body, seam, dark, trim, chrome, heads, tails, headPos, tailPos } = c;
+  const { kit, st, style, taxi, police, hl, hw, ghw, body, seam, dark, trim, chrome, heads, tails, headPos, tailPos, platePos } = c;
   const plateColor = style === 'kei' ? PLATE_KEI : taxi ? PLATE_TAXI : PLATE_WHITE;
   const inkColor = taxi ? rgb(0.75, 0.75, 0.7) : style === 'kei' ? rgb(0.02, 0.02, 0.02) : PLATE_INK;
   const plate = (y: number, z: number, dir: 1 | -1, lit: boolean) => {
+    platePos.push({ at: [0, y, z], dir });
     kit.add(onZ(rrect(0, y, 0.33, 0.165, 0.012), z, dir), look(plateColor, lit ? GLOW : MATTE));
     const ink = look(inkColor, MATTE);
     kit.add(onZ(rrect(0.02, y + 0.048, 0.14, 0.022, 0.004), z + dir * 0.004, dir), ink);

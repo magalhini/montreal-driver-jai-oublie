@@ -218,6 +218,11 @@ const unitBox = new THREE.BoxGeometry(1, 1, 1);
 const footBox = new THREE.BoxGeometry(1, 1, 1).translate(0, 0.5, 0);
 const plane = new THREE.PlaneGeometry(1, 1);
 
+/** A frame (local z along a road) tilted to the road's grade between two heights `run` m apart. */
+function pitched(m: THREE.Matrix4, y0: number, y1: number, run: number): THREE.Matrix4 {
+  return m.multiply(new THREE.Matrix4().makeRotationX(-Math.atan2(y1 - y0, run)));
+}
+
 /** World matrix for a frame at `o` with local x = `u` (along), y up, z = `n` (facing). */
 function frameMatrix(o: Vec2, y: number, u: Vec2, n: Vec2): THREE.Matrix4 {
   return new THREE.Matrix4().makeBasis(new THREE.Vector3(u.x, 0, u.z), new THREE.Vector3(0, 1, 0), new THREE.Vector3(n.x, 0, n.z)).setPosition(o.x, y, o.z);
@@ -361,8 +366,8 @@ export function buildClosures(city: CityModel, closures: Closures, scene: THREE.
     const sMid = (h.s0 + h.s1) / 2;
     const latMid = (l0 + l1) / 2;
     const c = at(sMid, latMid);
-    // Ground frame: local x = + lateral (left of a -> b), z = along the edge
-    const g = frameMatrix(c, Y(c), left, t);
+    // Ground frame: local x = + lateral (left of a -> b), z = along the edge, tilted to the street's grade
+    const g = pitched(frameMatrix(c, Y(c), left, t), Y(at(h.s0, latMid)), Y(at(h.s1, latMid)), len);
     // Torn-up road: a dark cut over most of the road part
     b.add('cut', footBox, M.cut, local(g, 0, 0.005, 0, Math.abs(l1 - l0) - 0.8, 0.02, len - 1.4), false);
     const room = Math.abs(l1 - l0);
@@ -401,7 +406,7 @@ export function buildClosures(city: CityModel, closures: Closures, scene: THREE.
       const k = Math.max(1, Math.round(L / 3));
       for (let i = 0; i < k; i++) {
         const q = { x: sp.a.x + ((sp.b.x - sp.a.x) * (i + 0.5)) / k, z: sp.a.z + ((sp.b.z - sp.a.z) * (i + 0.5)) / k };
-        const m = frameMatrix(q, Y(q), left, t);
+        const m = pitched(frameMatrix(q, Y(q), left, t), Y(sp.a), Y(sp.b), L);
         b.add('jersey', footBox, M.concrete, local(m, 0, 0, 0, 0.6, 0.82, L / k - 0.08));
       }
     }
@@ -464,7 +469,8 @@ export function buildClosures(city: CityModel, closures: Closures, scene: THREE.
     const len = m.s1 - m.s0;
     const width = m.lat1 - m.lat0;
     const c = at((m.s0 + m.s1) / 2, (m.lat0 + m.lat1) / 2);
-    const g = frameMatrix(c, Y(c), left, t);
+    const latC = (m.lat0 + m.lat1) / 2;
+    const g = pitched(frameMatrix(c, Y(c), left, t), Y(at(m.s0, latC)), Y(at(m.s1, latC)), len);
     const ab = m.dir.x * t.x + m.dir.z * t.z > 0;
     // Which side of the box faces the open lane (the merge moves toward it)
     const openX = m.open - (m.lat0 + m.lat1) / 2;

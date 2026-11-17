@@ -126,23 +126,39 @@ class Kit {
     if (axis === 'z') {
       // Local (u, y, -fixed) -> world (fixed, y, u): a quarter turn about Y (local +x to world +z)
       const marks = this.lists().map((l) => l.length);
-      this.islandX(s0, s1, -z, half, h, rng, city.terrain.heightAt(z, (s0 + s1) / 2));
+      this.islandX(s0, s1, -z, half, h, rng, (u) => city.terrain.heightAt(z, u));
       const R = new THREE.Matrix4().makeRotationY(-Math.PI / 2);
       this.lists().forEach((l, k) => {
         for (let i = marks[k]; i < l.length; i++) l[i].premultiply(R);
       });
       return;
     }
-    this.islandX(s0, s1, z, half, h, rng, city.terrain.heightAt((s0 + s1) / 2, z));
+    this.islandX(s0, s1, z, half, h, rng, (u) => city.terrain.heightAt(u, z));
   }
 
-  private islandX(s0: number, s1: number, z: number, half: number, h: number, rng: Rng, y: number): void {
-    const mid = (s0 + s1) / 2;
+  /** `ground(u)`: the road's height `u` along the island (the islands follow the hills, PRD Phase 7 relief). */
+  private islandX(s0: number, s1: number, z: number, half: number, h: number, rng: Rng, ground: (u: number) => number): void {
     const len = s1 - s0;
-    // The straight body stops a half width short of each end, where the rounded nose takes over
-    this.concrete.push(new THREE.Matrix4().makeScale(len - 2 * half, h, 2 * half).setPosition(mid, y + h / 2, z));
-    this.snow.push(new THREE.Matrix4().makeScale(len - 2 * half - 0.2, 0.08, 2 * half - 0.22).setPosition(mid, y + h + 0.03, z));
+    // The straight body stops a half width short of each end, where the rounded nose takes over. On a slope it is
+    // a run of short pieces, each tilted to the grade under it (the curb sinks a little at their joints, not more).
+    const b0 = s0 + half;
+    const b1 = s1 - half;
+    const pieces = Math.max(1, Math.ceil((b1 - b0) / 4));
+    const step = (b1 - b0) / pieces;
+    for (let k = 0; k < pieces; k++) {
+      const a = b0 + k * step;
+      const ya = ground(a);
+      const yb = ground(a + step);
+      const pitch = Math.atan2(yb - ya, step);
+      const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), pitch);
+      const c = a + step / 2;
+      const yc = (ya + yb) / 2;
+      const L = step / Math.cos(pitch) + 0.05;
+      this.concrete.push(new THREE.Matrix4().compose(new THREE.Vector3(c, yc + h / 2, z), q, new THREE.Vector3(L, h, 2 * half)));
+      this.snow.push(new THREE.Matrix4().compose(new THREE.Vector3(c, yc + h + 0.03, z), q, new THREE.Vector3(L - 0.05, 0.08, 2 * half - 0.22)));
+    }
     for (const [x, dir] of [[s0 + half, -1], [s1 - half, 1]] as const) {
+      const y = ground(x);
       this.noses.push(new THREE.Matrix4().makeScale(half, h, half).setPosition(x, y + h / 2, z));
       this.snowNoses.push(new THREE.Matrix4().makeScale(half - 0.11, 0.08, half - 0.11).setPosition(x, y + h + 0.03, z));
       // Yellow-and-black marker on the nose, facing the oncoming lanes
@@ -157,7 +173,7 @@ class Kit {
     const n = Math.max(2, Math.round((len - 6) / MEDIAN_TUNING.treeStep));
     for (let i = 0; i < n; i++) {
       const x = s0 + 3 + ((i + 0.5) / n) * (len - 6) + rng.range(-0.8, 0.8);
-      this.tree(x, y + h, z, rng);
+      this.tree(x, ground(x) + h, z, rng);
     }
   }
 

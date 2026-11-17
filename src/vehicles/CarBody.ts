@@ -17,6 +17,8 @@ export interface BaseParts {
   sign?: THREE.BufferGeometry;
   headPos: [number, number, number][];
   tailPos: [number, number, number][];
+  /** Number plates: center and facing (+1 front, -1 rear). */
+  platePos: { at: [number, number, number]; dir: 1 | -1 }[];
 }
 
 const smooth01 = (t: number): number => {
@@ -182,6 +184,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   const tails: THREE.BufferGeometry[] = [];
   const headPos: [number, number, number][] = [];
   const tailPos: [number, number, number][] = [];
+  const platePos: BaseParts['platePos'] = [];
 
   // The player's own bodies are split across the width, so the end round and the hood crown become a
   // curve instead of a flat face sliding back. Traffic keeps a single span: same outline, far fewer triangles.
@@ -370,7 +373,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   addSkinDetails(kit, st, style, hw, ghw, R, seam, dark, trim);
 
   // --- Front and rear ends ---
-  buildEnds({ kit, st, style, taxi, police, hl, hw, ghw, body, seam, dark, trim, chrome, heads, tails, headPos, tailPos });
+  buildEnds({ kit, st, style, taxi, police, hl, hw, ghw, body, seam, dark, trim, chrome, heads, tails, headPos, tailPos, platePos });
 
   // --- Roof furniture ---
   const roofPts = [st.ws[1], ...st.roof, st.bl[0]];
@@ -401,7 +404,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   const w = shapeWarp(st, R, shaped);
   warpArrays(kit.pos, kit.nrm, w);
   for (const g of [...heads, ...tails]) warpGeo(g, w);
-  for (const p of [...headPos, ...tailPos]) {
+  for (const p of [...headPos, ...tailPos, ...platePos.map((q) => q.at)]) {
     const n = w(p[0], p[1], p[2]);
     p[0] = n[0];
     p[1] = n[1];
@@ -418,5 +421,6 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
     sign,
     headPos,
     tailPos,
+    platePos,
   };
 }
