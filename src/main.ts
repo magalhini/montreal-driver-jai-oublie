@@ -39,6 +39,8 @@ import { Closures, closureSalt, defaultAnchors } from "./gameplay/Closures";
 import { Cones } from "./gameplay/Cones";
 import { Chantier } from "./gameplay/Chantier";
 import { OfficerView } from "./gameplay/OfficerView";
+import { ParkingTicket } from "./gameplay/ParkingTicket";
+import { TicketAgentView } from "./gameplay/TicketAgentView";
 import { CollisionSystem } from "./physics/Collision";
 import { SpatialHash } from "./physics/SpatialHash";
 import { CameraRig } from "./render/CameraRig";
@@ -331,6 +333,9 @@ game.addSim(heat);
 const bust = new BustSystem(world, heat, police, economy);
 bust.onRespawn = () => camRig.snap();
 game.addSim(bust);
+// Every painted curb stall is illegal. Sit between the lines and the agency walks up.
+const parkingTickets = new ParkingTicket(world, economy);
+game.addSim(parkingTickets);
 const recovery = new Recovery(world, economy);
 recovery.blocked = () =>
   bust.phase !== "free" ||
@@ -521,6 +526,7 @@ game.addView(new DogView(dogs, peds, r.scene, city.terrain));
 const riderView = new RiderView(world, r.scene, city.terrain, r.camera);
 game.addView(riderView);
 game.addView(new OfficerView(bust, r.scene, city.terrain));
+game.addView(new TicketAgentView(parkingTickets, r.scene, city.terrain));
 const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
   city.terrain.heightAt(x, z),
 );
@@ -553,7 +559,7 @@ game.addView({
       player.pos,
       wreck.playing ? dt * game.timeScale : dt,
     );
-    camRig.focus = bust.officer?.pos ?? null;
+    camRig.focus = bust.officer?.pos ?? parkingTickets.cameraFocus;
     cockpit.fit(player);
     const body = carView.bodyOf(player.id);
     cockpit.attach(body);
@@ -756,6 +762,7 @@ function quitToTitle(): void {
 /** Abort busts / tows and chases, put the repaired car back at the start. The mission pin does not survive. */
 function resetSession(): void {
   bust.cancel();
+  parkingTickets.cancel();
   wreck.cancel();
   breakdown.cancel();
   recovery.cancel();
