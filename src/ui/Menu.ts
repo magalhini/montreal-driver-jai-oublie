@@ -170,7 +170,7 @@ export class Menu {
     this.root = document.createElement("div");
     this.root.className = "menu";
     this.root.innerHTML = `
-      <div class="menu-logo"><div class="word">MONTREAL</div><div class="word driver">DRIVER</div></div>
+      <div class="menu-logo"><div class="word">MONTREAL</div><div class="word driver">DRIVER</div><div class="menu-motto"><span class="plate">Je me souviens</span><span class="scrawl">J'ai oublié</span></div></div>
       <div class="menu-head"></div><div class="menu-sub"></div><div class="menu-body"></div>
       <div class="menu-list"></div><div class="menu-hint"></div>
       <div class="menu-foot"><span><kbd>↑ ↓</kbd> select</span><span><kbd>ENTER</kbd> confirm</span><span><kbd>ESC</kbd> back</span></div>

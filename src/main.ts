@@ -28,6 +28,7 @@ import { Economy } from "./gameplay/Economy";
 import { Gps } from "./gameplay/Gps";
 import { Tires } from "./gameplay/Tires";
 import { formatClock, WinterTires } from "./gameplay/WinterTires";
+import { Snowstorm, SNOWSTORM_TUNING } from "./gameplay/Snowstorm";
 import { TirePickup } from "./gameplay/TirePickup";
 import { TirePickupView } from "./gameplay/TirePickupView";
 import { storageStop } from "./gameplay/MissionRoute";
@@ -274,9 +275,13 @@ const winter = CONFIG.SKY === "winterDay";
 if (winter) weather.holdWinter();
 game.addSim(weather);
 const tires = new Tires();
+// Snow squalls a few minutes into the drive: thicker snow, and summer tires lose up to a fifth of their grip
+const snowstorm = new Snowstorm(world);
+snowstorm.tireSet = () => tires.set;
+if (winter) game.addSim(snowstorm);
 game.addSim({
   update: () =>
-    (VehiclePhysics.surfaceGrip = winter ? tires.grip : weather.grip),
+    (VehiclePhysics.surfaceGrip = winter ? tires.grip * snowstorm.gripScale(tires.set) : weather.grip),
 });
 game.addSim(lights);
 const limiter = new SpeedLimiter(world);
@@ -704,20 +709,27 @@ const roofs = [
   ...city.features.interiors.map((i) => i.box),
   ...city.features.pitStops.map((p) => p.canopy),
 ];
-game.addView(
-  new RainView(
-    weather,
-    r.scene,
-    r.camera,
-    city.terrain,
-    envParts,
-    roadMats,
-    roofs,
-  ),
+const rainView = new RainView(
+  weather,
+  r.scene,
+  r.camera,
+  city.terrain,
+  envParts,
+  roadMats,
+  roofs,
 );
+game.addView({ sync: () => (rainView.storm = snowstorm.intensity) });
+game.addView(rainView);
 if (CONFIG.SKY === "winterDay") {
-  game.addView(new SnowView(r.scene, r.camera));
+  const snowView = new SnowView(r.scene, r.camera);
+  game.addView({ sync: () => (snowView.storm = snowstorm.intensity) });
+  game.addView(snowView);
   const snowFolder = Debug.addFolder("Snow");
+  snowFolder.add({ go: () => snowstorm.toggle() }, "go").name("start / end a squall");
+  snowFolder.add(SNOWSTORM_TUNING, "firstAfter", 10, 600, 10).name("first squall after (s)");
+  snowFolder.add(SNOWSTORM_TUNING, "hold", 10, 400, 10).name("squall lasts (s)");
+  snowFolder.add(SNOWSTORM_TUNING, "summerGrip", 0.5, 1, 0.01).name("summer grip in squall");
+  Debug.watch("snow", () => `${snowstorm.status()}  grip x${VehiclePhysics.surfaceGrip.toFixed(2)}`);
   snowFolder.add(SNOW_TUNING, "fall", 0.2, 4, 0.05).name("fall m/s");
   snowFolder.add(SNOW_TUNING, "size", 0.01, 0.15, 0.005).name("flake size m");
   snowFolder.add(SNOW_TUNING, "opacity", 0, 1, 0.05);
@@ -821,6 +833,7 @@ function resetSession(): void {
   chantier.reset();
   mission.clear();
   pickup.reset();
+  snowstorm.reset();
   repair(player);
   player.teleport(start.pos, start.yaw);
   player.blinker = null;
@@ -868,6 +881,7 @@ function viewHeading(cam: THREE.Camera): number {
   weather,
   tires,
   mission,
+  snowstorm,
   pickup,
   pickupView,
   briefing,

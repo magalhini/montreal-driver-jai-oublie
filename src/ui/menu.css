@@ -63,6 +63,42 @@
 .menu-logo .word.driver {
   color: #d8e6f5;
 }
+/* The plate's motto, crossed out, and the driver's correction scrawled beside it */
+.menu-motto {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  gap: clamp(12px, 1.6vw, 22px);
+  margin-top: clamp(10px, 2vh, 20px);
+  line-height: 1;
+}
+.menu-motto .plate {
+  position: relative;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-style: italic;
+  font-size: clamp(16px, min(2.2vw, 3vh), 26px);
+  color: rgba(196, 220, 255, 0.95);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45);
+}
+.menu-motto .plate::after {
+  content: '';
+  position: absolute;
+  left: -4%;
+  right: -4%;
+  top: 52%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 59, 48, 0.9);
+  transform: rotate(-3deg);
+  box-shadow: 0 0 6px rgba(255, 59, 48, 0.5);
+}
+.menu-motto .scrawl {
+  font-family: 'Marker Felt', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  font-size: clamp(20px, min(2.8vw, 3.8vh), 34px);
+  color: #ff4a3d;
+  transform: rotate(-5deg) translateY(-2px);
+  text-shadow: 0 2px 0 rgba(0, 0, 0, 0.5), 0 0 12px rgba(255, 74, 61, 0.35);
+}
 
 .menu-head {
   font-family: 'Press Start 2P', monospace;

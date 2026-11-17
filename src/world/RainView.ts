@@ -123,6 +123,8 @@ const additive = (
  * stops). Covered arcades stay dry. Also owns the Weather debug folder.
  */
 export class RainView implements ViewSystem {
+  /** Snow squall strength 0..1 (`gameplay/Snowstorm.ts`): the fog closes in with it. */
+  storm = 0;
   private readonly drops: THREE.Mesh;
   private readonly dropGeo: THREE.InstancedBufferGeometry;
   private readonly dropU: Record<string, THREE.IUniform>;
@@ -281,7 +283,7 @@ export class RainView implements ViewSystem {
     // Atmosphere and wet surfaces
     const wet = w.wetness;
     const b = this.base;
-    this.env.fog.density = b.density + 0.0026 * rain;
+    this.env.fog.density = b.density + 0.0026 * rain + 0.0055 * this.storm;
     this.env.fog.color.copy(b.fog).lerp(this.rainFog, rain * 0.75);
     this.env.background.copy(b.bg).lerp(this.rainBg, rain * 0.75);
     (this.env.sky.uniforms.uRain as THREE.IUniform<number>).value = rain;
