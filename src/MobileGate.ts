@@ -69,6 +69,13 @@ export function showMobileGate(): void {
         </figure>`,
       ).join("")}
     </section>
-    <footer class="mg-foot">Montreal Driver · play on desktop</footer>`;
+    <footer class="mg-foot">
+      <p>Made by Ricardo Magalhães</p>
+      <p class="mg-links">
+        <a href="https://ricardom.ca" target="_blank" rel="noopener">ricardom.ca</a>
+        <span aria-hidden="true">·</span>
+        <a href="https://www.instagram.com/magalhini/" target="_blank" rel="noopener">@magalhini</a>
+      </p>
+    </footer>`;
   document.body.replaceChildren(page);
 }

@@ -83,11 +83,28 @@ body.mg-body {
   color: rgba(255, 255, 255, 0.78);
 }
 .mg-foot {
-  margin-top: 30px;
+  margin-top: 36px;
   text-align: center;
   font-family: 'VT323', monospace;
-  font-size: 18px;
-  color: rgba(255, 255, 255, 0.38);
+  font-size: 22px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.mg-foot p {
+  margin: 0 0 6px;
+}
+.mg-links span {
+  margin: 0 10px;
+  color: rgba(255, 255, 255, 0.35);
+}
+.mg-links a {
+  color: #3ef2ff;
+  text-decoration: none;
+  /* A comfortable tap target on a phone */
+  display: inline-block;
+  padding: 6px 2px;
+}
+.mg-links a:active {
+  color: #fff;
 }
 @media (min-width: 900px) {
   .mg {

@@ -5,6 +5,7 @@ import type { CarLook } from '../vehicles/Car';
 import { buildCarParts, carMaterial } from '../vehicles/CarModel';
 import { wheelPair } from '../vehicles/CarWheel';
 import { charmGeometry } from '../vehicles/Charms';
+import { PLATE_H, PLATE_W, PLAYER_PLATE, plateMaterial } from '../vehicles/Plate';
 import { STOCK_BUILD, type CharmId } from '../vehicles/Tuning';
 import { HIP, lerpPose, Person, POSE, type ArmPose, type PersonLook } from './People';
 import { concreteTexture, corrugatedTexture, pegboardTexture, posterTexture, screenTexture, signTexture, streetTexture } from './PitGarageTextures';
@@ -20,6 +21,7 @@ const ARRIVE = 3.4;
 const ROLL_IN = 12;
 
 /** Room (local frame: the car parks at the origin facing -z, the open door is at +z). */
+const PLATE_GEO = new THREE.PlaneGeometry(PLATE_W, PLATE_H);
 const W = 6.5;
 const BACK = -7;
 const FRONT = 8;
@@ -223,6 +225,13 @@ export class PitGarage {
     this.car.add(this.head, this.tail);
     if (parts.barL && parts.barR) this.car.add(new THREE.Mesh(parts.barL, this.mats.tailOff), new THREE.Mesh(parts.barR, this.mats.tailOff));
     if (parts.sign) this.car.add(new THREE.Mesh(parts.sign, this.mats.tailOff));
+    // It's always the player's car in here: the same POUT1NE plates as on the street (`CarView`)
+    for (const pl of parts.platePos ?? []) {
+      const m = new THREE.Mesh(PLATE_GEO, plateMaterial(PLAYER_PLATE));
+      m.position.set(pl.at[0], pl.at[1], pl.at[2] + pl.dir * 0.006);
+      if (pl.dir < 0) m.rotation.y = Math.PI;
+      this.car.add(m);
+    }
     this.wheels = parts.wheelPos.map((wp) => {
       const w = new THREE.Mesh(wp[0] < 0 ? pair.neg : pair.pos, this.mats.wheel);
       w.position.set(wp[0], wp[1], wp[2]);
