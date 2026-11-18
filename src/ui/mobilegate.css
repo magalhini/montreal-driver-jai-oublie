@@ -1,0 +1,82 @@
+/* Phone/tablet page (src/MobileGate.ts). Same night palette and type as the menu. */
+body.mg-body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(ellipse at 50% 0%, #2a1248 0%, #0a0418 55%, #04000c 100%) fixed;
+  color: #f4f6f8;
+  overflow-y: auto;
+  -webkit-text-size-adjust: 100%;
+}
+.mg {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: max(28px, env(safe-area-inset-top)) 18px max(28px, env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+.mg-head {
+  text-align: center;
+}
+.mg-head h1 {
+  font-family: 'Press Start 2P', monospace;
+  font-size: clamp(22px, 7vw, 40px);
+  line-height: 1.35;
+  margin: 8px 0 18px;
+  letter-spacing: 2px;
+}
+.mg-note {
+  display: inline-block;
+  margin: 0 0 18px;
+  padding: 8px 12px;
+  font-family: 'Press Start 2P', monospace;
+  font-size: 11px;
+  color: #fff;
+  background: rgba(255, 59, 48, 0.9);
+}
+.mg-text,
+.mg-sub {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  line-height: 1.5;
+  color: rgba(196, 220, 255, 0.95);
+  margin: 0 0 14px;
+}
+.mg-sub {
+  margin: 22px 0 18px;
+  color: rgba(255, 255, 255, 0.6);
+}
+.mg-shots {
+  display: grid;
+  gap: 18px;
+}
+.mg-shots figure {
+  margin: 0;
+}
+.mg-shots img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  background: #140a26;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+.mg-shots figcaption {
+  margin-top: 8px;
+  font-family: 'VT323', monospace;
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.7);
+}
+.mg-foot {
+  margin-top: 30px;
+  text-align: center;
+  font-family: 'VT323', monospace;
+  font-size: 18px;
+  color: rgba(255, 255, 255, 0.38);
+}
+@media (min-width: 900px) {
+  .mg {
+    max-width: 1100px;
+  }
+  .mg-shots {
+    grid-template-columns: 1fr 1fr;
+  }
+}
