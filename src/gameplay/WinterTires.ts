@@ -1,21 +1,21 @@
-import type { Heat } from '../ai/Heat';
-import type { World } from '../core/World';
-import type { SimSystem, Vec2 } from '../types';
-import type { Economy } from './Economy';
-import { DESTINATION_GARAGE, type PitStop } from '../world/PitStops';
-import type { Gps } from './Gps';
-import { garageVias, storagePoint, storageVias } from './MissionRoute';
-import { portPicnic } from './PortPicnic';
-import type { Tires } from './Tires';
+import type { Heat } from "../ai/Heat";
+import type { World } from "../core/World";
+import type { SimSystem, Vec2 } from "../types";
+import type { Economy } from "./Economy";
+import { DESTINATION_GARAGE, type PitStop } from "../world/PitStops";
+import type { Gps } from "./Gps";
+import { garageVias, storagePoint, storageVias } from "./MissionRoute";
+import { portPicnic } from "./PortPicnic";
+import type { Tires } from "./Tires";
 
 /** Workshop sounds for the tire swap, in order (PRD 5.1). */
-export type TireCue = 'jack' | 'wrench' | 'ratchet' | 'hood';
+export type TireCue = "jack" | "wrench" | "ratchet" | "hood";
 
 /** When each tool plays after INSTALL in the garage menu (s). Playtest numbers live here. */
 export const TIRE_CUES: { at: number; step: TireCue }[] = [
-  { at: 0, step: 'jack' },
-  { at: 0.55, step: 'wrench' },
-  { at: 1.5, step: 'ratchet' },
+  { at: 0, step: "jack" },
+  { at: 0.55, step: "wrench" },
+  { at: 1.5, step: "ratchet" },
 ];
 
 /**
@@ -37,21 +37,21 @@ export const REWARD_TUNING = {
 /** `m:ss`, the HUD clock and the debrief. */
 export function formatClock(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));
-  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
 /** What the garage's TIRES tab offers on this drive. */
-export type TireOffer = 'ready' | 'storage' | 'fitted';
+export type TireOffer = "ready" | "storage" | "fitted";
 
 /** Shown when the winter-tire drive starts, before the car is released. */
 export const MISSION_BRIEF =
-  "It's December 1st and you forgot to change to your winter tires. Your goal: make it to the garage to change your tires in the other side of the city. The SPVM is watching: drive too fast, run a red light or a STOP sign and they'll be on your tail. Be careful about potholes: drive over them too fast and your car will be severely damaged.";
+  "It's December 1st and you forgot to change to your winter tires! Grab them from storage and head to the garage to change them. The SPVM is watching: drive too fast, run a red light or endanger a pedestrian and they'll be on your tail. Be careful with potholes: drive over them above 30km/h and your car will be damaged.";
 
 /** The stops on the briefing card, in order. */
 export const MISSION_STEPS = [
-  'Pick up your winter tires from storage',
-  'Drive to Jacques-Cartier Pneus Garage to swap them',
-  'Park at the Vieux-Port and eat the lox bagel',
+  "Pick up your winter tires from storage",
+  "Drive to Jacques-Cartier Pneus Garage to swap them",
+  "Park at the Vieux-Port and enjoy your lox bagel",
 ];
 
 /**
@@ -92,7 +92,9 @@ export class WinterTires implements SimSystem {
   /** Start fetching the tool clips when the drive begins, so the workshop is not silent. */
   warm: (() => void) | null = null;
   /** Big debrief card, when the tires are on. The feed lines are sent from here either way. */
-  onDone: ((result: { chases: number; elapsed: number; reward: number }) => void) | null = null;
+  onDone:
+    | ((result: { chases: number; elapsed: number; reward: number }) => void)
+    | null = null;
   /** The bagel card, once he has sat down. */
   onFeast: (() => void) | null = null;
 
@@ -122,7 +124,7 @@ export class WinterTires implements SimSystem {
   arm(): void {
     this.clear();
     this.active = true;
-    this.tires.set = 'summer';
+    this.tires.set = "summer";
     this.aimStorage();
     this.warm?.();
   }
@@ -158,24 +160,31 @@ export class WinterTires implements SimSystem {
   prize(): number {
     const T = REWARD_TUNING;
     const seconds = this.scored ? this.scoreTime : this.elapsed;
-    const late = Math.min(1, Math.max(0, (seconds - T.parTime) / (T.slowTime - T.parTime)));
-    const raw = T.timePrize * (1 - late) + Math.max(0, T.cleanPrize - T.perChase * this.chases);
+    const late = Math.min(
+      1,
+      Math.max(0, (seconds - T.parTime) / (T.slowTime - T.parTime)),
+    );
+    const raw =
+      T.timePrize * (1 - late) +
+      Math.max(0, T.cleanPrize - T.perChase * this.chases);
     return Math.max(T.minimum, Math.floor(raw / T.step) * T.step);
   }
 
   /** Canopy line while the drive is on and this bay is the goal. Null keeps the usual repair line. */
   bayHint(stop: PitStop): string | null {
     const offer = this.offer(stop);
-    if (offer === 'storage') return `${stop.name}: the winter tires are still in storage.`;
-    if (offer === 'ready') return `${stop.name}: stop in the circle to put the winter tires on, for free.`;
+    if (offer === "storage")
+      return `${stop.name}: the winter tires are still in storage.`;
+    if (offer === "ready")
+      return `${stop.name}: stop in the circle to put the winter tires on, for free.`;
     return null;
   }
 
   /** The garage's TIRES tab at this stop, or null for no tab (another garage, free roam, the drive is over). */
   offer(stop: PitStop): TireOffer | null {
     if (!this.active || stop !== this.garage) return null;
-    if (this.done) return this.debriefOwed ? 'fitted' : null;
-    return this.pickedUp ? 'ready' : 'storage';
+    if (this.done) return this.debriefOwed ? "fitted" : null;
+    return this.pickedUp ? "ready" : "storage";
   }
 
   /**
@@ -187,7 +196,7 @@ export class WinterTires implements SimSystem {
     if (!this.active || this.done || !this.pickedUp) return null;
     this.done = true;
     this.debriefOwed = true;
-    this.tires.set = 'winter';
+    this.tires.set = "winter";
     this.scoreTime = this.elapsed;
     this.scored = true;
     this.reward = this.prize();
@@ -201,14 +210,32 @@ export class WinterTires implements SimSystem {
   leftGarage(): void {
     if (!this.debriefOwed) return;
     this.debriefOwed = false;
-    const run = this.chases ? 'The SPVM joined you there for a bit.' : 'A clean run!';
-    this.world.events.message("Winter tires. You're legal. The street isn't.", 'good', 8);
+    const run = this.chases
+      ? "The SPVM joined you there for a bit."
+      : "A clean run!";
+    this.world.events.message(
+      "Winter tires. You're legal. The street isn't.",
+      "good",
+      8,
+    );
     if (this.aimPort()) {
-      this.world.events.message(`${run} The lox bagel is at the Vieux-Port. Park by the clock tower.`, 'info', 9);
+      this.world.events.message(
+        `${run} The lox bagel is at the Vieux-Port. Park by the clock tower.`,
+        "info",
+        9,
+      );
     } else {
-      this.world.events.message(`${run} You deserve the best lox bagel.`, 'info', 8);
+      this.world.events.message(
+        `${run} You deserve the best lox bagel.`,
+        "info",
+        8,
+      );
     }
-    this.onDone?.({ chases: this.chases, elapsed: this.elapsed, reward: this.reward });
+    this.onDone?.({
+      chases: this.chases,
+      elapsed: this.elapsed,
+      reward: this.reward,
+    });
   }
 
   /** Stopped in the lot and the cutscene finished. The clock stops for good. */
@@ -218,7 +245,11 @@ export class WinterTires implements SimSystem {
     this.picnic = false;
     this.clock = false;
     this.gps.setDestination(null);
-    this.world.events.message('Lox on a sesame bagel. The river. The rest of December can wait.', 'good', 8);
+    this.world.events.message(
+      "Lox on a sesame bagel. The river. The rest of December can wait.",
+      "good",
+      8,
+    );
     this.onFeast?.();
   }
 
@@ -237,24 +268,32 @@ export class WinterTires implements SimSystem {
     this.debriefOwed = false;
     this.feasted = false;
     this.picnic = false;
-    this.tires.set = 'winter';
+    this.tires.set = "winter";
     this.aimPort();
   }
 
   /** HUD line for the current session. */
   objective(): string {
-    if (!this.active) return 'Free roam: explore the city';
-    if (this.feasted) return 'Lox bagel, by the water.';
-    if (this.picnic) return 'Park at the Vieux-Port, by the clock tower';
+    if (!this.active) return "Free roam: explore the city";
+    if (this.feasted) return "Lox bagel, by the water.";
+    if (this.picnic) return "Park at the Vieux-Port, by the clock tower";
     if (this.done) return "Winter tires on. The street isn't.";
-    if (!this.pickedUp) return 'Pick up the winter tires';
-    return 'Get to Jacques-Cartier Pneus Garage';
+    if (!this.pickedUp) return "Pick up the winter tires";
+    return "Get to Jacques-Cartier Pneus Garage";
   }
 
   /** Debug overlay. */
   status(): string {
-    if (!this.active) return 'off';
-    const phase = this.feasted ? 'bagel' : this.picnic ? 'to the port' : this.done ? 'done' : this.pickedUp ? 'to the garage' : 'to storage';
+    if (!this.active) return "off";
+    const phase = this.feasted
+      ? "bagel"
+      : this.picnic
+        ? "to the port"
+        : this.done
+          ? "done"
+          : this.pickedUp
+            ? "to the garage"
+            : "to storage";
     return `${phase}  ${this.tires.set}  ${formatClock(this.elapsed)}  chases ${this.chases}  prize ${this.prize()}`;
   }
 
@@ -263,7 +302,8 @@ export class WinterTires implements SimSystem {
     if (this.active && !this.feasted) {
       if (!this.done && pursuit && !this.pursuitWas) this.chases++;
       // A cutscene has the car (storage, the port, a bust, a wreck): the clock waits, then carries on.
-      if (this.clock && this.world.mode === 'free' && !this.world.controlLocked) this.elapsed += dt;
+      if (this.clock && this.world.mode === "free" && !this.world.controlLocked)
+        this.elapsed += dt;
     }
     this.pursuitWas = pursuit;
   }
@@ -278,7 +318,11 @@ export class WinterTires implements SimSystem {
     if (!this.needsTires) return;
     this.pickedUp = true;
     this.aimGarage();
-    this.world.events.message('Winter tires are in the trunk. Jacques-Cartier Pneus is on the other side of town.', 'good', 7);
+    this.world.events.message(
+      "Winter tires are in the trunk. Jacques-Cartier Pneus is on the other side of town.",
+      "good",
+      7,
+    );
   }
 
   /** The last pin, once the tires are on: the Vieux-Port lot beside the clock tower. */
@@ -287,19 +331,23 @@ export class WinterTires implements SimSystem {
     if (!spot) return false;
     this.picnic = true;
     this.feasted = false;
-    this.gps.setCourse([], spot.pin, 'VIEUX-PORT');
+    this.gps.setCourse([], spot.pin, "VIEUX-PORT");
     return true;
   }
 
   /** The first pin: down Lucien-L'Allier and along Ottawa to the storage circle. */
   private aimStorage(): void {
-    this.gps.setCourse(storageVias(this.world.city), this.storage, 'STORAGE');
+    this.gps.setCourse(storageVias(this.world.city), this.storage, "STORAGE");
   }
 
   /** The second pin, only once the tires are in the car: through downtown to Jacques-Cartier Pneus. */
   private aimGarage(): void {
     const g = this.garage;
     if (!g) return;
-    this.gps.setCourse(garageVias(this.world.city), { x: g.bay.x, z: g.bay.z }, 'JACQUES-CARTIER PNEUS');
+    this.gps.setCourse(
+      garageVias(this.world.city),
+      { x: g.bay.x, z: g.bay.z },
+      "JACQUES-CARTIER PNEUS",
+    );
   }
 }

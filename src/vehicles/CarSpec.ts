@@ -40,7 +40,7 @@ export interface CarSpec {
 }
 
 export const COUPE: CarSpec = {
-  name: "2013 Coupe",
+  name: "2013 Toyoda",
   mass: 1100,
   inertiaScale: 1.0,
   cgToFront: 1.24,

@@ -96,7 +96,7 @@ export const ENGINES = {
 export type EngineId = keyof typeof ENGINES;
 
 const BY_SPEC: Record<string, EngineId> = {
-  "2013 Coupe": "straightSix",
+  "2013 Toyoda": "straightSix",
   "SPVM Cruiser": "vEight",
   "Box Truck": "diesel",
   Pickup: "four",

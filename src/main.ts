@@ -299,7 +299,8 @@ game.addSim({
 });
 game.addSim(lights);
 const limiter = new SpeedLimiter(world);
-game.addSim(new PlayerController(world, input, limiter));
+const playerController = new PlayerController(world, input, limiter);
+game.addSim(playerController);
 const ignition = new Ignition(world);
 game.addSim(ignition);
 const signals = new TurnSignals(world);
@@ -310,6 +311,8 @@ traffic.target = CONFIG.MAX_TRAFFIC;
 traffic.populate();
 game.addSim(traffic);
 const heat = new Heat(world);
+// Chased by the SPVM, forward is a burnout launch: a slow start can still get away.
+playerController.pursuit = () => heat.inPursuit;
 // Traffic and police know about the fences (PRD 5.2); the GPS gets its own pathfinder below, which doesn't
 const pathfinder = new Pathfinder(city, undefined, closures.closed);
 const police = new PoliceSystem(world, heat, pathfinder);
