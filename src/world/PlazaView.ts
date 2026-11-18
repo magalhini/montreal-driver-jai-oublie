@@ -6,7 +6,7 @@ import { LOOK } from '../render/Look';
 import type { AABB, Vec2 } from '../types';
 import type { PlazaDressing } from './Features';
 import type { CityModel } from './RoadGraph';
-import { snowMaterial } from './SnowCover';
+import { lawnSnowMaterial, snowMaterial } from './SnowCover';
 import { SurfaceBuilder } from './SurfaceBuilder';
 import { pavingTextures } from './textures';
 
@@ -38,7 +38,13 @@ export function buildPlazas(city: CityModel, scene: THREE.Scene): void {
   if (lawnRects.length) {
     const lawns = new SurfaceBuilder(H);
     for (const l of lawnRects) lawns.patch(l.minX, l.minZ, l.maxX, l.maxZ, curb + 0.03, 4);
-    scene.add(lawns.mesh(LOOK.day ? snowMaterial() : new THREE.MeshStandardMaterial({ color: 0x5e6e58, roughness: 0.95 })));
+    const snow = LOOK.day ? lawnSnowMaterial().clone() : new THREE.MeshStandardMaterial({ color: 0x5e6e58, roughness: 0.95 });
+    if (LOOK.day) {
+      snow.polygonOffset = true;
+      snow.polygonOffsetFactor = 1;
+      snow.polygonOffsetUnits = 1;
+    }
+    scene.add(lawns.mesh(snow));
   }
 
   const dressing: PlazaDressing[] = [...squares, ...(port ? [port] : [])];

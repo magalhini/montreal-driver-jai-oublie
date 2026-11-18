@@ -1,15 +1,16 @@
 import * as THREE from 'three';
 import { Rng } from '../core/Rng';
-import type { Vec2 } from '../types';
+import type { AABB, Vec2 } from '../types';
+import type { CityPark } from './Features';
 import type { CityModel } from './RoadGraph';
-import { SurfaceBuilder } from './SurfaceBuilder';
 import { sharedGlow } from './textures';
 import { LOOK } from '../render/Look';
+import { lawnSnowMaterial } from './SnowCover';
 import { winterCrown } from './StreetProps';
 
 /**
- * Gardens (`maps/montreal/Parks.ts`): gravel path, cherry trees and pines, lamp posts, stone lanterns and
- * benches. The same pieces as the shrine park and the lookout. The lawn itself is the grass cut in `RoadMesh`.
+ * Gardens: trees, lamps, lanterns, benches, a plowed road's snowbanks and a few drifts on the lawn.
+ * The snow and the road themselves are cut in `RoadMesh`.
  */
 const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number): THREE.Matrix4 =>
   new THREE.Matrix4().makeScale(sx, sy, sz).setPosition(x, y, z);
@@ -20,10 +21,6 @@ export function buildParks(city: CityModel, scene: THREE.Scene): void {
   const parks = city.features.parks ?? [];
   if (!parks.length) return;
   const H = (x: number, z: number) => city.terrain.heightAt(x, z);
-
-  const gravel = new SurfaceBuilder(H, 1 / 3);
-  for (const p of parks) gravel.patch(p.path.minX, p.path.minZ, p.path.maxX, p.path.maxZ, 0.02, 3);
-  scene.add(gravel.mesh(new THREE.MeshStandardMaterial({ color: 0xb0aca4, map: gravelTexture(), roughness: 0.95 })));
 
   const trunks: THREE.Matrix4[] = [];
   const blossom: THREE.Matrix4[] = [];
@@ -37,6 +34,8 @@ export function buildParks(city: CityModel, scene: THREE.Scene): void {
   const paper: THREE.Matrix4[] = [];
   const roofs: THREE.Matrix4[] = [];
   const wood: THREE.Matrix4[] = [];
+  const drifts: THREE.Matrix4[] = [];
+  const ice: THREE.Matrix4[] = [];
   const pinks = [0xf2a6c8, 0xe58cb4, 0xf7c4d8].map((c) => new THREE.Color(c));
   const rng = new Rng(77);
   const lampGlow = new THREE.Color(0.3, 0.24, 0.16);
@@ -83,6 +82,25 @@ export function buildParks(city: CityModel, scene: THREE.Scene): void {
       poolAt(p.x, p.z, 6, lanternGlow);
     }
     for (const b of park.benches) wood.push(...bench(b.pos, b.yaw, H(b.pos.x, b.pos.z)));
+    const walks = [park.path, ...(park.paths ?? [])];
+    drifts.push(...snowAlong(walks, H), ...snowMounds(park, walks, H, rng));
+    const rink = iceRink(park, walks, H);
+    if (rink) ice.push(rink);
+    const mark = park.monument;
+    if (mark) {
+      const y = H(mark.pos.x, mark.pos.z);
+      const { x, z } = mark.pos;
+      if (mark.kind === 'column') {
+        stone.push(box(1.7, 0.7, 1.7, x, y + 0.35, z), box(0.55, 4.4, 0.55, x, y + 2.9, z), box(1.15, 0.28, 1.15, x, y + 5.24, z));
+      } else {
+        stone.push(box(6.6, 0.1, 6.6, x, y + 0.05, z));
+        const s = 2.35;
+        for (const sx of [-s, s]) {
+          for (const sz of [-s, s]) posts.push(box(0.22, 3.15, 0.22, x + sx, y + 1.58, z + sz));
+        }
+        roofs.push(new THREE.Matrix4().makeScale(7.4, 1.15, 7.4).setPosition(x, y + 3.2, z));
+      }
+    }
   }
 
   const unit = new THREE.BoxGeometry(1, 1, 1);
@@ -103,6 +121,80 @@ export function buildParks(city: CityModel, scene: THREE.Scene): void {
     poolCol,
   );
   if (glow) glow.renderOrder = 1;
+  add(scene, unit, lawnSnowMaterial(), drifts);
+  if (ice.length) {
+    const disc = new THREE.CircleGeometry(1, 20);
+    disc.rotateX(-Math.PI / 2);
+    add(
+      scene,
+      disc,
+      new THREE.MeshStandardMaterial({ color: 0xc5d6de, roughness: 0.18, metalness: 0.2, emissive: new THREE.Color(0.04, 0.06, 0.08) }),
+      ice,
+    );
+  }
+}
+
+function onWalk(p: Vec2, walks: AABB[], m: number): boolean {
+  return walks.some((w) => p.x > w.minX - m && p.x < w.maxX + m && p.z > w.minZ - m && p.z < w.maxZ + m);
+}
+
+/** Low ridges just off the plowed road. Short enough that a car on the asphalt stays above them. */
+function snowAlong(walks: AABB[], H: (x: number, z: number) => number): THREE.Matrix4[] {
+  const out: THREE.Matrix4[] = [];
+  for (const path of walks) {
+    const alongX = path.maxX - path.minX >= path.maxZ - path.minZ;
+    const len = alongX ? path.maxX - path.minX : path.maxZ - path.minZ;
+    const wide = alongX ? path.maxZ - path.minZ : path.maxX - path.minX;
+    if (len < 10) continue;
+    for (let t = 4; t < len - 4; t += 7) {
+      for (const side of [-1, 1] as const) {
+        const along = (alongX ? path.minX : path.minZ) + t;
+        const mid = alongX ? (path.minZ + path.maxZ) / 2 : (path.minX + path.maxX) / 2;
+        const across = mid + side * (wide / 2 + 0.85);
+        const x = alongX ? along : across;
+        const z = alongX ? across : along;
+        if (walks.some((w) => w !== path && onWalk({ x, z }, [w], 0.3))) continue;
+        const h = 0.2 + ((Math.floor(along) * 3) % 5) * 0.028;
+        out.push(box(alongX ? 4.2 : 1.0, h, alongX ? 1.0 : 4.2, x, H(x, z) + h / 2, z));
+      }
+    }
+  }
+  return out;
+}
+
+/** Scattered drifts on the snow, kept off the road and away from a pavilion. */
+function snowMounds(park: CityPark, walks: AABB[], H: (x: number, z: number) => number, rng: Rng): THREE.Matrix4[] {
+  const lawn = park.lawn;
+  const out: THREE.Matrix4[] = [];
+  for (let x = lawn.minX + 6; x < lawn.maxX - 5; x += 15) {
+    for (let z = lawn.minZ + 6; z < lawn.maxZ - 5; z += 15) {
+      if (rng.chance(0.42)) continue;
+      const p = { x: x + rng.range(-2, 2), z: z + rng.range(-2, 2) };
+      if (p.x < lawn.minX + 2 || p.x > lawn.maxX - 2 || p.z < lawn.minZ + 2 || p.z > lawn.maxZ - 2) continue;
+      if (onWalk(p, walks, 2.4)) continue;
+      if (park.monument && Math.hypot(p.x - park.monument.pos.x, p.z - park.monument.pos.z) < 7) continue;
+      const s = rng.range(1.4, 2.5);
+      const h = rng.range(0.15, 0.3);
+      out.push(box(s, h, s * rng.range(0.65, 1.15), p.x, H(p.x, p.z) + h / 2, p.z));
+    }
+  }
+  return out;
+}
+
+/** A cleared outdoor rink in one quadrant, off the road. */
+function iceRink(park: CityPark, walks: AABB[], H: (x: number, z: number) => number): THREE.Matrix4 | null {
+  const lawn = park.lawn;
+  if (lawn.maxX - lawn.minX < 42 || lawn.maxZ - lawn.minZ < 42) return null;
+  const mx = (lawn.minX + lawn.maxX) / 2;
+  const mz = (lawn.minZ + lawn.maxZ) / 2;
+  const sx = park.monument && park.monument.pos.x > mx ? -1 : 1;
+  const sz = park.monument && park.monument.pos.z > mz ? -1 : 1;
+  const x = mx + sx * Math.min(14, (lawn.maxX - lawn.minX) * 0.22);
+  const z = mz + sz * Math.min(14, (lawn.maxZ - lawn.minZ) * 0.22);
+  const r = 6.2;
+  if (x - r < lawn.minX + 2 || x + r > lawn.maxX - 2 || z - r < lawn.minZ + 2 || z + r > lawn.maxZ - 2) return null;
+  if (onWalk({ x, z }, walks, r + 0.8)) return null;
+  return new THREE.Matrix4().makeScale(r, 1, r).setPosition(x, H(x, z) + 0.045, z);
 }
 
 function bench(pos: Vec2, yaw: number, y: number): THREE.Matrix4[] {
@@ -119,24 +211,6 @@ function hipRoof(): THREE.BufferGeometry {
   g.rotateY(Math.PI / 4);
   g.translate(0, 0.5, 0);
   return g;
-}
-
-function gravelTexture(): THREE.Texture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d')!;
-  const rng = new Rng(33);
-  g.fillStyle = '#8e8a84';
-  g.fillRect(0, 0, 128, 128);
-  for (let i = 0; i < 1800; i++) {
-    const v = Math.round(rng.range(100, 190));
-    g.fillStyle = `rgb(${v},${v - 4},${v - 10})`;
-    g.fillRect(rng.range(0, 128), rng.range(0, 128), rng.range(1, 3), rng.range(1, 3));
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }
 
 function add(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Material, mats: THREE.Matrix4[], colors?: THREE.Color[]): THREE.InstancedMesh | null {

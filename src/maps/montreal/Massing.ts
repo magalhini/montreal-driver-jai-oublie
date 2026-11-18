@@ -20,11 +20,13 @@ function dropBlock(city: CityModel, bl: Block): void {
 }
 
 /**
- * Montreal blocks are larger than Tokyo's, and the lot splitter would fill them solid.
- * Keep the street wall. Downtown also keeps its two tallest courtyard buildings, so the tower cluster
- * is not only the frontage.
+ * Parks, squares, the canal and the landmark blocks keep only their street wall: those planners open the
+ * middle themselves. Every other block keeps the buildings behind the frontage. A hollow court with an
+ * alley through it is not a Montreal lane; `layCourtyards` turns some of the large ones into gardens, and
+ * the rest stay built so a through-alley runs between buildings.
  */
 export function openCourtyards(city: CityModel): void {
+  const f = city.features;
   const groups = new Map<number, Building[]>();
   const outside: Building[] = [];
   for (const b of city.buildings) {
@@ -39,11 +41,13 @@ export function openCourtyards(city: CityModel): void {
   }
   const keep = [...outside];
   for (const [id, list] of groups) {
-    const edge = list.filter((b) => b.faces.length > 0 || b.landmark);
-    keep.push(...edge);
-    if (city.blocks[id].district !== 'downtown') continue;
-    const inner = list.filter((b) => b.faces.length === 0 && !b.landmark).sort((a, b) => b.height - a.height);
-    keep.push(...inner.slice(0, 2));
+    const bl = city.blocks[id];
+    const opened = bl.gj === f.canal?.row || f.kinds[id] === 'park' || f.kinds[id] === 'square' || f.kinds[id] === 'bridge' || f.kinds[id] === 'lot';
+    if (!opened) {
+      keep.push(...list);
+      continue;
+    }
+    keep.push(...list.filter((b) => b.faces.length > 0 || b.landmark));
   }
   city.buildings = keep;
 }

@@ -245,6 +245,7 @@ function placeScrambles(city: CityModel): void {
   const WIDE = 9;
   const ranked = city.blocks
     .filter((bl) => city.features.kinds[bl.id] === 'normal' && bl.district === 'downtown' && bl.gj !== city.features.canal?.row)
+    .filter((bl) => !(city.features.parks ?? []).some((p) => p.enclosed && p.block === bl.id))
     .map((bl) => {
       const r = inner(bl);
       const w = r.maxX - r.minX;

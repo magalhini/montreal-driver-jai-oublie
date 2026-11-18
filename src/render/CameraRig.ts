@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { clamp, damp, lerpAngle, wrapAngle } from '../core/math';
 import { CONFIG } from '../config';
 import type { SpatialHash } from '../physics/SpatialHash';
-import type { Interior, Vec2 } from '../types';
+import type { AABB, Interior, Vec2 } from '../types';
 import type { Car } from '../vehicles/Car';
 import type { Alley } from '../world/Features';
 
@@ -69,6 +69,14 @@ export class CameraRig {
   rooms: Interior[] = [];
   /** Alleys (IMPROVEMENTS #19): while the car or the camera is between their buildings, the camera keeps in line with the lane. */
   alleys: Alley[] = [];
+  /**
+   * Enclosed gardens (the lawn and each gate). Inside one, the chase view eases up to the top camera and
+   * back to the player's mode on the way out. A lens behind the car rattles there: buildings stand on
+   * every side, and the wall test gains and loses them as the car turns.
+   */
+  courts: AABB[] = [];
+  /** 0..1 blend from the current chase framing up to the top view. */
+  private court = 0;
   /** Alley the camera was last inside (keeps holding it there until it leaves the block). */
   private lastAlley: Alley | null = null;
   /** Player car's body group and the driver's eye in its frame, for the cockpit view. */
@@ -125,6 +133,8 @@ export class CameraRig {
     const s = car.phys.state;
     const carY = car.interpY(alpha);
     const speed = Math.hypot(s.vel.x, s.vel.z);
+    const overCourt = (this.mode === 'near' || this.mode === 'far') && !this.focus && this.insideCourt(p);
+    this.court += ((overCourt ? 1 : 0) - this.court) * damp(3.4, dt);
     const velYaw = Math.atan2(s.vel.x, s.vel.z);
     let target = yaw;
     if (speed > 4 && s.speed > 0) target = yaw + wrapAngle(velYaw - yaw) * 0.55;
@@ -178,11 +188,17 @@ export class CameraRig {
       dist += this.air * 1.5;
       lookAhead *= 1 - this.air * 0.5;
     }
+    if (this.court > 0.001 && this.mode !== 'top') {
+      // Close overhead, not the street-wide top view: that one sits back inside the roofs around a garden.
+      dist += (3.2 - dist) * this.court;
+      height += (20 - height) * this.court;
+      lookAhead += (7 - lookAhead) * this.court;
+    }
 
     const fx = Math.sin(this.camYaw);
     const fz = Math.cos(this.camYaw);
     // The chase camera takes part of the suspension ride, so a pothole is felt and the body is still seen to move.
-    const bob = this.mode === 'top' ? 0 : s.heave * 0.55;
+    const bob = this.mode === 'top' ? 0 : s.heave * 0.55 * (1 - this.court);
     const desired = new THREE.Vector3();
     const look = new THREE.Vector3();
     if (this.focus) {
@@ -224,6 +240,8 @@ export class CameraRig {
     } else {
       desired.set(p.x - fx * dist, cy + height + bob, p.z - fz * dist);
       look.set(p.x + fx * lookAhead, cy + 1.1 + bob + (carY - cy) * 0.6, p.z + fz * lookAhead);
+      // Stay over the lawn or the lane. A lens that swings back into the street wall ends up under a snowy roof.
+      if (this.court > 0.05) this.keepOverCourt(desired, p);
       if (!this.initialized) {
         this.pos.copy(desired);
         this.look.copy(look);
@@ -234,7 +252,9 @@ export class CameraRig {
     }
     this.initialized = true;
     const chase = this.focus || (this.mode !== 'top' && this.mode !== 'bumper');
-    if (chase && !this.keepInRooms(p, dt)) this.keepOutOfWalls(p, cy);
+    // Overhead, the lens is above the roofs. Pulling it in front of whichever wall the ray hits is what shakes.
+    const lifted = !this.focus && (overCourt || this.court > 0.4);
+    if (chase && !lifted && !this.keepInRooms(p, dt)) this.keepOutOfWalls(p, cy);
 
     cam.position.copy(this.pos);
     const floor = this.groundAt(cam.position.x, cam.position.z) + 0.6;
@@ -246,7 +266,7 @@ export class CameraRig {
     }
     // A faint road buzz at high speed (smooth, not random jitter), part of the sense of speed
     this.buzzT += dt;
-    const buzz = this.mode === 'top' ? 0 : clamp((speed - BUZZ_FROM) / 25, 0, 1) * BUZZ_AMP * (s.airborne ? 0 : 1);
+    const buzz = this.mode === 'top' || this.court > 0.5 ? 0 : clamp((speed - BUZZ_FROM) / 25, 0, 1) * BUZZ_AMP * (s.airborne ? 0 : 1);
     if (buzz > 0) {
       const t = this.buzzT;
       cam.position.y += buzz * (Math.sin(t * 37) * 0.6 + Math.sin(t * 61 + 1.3) * 0.4);
@@ -256,6 +276,38 @@ export class CameraRig {
     // The wide-open lens at speed shrinks a small car the same way a long pull-back does.
     const widen = cityNear ? 0.4 : 1;
     this.lens(this.mode === 'bumper' ? 75 : 62 + clamp(speed * 0.35 * widen, 0, 20 * widen), 0.3, dt);
+  }
+
+  /** The open court under the car: the lawn if it is on one, otherwise the gate it is driving through. */
+  private courtAround(p: Vec2): AABB | null {
+    let best: AABB | null = null;
+    let area = 0;
+    for (const b of this.courts) {
+      if (p.x <= b.minX || p.x >= b.maxX || p.z <= b.minZ || p.z >= b.maxZ) continue;
+      const a = (b.maxX - b.minX) * (b.maxZ - b.minZ);
+      if (a > area) {
+        best = b;
+        area = a;
+      }
+    }
+    return best;
+  }
+
+  /** Pull an overhead camera back inside the opening, so it cannot pass into the buildings around it. */
+  private keepOverCourt(pos: THREE.Vector3, car: Vec2): void {
+    const b = this.courtAround(car);
+    if (!b) return;
+    const m = 0.5;
+    if (b.maxX - b.minX > m * 2 + 0.4) pos.x = clamp(pos.x, b.minX + m, b.maxX - m);
+    if (b.maxZ - b.minZ > m * 2 + 0.4) pos.z = clamp(pos.z, b.minZ + m, b.maxZ - m);
+  }
+
+  /** True when `p` is on an enclosed garden's lawn or in one of its gates (not on the street in front). */
+  private insideCourt(p: Vec2): boolean {
+    for (const b of this.courts) {
+      if (p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ) return true;
+    }
+    return false;
   }
 
   /**

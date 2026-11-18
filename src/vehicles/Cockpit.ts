@@ -87,6 +87,14 @@ export class Cockpit {
     }
   }
 
+  /**
+   * The hanging charm, in the body frame. The pivot is the mirror; the point is the toy itself, about 9 cm
+   * down the cord. Charms face -z, toward the driver.
+   */
+  localCharm(out: THREE.Vector3): THREE.Vector3 {
+    return out.set(0, -0.095, 0).applyQuaternion(this.charm.quaternion).add(this.charm.position);
+  }
+
   private mount(car: Car): void {
     const p = buildCockpit(car.look.style);
     this.eye.copy(p.eye);

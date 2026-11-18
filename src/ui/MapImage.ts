@@ -103,11 +103,17 @@ export function buildMapImage(city: CityModel): MapImage {
   // Gardens: the gate, the lawn and the path. Trees are drawn over the buildings.
   for (const park of f.parks ?? []) {
     ctx.fillStyle = C.gravel;
-    rect(park.gate.minX, park.gate.minZ, park.gate.maxX, park.gate.maxZ);
+    for (const g of [park.gate, ...(park.gates ?? [])]) rect(g.minX, g.minZ, g.maxX, g.maxZ);
     ctx.fillStyle = C.park;
     rect(park.lawn.minX, park.lawn.minZ, park.lawn.maxX, park.lawn.maxZ);
     ctx.fillStyle = C.gravel;
-    rect(park.path.minX, park.path.minZ, park.path.maxX, park.path.maxZ);
+    for (const w of [park.path, ...(park.paths ?? [])]) rect(w.minX, w.minZ, w.maxX, w.maxZ);
+    if (park.monument) {
+      ctx.fillStyle = 'rgb(176, 166, 150)';
+      const m = park.monument;
+      const s = m.kind === 'kiosk' ? 3.2 : 1.3;
+      rect(m.pos.x - s, m.pos.z - s, m.pos.x + s, m.pos.z + s);
+    }
   }
 
   // Buildings: taller reads brighter

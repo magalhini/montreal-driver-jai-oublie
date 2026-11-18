@@ -232,11 +232,14 @@ const player = new Car(
 equipCar(player, PLAYER_CAR, builds.of(PLAYER_CAR));
 world.player = player;
 world.addCar(player);
+// A red the player is sitting at changes 25% sooner, for their direction only
+lights.forWaiting(() => (world.mode === "free" && !world.controlLocked ? player : null));
 
 const camRig = new CameraRig(r.camera);
 camRig.groundAt = (x, z) => city.terrain.surfaceY(x, z);
 camRig.rooms = city.features.interiors;
 camRig.alleys = city.features.alleys;
+camRig.courts = (city.features.parks ?? []).filter((p) => p.enclosed).flatMap((p) => [p.lawn, p.gate, ...(p.gates ?? [])]);
 camRig.walls = new SpatialHash(city.buildings.flatMap(solidParts));
 const carView = new CarView(r.scene, () => world.cars, r.camera);
 carView.groundAt = (x, z) => city.terrain.heightAt(x, z);
@@ -396,8 +399,12 @@ const fullMap = new FullMap(uiRoot, mapImage, city, gps, player, police, input);
 // T30: title screen (the city keeps running behind it under the orbit camera) and pause menu
 let session: PlayMode = "free";
 const briefing = new Briefing(uiRoot);
-// Ten seconds of Montreal before either mode starts (ESC / F / Space skip it)
-const intro = new IntroCutscene(uiRoot, world, closures, potholes);
+// Montreal, then the car, before either mode starts (ESC / F / Space skip it)
+const intro = new IntroCutscene(uiRoot, world, closures, potholes, {
+  car: player,
+  body: () => carView.bodyOf(player.id),
+  cockpit,
+});
 let introCam = false;
 const menu = new Menu(uiRoot, {
   cash: () => economy.cash,
@@ -603,6 +610,13 @@ game.addView({
     camRig.cockpit = body ? { body, eye: cockpit.eye } : null;
     camRig.orbit = world.mode === "menu";
     orbitCenter.set(player.pos.x, 0, player.pos.z);
+    // Before the intro aims: the charm shot reads the toy's pose, and the cabin has to be open while it does.
+    const inCabin =
+      !breakdown.playing &&
+      !pickup.cinematic &&
+      (intro.inside || (camRig.interior && !intro.playing));
+    cockpit.update(player, dt, inCabin);
+    carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     if (wreck.playing) wreckView.aim(r.camera);
     else if (breakdown.playing) breakdownView.aim(r.camera);
     else if (intro.playing) intro.aim(r.camera);
@@ -617,13 +631,6 @@ game.addView({
     post.boost.bloom = 0.55 * wreck.fx;
     post.boost.aberration = 0.0035 * wreck.fx;
     steam.rain = weather.rain;
-    const inCabin =
-      camRig.interior &&
-      !breakdown.playing &&
-      !pickup.cinematic &&
-      !intro.playing;
-    cockpit.update(player, dt, inCabin);
-    carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     hud.paused = game.pausedBy("debug") && !menu.open && !fullMap.open;
     hud.limiter = limiter.on ? Math.round(limiter.cap / KMH) : null;
     hud.speedLimit = limiter.postedKmh;

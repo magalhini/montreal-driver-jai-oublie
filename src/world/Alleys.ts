@@ -6,10 +6,12 @@ import type { CityModel } from './RoadGraph';
 
 /**
  * Shortcuts through the blocks (IMPROVEMENTS #19), pure data: straight alleys cut between the buildings
- * from street to street, drive-through passages where an alley runs under a building that spans it, and a
+ * from street to street, drive-through passages where an alley runs under a street-front building, and a
  * few hidden dead-end nooks under buildings to hide in. Passages and nooks are `Interior`s carved out of the
  * building's ground floor (`Building.cavity`), so collisions, sight lines, the camera and rain already know
- * about them. Runs after the home is planned (its block is left alone) and before buildings are re-settled.
+ * about them. A long block always gets a through-lane, and one that is long both ways gets a crossing, so
+ * the middle is a junction between buildings. Enclosed gardens are left alone (their gates are the way in).
+ * Runs after the home is planned (its block is left alone) and before buildings are re-settled.
  */
 
 export const ALLEY = {
@@ -54,14 +56,38 @@ export function planAlleys(city: CityModel, seed: number): void {
     bl.gj !== f.canal?.row &&
     (bl.district === 'residential' || bl.district === 'shotengai' || bl.district === 'downtown');
   for (const bl of city.blocks) {
-    if (!eligible(bl) || !rng.chance(ALLEY.chance)) continue;
+    if (!eligible(bl) || isCourt(city, bl)) continue;
     const r = inner(bl);
-    const first: Axis = rng.chance(0.5) ? 'x' : 'z';
-    const axes: Axis[] = [first];
-    if (r.maxX - r.minX > 60 && r.maxZ - r.minZ > 60 && rng.chance(ALLEY.crossChance)) axes.push(first === 'x' ? 'z' : 'x');
+    const axes = alleyAxes(r.maxX - r.minX, r.maxZ - r.minZ, rng);
+    if (!axes) continue;
     for (const axis of axes) cutAlley(city, bl, axis, rng);
   }
   planNooks(city, rng, eligible);
+}
+
+/** A garden that fills the court (`maps/montreal/Courtyards.ts`): no alley through the lawn. */
+function isCourt(city: CityModel, bl: Block): boolean {
+  return (city.features.parks ?? []).some((p) => p.enclosed && p.block === bl.id);
+}
+
+/**
+ * Lanes for one block. A long block always opens onto the streets at its ends. A block that is long both
+ * ways gets a second lane across the first, so you are not committed to one corridor the length of the block.
+ */
+function alleyAxes(w: number, d: number, rng: Rng): Axis[] | null {
+  const longX = w >= 78;
+  const longZ = d >= 78;
+  if (longX || longZ) {
+    const first: Axis = w >= d ? 'x' : 'z';
+    const axes: Axis[] = [first];
+    if ((longX && longZ) || (Math.min(w, d) > 52 && rng.chance(0.65))) axes.push(first === 'x' ? 'z' : 'x');
+    return axes;
+  }
+  if (!rng.chance(ALLEY.chance)) return null;
+  const first: Axis = rng.chance(0.5) ? 'x' : 'z';
+  const axes: Axis[] = [first];
+  if (w > 60 && d > 60 && rng.chance(ALLEY.crossChance)) axes.push(first === 'x' ? 'z' : 'x');
+  return axes;
 }
 
 /** Buildings standing on a block (by their center). */
@@ -111,7 +137,11 @@ function cutAlley(city: CityModel, bl: Block, axis: Axis, rng: Rng): void {
   const added: Building[] = [];
   for (const b of hits) {
     const [b0, b1] = across(axis, b);
-    if (b0 <= lo - ALLEY.passageWall && b1 >= hi + ALLEY.passageWall && rng.chance(ALLEY.passageChance) && carvePassage(city, b, axis, lo, hi)) continue;
+    // A passage only under the street frontage. Inner buildings are split, so the lane stays open between them
+    // instead of becoming a tunnel the length of the block.
+    const sw = CONFIG.SIDEWALK + 3;
+    const atStreet = axis === 'z' ? b.minZ <= bl.min.z + sw || b.maxZ >= bl.max.z - sw : b.minX <= bl.min.x + sw || b.maxX >= bl.max.x - sw;
+    if (atStreet && b0 <= lo - ALLEY.passageWall && b1 >= hi + ALLEY.passageWall && rng.chance(ALLEY.passageChance) && carvePassage(city, b, axis, lo, hi)) continue;
     removed.add(b);
     if (cut0 - b0 >= ALLEY.minPiece) added.push(piece(b, axis, b0, cut0, nearFace, b.seed, b.height));
     if (b1 - cut1 >= ALLEY.minPiece) added.push(piece(b, axis, cut1, b1, farFace, rng.int(0, 1e6), Math.max(5, b.height * rng.range(0.8, 1.2))));
@@ -122,7 +152,7 @@ function cutAlley(city: CityModel, bl: Block, axis: Axis, rng: Rng): void {
 
 /** Part of `b` between p0 and p1 across the alley, with a facade onto the alley (if it had street faces). */
 function piece(b: Building, axis: Axis, p0: number, p1: number, face: Facing, seed: number, height: number): Building {
-  const q: Building = { ...b, seed, height, faces: b.faces.length ? [...b.faces.filter((x) => x !== face), face] : [] };
+  const q: Building = { ...b, seed, height, faces: [...b.faces.filter((x) => x !== face), face] };
   if (axis === 'z') {
     q.minX = p0;
     q.maxX = p1;
@@ -172,7 +202,7 @@ function planNooks(city: CityModel, rng: Rng, eligible: (bl: Block) => boolean):
   const f = city.features;
   const spots: NookSpot[] = [];
   for (const bl of city.blocks) {
-    if (!eligible(bl)) continue;
+    if (!eligible(bl) || isCourt(city, bl)) continue;
     const r = inner(bl);
     for (const b of buildingsIn(city, bl)) {
       if (b.cavity || b.tower || b.height < 9) continue;

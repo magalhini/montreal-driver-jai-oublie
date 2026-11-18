@@ -8,7 +8,7 @@ import type { MarkingStyle } from '../maps/MapDef';
 import { buildMarkings } from './RoadMarkings';
 import type { CityModel } from './RoadGraph';
 import { LOOK } from '../render/Look';
-import { snowMaterial } from './SnowCover';
+import { lawnSnowMaterial } from './SnowCover';
 import { offset } from './Polyline';
 import { polygonArea } from './RoadIndex';
 import { SurfaceBuilder } from './SurfaceBuilder';
@@ -73,7 +73,8 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
     const r = blockRects(bl, f);
     raised.push(...r.raised);
     for (const q of r.lowered) (q.maxX - q.minX > 20 && q.maxZ - q.minZ > 20 ? lots : ground).patch(q.minX, q.minZ, q.maxX, q.maxZ, 0, 3);
-    for (const q of r.grass) grass.patch(q.minX, q.minZ, q.maxX, q.maxZ, 0, 3);
+    // A hair under the plowed road, so the snow sheet cannot draw over the car
+    for (const q of r.grass) grass.patch(q.minX, q.minZ, q.maxX, q.maxZ, -0.03, 3);
     for (const q of r.floor) (q.maxX - q.minX > 20 && q.maxZ - q.minZ > 20 ? lots : ground).patch(q.minX, q.minZ, q.maxX, q.maxZ, 0, 3);
     for (const q of r.paved) paving.patch(q.minX, q.minZ, q.maxX, q.maxZ, 0.01, 3);
   }
@@ -158,10 +159,15 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   if (grass.vertexCount > 0) {
     const lawn = grassTexture();
     lawn.repeat.set(1 / 6, 1 / 6);
-    // December lawns are snow, the turf texture showing through a little
+    // December lawns are drifted snow. Night keeps the turf.
     const lawnMat = LOOK.day
-      ? snowMaterial()
+      ? lawnSnowMaterial().clone()
       : new THREE.MeshStandardMaterial({ color: 0x8a9a80, map: lawn, roughness: 0.95, metalness: 0 });
+    if (LOOK.day) {
+      lawnMat.polygonOffset = true;
+      lawnMat.polygonOffsetFactor = 1;
+      lawnMat.polygonOffsetUnits = 1;
+    }
     scene.add(grass.mesh(lawnMat));
   }
 
@@ -250,7 +256,10 @@ function blockRects(bl: Block, f: CityFeatures): { raised: Rect[]; lowered: Rect
   const box = rect(bl.min.x, bl.min.z, bl.max.x, bl.max.z);
   // Road-level cuts: driveways (through the ring, up to a garage door), the garage / passage / nook floors
   // and the alleys through the block. Drawn without overlaps (coplanar patches would z-fight).
-  const cuts: Rect[] = [...f.driveways, ...f.interiors.map((r) => r.box), ...f.alleys.map((a) => a.box), ...f.pitStops.map((p) => p.box), ...(f.station ? [f.station.lot] : [])].filter((d) => overlaps(d, box));
+  const here = (f.parks ?? []).filter((p) => p.block === bl.id);
+  // Plowed roads across a garden: asphalt, cut out of the snow, meeting the gates
+  const trails = here.flatMap((p) => [p.path, ...(p.paths ?? [])]);
+  const cuts: Rect[] = [...f.driveways, ...f.interiors.map((r) => r.box), ...f.alleys.map((a) => a.box), ...trails, ...f.pitStops.map((p) => p.box), ...(f.station ? [f.station.lot] : [])].filter((d) => overlaps(d, box));
   for (let i = 0; i < cuts.length; i++) {
     let parts: Rect[] = [cuts[i]];
     for (let k = 0; k < i; k++) parts = parts.flatMap((p) => subtractRect(p, cuts[k]));
@@ -271,15 +280,16 @@ function blockRects(bl: Block, f: CityFeatures): { raised: Rect[]; lowered: Rect
   let parts: Rect[] = [rect(ix0, iz0, ix1, iz1)];
   const k = f.canal;
   if (k && bl.gj === k.row) parts = [rect(ix0, iz0, ix1, k.z0), rect(ix0, k.z1, ix1, iz1)];
-  const lawns = (f.parks ?? []).filter((p) => p.block === bl.id).map((p) => p.lawn);
+  let snow: Rect[] = here.map((p) => p.lawn);
+  for (const t of trails) snow = snow.flatMap((p) => subtractRect(p, t));
   if (blockFloor(f, bl)) floor.push(...parts);
   else {
     // Raised slab, minus the driveway / garage cuts reaching in from the ring (already lowered above)
     for (const c of cuts) parts = parts.flatMap((p) => subtractRect(p, c));
-    for (const lawn of lawns) parts = parts.flatMap((p) => subtractRect(p, lawn));
+    for (const lawn of here.map((p) => p.lawn)) parts = parts.flatMap((p) => subtractRect(p, lawn));
     raised.push(...parts);
   }
-  grass.push(...lawns);
+  grass.push(...snow);
   return { raised, lowered, floor, paved, grass };
 }
 

@@ -5,6 +5,7 @@ import type { Vec2 } from '../types';
 import { inDriveway } from './Features';
 import { cumulative, pointAt, tangentAt } from './Polyline';
 import type { CityModel } from './RoadGraph';
+import { snowTextures } from './textures';
 
 /** Plowed snow along the curbs (PRD 4.4). Lengths in meters. */
 export const BERM_TUNING = {
@@ -33,6 +34,28 @@ export function snowMaterial(opts: { vertexColors?: boolean; flatShading?: boole
     metalness: 0,
     ...opts,
   });
+}
+
+/** Ground snow (gardens, squares): the drift texture, not a flat white sheet. Shared, so one upload. */
+let lawnSnow: THREE.MeshStandardMaterial | null = null;
+export function lawnSnowMaterial(): THREE.MeshStandardMaterial {
+  if (lawnSnow) return lawnSnow;
+  const tex = snowTextures();
+  const repeat = 1 / 9;
+  tex.map.repeat.set(repeat, repeat);
+  tex.normalMap.repeat.set(repeat, repeat);
+  tex.rough.repeat.set(repeat, repeat);
+  lawnSnow = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    map: tex.map,
+    normalMap: tex.normalMap,
+    normalScale: new THREE.Vector2(1.1, 1.1),
+    roughness: 0.92,
+    roughnessMap: tex.rough,
+    emissive: new THREE.Color(0.05, 0.055, 0.065),
+    metalness: 0,
+  });
+  return lawnSnow;
 }
 
 /** Low dome: flat bottom on the sidewalk, white on top, grey-brown slush along the bottom (vertex colors). */

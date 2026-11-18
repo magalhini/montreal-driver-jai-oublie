@@ -16,15 +16,12 @@ export const POSTFX = {
   grain: 0.035,
   aberration: 0.0006,
   saturation: 1.08,
-  /** How hard the CRT lines read (0 = off, 1 = full magenta gap). */
-  scanlines: 0.22,
   /** Barrel bend when SCREEN BEND is on. */
   curve: 0.085,
 };
 
 /** Picture options on the GRAPHICS page. Saved to `localStorage`. */
 export const GRAPHICS_OPTIONS = [
-  { key: 'scanlines', label: 'SCANLINES', hint: 'CRT lines across the picture, tinted like neon glass' },
   { key: 'bloom', label: 'NEON GLOW', hint: 'Bloom on signs, lamps and tail lights' },
   { key: 'vignette', label: 'VIGNETTE', hint: 'Darkened corners' },
   { key: 'grain', label: 'FILM GRAIN', hint: 'Fine noise, like old footage' },
@@ -35,7 +32,6 @@ export const GRAPHICS_OPTIONS = [
 export type GraphicsKey = (typeof GRAPHICS_OPTIONS)[number]['key'];
 
 const GRAPHICS_DEFAULTS: Record<GraphicsKey, boolean> = {
-  scanlines: true,
   bloom: true,
   vignette: true,
   grain: true,
@@ -81,11 +77,10 @@ function lookAmount(key: GraphicsKey, amount: number): number {
   return GRAPHICS[key] ? amount : 0;
 }
 
-/** Final pass: linear -> sRGB, then the retro glass (scanlines, bend, fringe, vignette, grain). */
+/** Final pass: linear -> sRGB, then the retro glass (bend, fringe, vignette, grain). */
 const FinishShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
-    uResolution: { value: new THREE.Vector2(1, 1) },
     uTime: { value: 0 },
     uVignette: { value: POSTFX.vignette },
     uGrain: { value: POSTFX.grain },
@@ -93,17 +88,14 @@ const FinishShader = {
     uSaturation: { value: POSTFX.saturation },
     uTired: { value: 0 },
     uBlink: { value: 0 },
-    uScan: { value: POSTFX.scanlines },
     uCurve: { value: 0 },
-    uPitch: { value: 3 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
-    uniform vec2 uResolution;
-    uniform float uTime, uVignette, uGrain, uAberration, uSaturation, uTired, uBlink, uScan, uCurve, uPitch;
+    uniform float uTime, uVignette, uGrain, uAberration, uSaturation, uTired, uBlink, uCurve;
     varying vec2 vUv;
     vec3 toSRGB(vec3 c) {
       c = max(c, 0.0);
@@ -125,13 +117,11 @@ const FinishShader = {
       vec2 d = uv - 0.5;
       float r2 = dot(d, d);
       vec2 off = d * uAberration * (1.0 + r2 * 6.0);
-      // Scanlines: the red and blue phosphor rows sit a pixel apart.
-      vec2 split = vec2(0.0, uScan * 0.7) / max(uResolution, vec2(1.0));
-      vec3 c = vec3(texture2D(tDiffuse, uv + off + split).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - off - split).b);
+      vec3 c = vec3(texture2D(tDiffuse, uv + off).r, texture2D(tDiffuse, uv).g, texture2D(tDiffuse, uv - off).b);
       if (uTired > 0.0) {
         // Tired driver (IMPROVEMENTS #25): a slowly drifting double image, softer contrast, washed colors
         vec2 g = vec2(sin(uTime * 0.37) + 0.6 * sin(uTime * 0.91), cos(uTime * 0.29) + 0.5 * sin(uTime * 0.73)) * 0.0055 * uTired;
-        vec3 ghost = vec3(texture2D(tDiffuse, uv + g + off + split).r, texture2D(tDiffuse, uv + g).g, texture2D(tDiffuse, uv + g - off - split).b);
+        vec3 ghost = vec3(texture2D(tDiffuse, uv + g + off).r, texture2D(tDiffuse, uv + g).g, texture2D(tDiffuse, uv + g - off).b);
         c = mix(c, ghost, 0.42 * uTired);
       }
       float l = dot(c, vec3(0.2126, 0.7152, 0.0722));
@@ -141,15 +131,6 @@ const FinishShader = {
       c *= 1.0 - min(1.0, uVignette + 0.4 * uTired) * smoothstep(0.08 - 0.06 * uTired, 0.62, r2 * 1.6);
       float n = hash(vUv * 1000.0 + fract(uTime * 7.3) * 91.7) - 0.5;
       c += n * uGrain;
-      // CRT glass, locked to the screen: one dark magenta gap every few pixels, and a faint band rolling down.
-      if (uScan > 0.0) {
-        float period = max(uPitch * 2.0, 2.0);
-        float gap = smoothstep(0.62, 0.92, fract(gl_FragCoord.y / period));
-        c *= mix(vec3(1.0), vec3(0.58, 0.36, 0.78), gap * uScan);
-        float fy = gl_FragCoord.y / max(uResolution.y, 1.0);
-        float roll = smoothstep(0.018, 0.0, abs(fract(fy - uTime * 0.02) - 0.5));
-        c *= 1.0 + roll * uScan * 0.045;
-      }
       // Heavy eyelids, in front of the glass: the screen closes from the top and the bottom
       if (uBlink > 0.0) {
         float e = abs(vUv.y - 0.5) * 2.0 + 0.12 * r2;
@@ -224,10 +205,6 @@ export class PostFX {
   setSize(): void {
     const size = this.renderer.getDrawingBufferSize(new THREE.Vector2());
     this.composer.setSize(size.x, size.y);
-    const u = this.finish.uniforms;
-    u.uResolution.value.set(size.x, size.y);
-    // One scanline period is about 3 CSS pixels, snapped to whole device pixels so the gap doesn't beat.
-    u.uPitch.value = Math.max(3, Math.round(this.renderer.getPixelRatio() * 3)) / 2;
   }
 
   render(time: number): void {
@@ -258,7 +235,6 @@ export class PostFX {
     u.uTired.value = this.tired;
     u.uBlink.value = this.blink;
     u.uSaturation.value = POSTFX.saturation;
-    u.uScan.value = lookAmount('scanlines', POSTFX.scanlines);
     u.uCurve.value = lookAmount('curve', POSTFX.curve);
     this.composer.render();
   }

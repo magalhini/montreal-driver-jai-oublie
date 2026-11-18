@@ -250,7 +250,6 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   fxFolder.add(POSTFX, 'grain', 0, 0.2, 0.005);
   fxFolder.add(POSTFX, 'aberration', 0, 0.01, 0.0001);
   fxFolder.add(POSTFX, 'saturation', 0, 2, 0.01);
-  fxFolder.add(POSTFX, 'scanlines', 0, 1, 0.01).name('scanline strength');
   fxFolder.add(POSTFX, 'curve', 0, 0.25, 0.005).name('screen bend');
   for (const opt of GRAPHICS_OPTIONS) {
     fxFolder

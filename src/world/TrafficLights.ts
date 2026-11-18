@@ -1,6 +1,7 @@
+import { dot, fwd } from '../core/math';
 import type { Rng } from '../core/Rng';
 import type { SimSystem, Vec2 } from '../types';
-import { reversed, segDir } from './Polyline';
+import { project, reversed, segDir, tangentAt } from './Polyline';
 import type { CityModel } from './RoadGraph';
 
 export type LightState = 'green' | 'yellow' | 'red';
@@ -13,6 +14,15 @@ const HALF = GREEN_T + YELLOW_T + ALLRED_T;
 const OFFSET_SPAN = HALF * 2;
 /** Approaches this close to straight across from each other share a phase. */
 const OPPOSITE_DEG = 35;
+/** Creeping or stopped, not rolling through (m/s). */
+const WAIT_SPEED = 3;
+/** Still queued for this light, not stopped back up the block (m before the stop line). */
+const WAIT_REACH = 35;
+/**
+ * A red the player is sitting at ends in 75% of the time: that junction's clock runs at 4/3 until their
+ * direction turns green. Their own green is left alone.
+ */
+const WAIT_HURRY = 1 / 0.75 - 1;
 
 /**
  * Per-junction signal phases (T43). A junction's approaches (edges with lanes entering it) are grouped:
@@ -29,12 +39,19 @@ export class TrafficLights implements SimSystem {
   /** Incremented whenever any light may have changed (cheap view invalidation). */
   version = 0;
   private lastBucket = -1;
+  /** The player, once the session exists. Null while a menu has the car. */
+  private waiter: (() => { pos: Vec2; yaw: number; speed: number } | null) | null = null;
 
   constructor(private city: CityModel, rng: Rng) {
     this.offsets = new Float32Array(city.nodes.length);
     this.groups = new Uint8Array(city.nodes.length);
     for (const n of city.nodes) this.offsets[n.id] = rng.range(0, OFFSET_SPAN);
     for (const n of city.nodes) this.groups[n.id] = this.groupApproaches(n.id);
+  }
+
+  /** Who might be waiting at a red. While they sit there, that approach changes 25% sooner. */
+  forWaiting(waiter: () => { pos: Vec2; yaw: number; speed: number } | null): void {
+    this.waiter = waiter;
   }
 
   private key(nodeId: number, edgeId: number): number {
@@ -84,6 +101,7 @@ export class TrafficLights implements SimSystem {
 
   update(dt: number): void {
     this.time += dt;
+    this.hurryForWaiter(dt);
     const bucket = Math.floor(this.time * 4);
     if (bucket !== this.lastBucket) {
       this.lastBucket = bucket;
@@ -99,6 +117,25 @@ export class TrafficLights implements SimSystem {
   /** Phase group of an approach (-1 if no lanes enter the junction from it). */
   groupOf(nodeId: number, edgeId: number): number {
     return this.group.get(this.key(nodeId, edgeId)) ?? -1;
+  }
+
+  /**
+   * Stopped at a red, pointed along the lane: pull that junction's clock forward so the player's direction
+   * turns green in three quarters of the remaining wait. Stops the moment their light is no longer red.
+   */
+  private hurryForWaiter(dt: number): void {
+    const car = this.waiter?.();
+    if (!car || car.speed > WAIT_SPEED) return;
+    const at = this.city.laneAt(car.pos);
+    if (!at) return;
+    const lane = at.lane;
+    const nodeId = lane.to;
+    if (this.phases(nodeId) < 2 || this.state(nodeId, lane.edgeId) !== 'red') return;
+    const pr = project(lane.pts, lane.cum, car.pos);
+    const toStop = lane.length - pr.s;
+    if (toStop < -1.5 || toStop > WAIT_REACH) return;
+    if (dot(fwd(car.yaw), tangentAt(lane.pts, lane.cum, pr.s)) < 0.5) return;
+    this.offsets[nodeId] += dt * WAIT_HURRY;
   }
 
   /** The phase running now and the seconds into it. */

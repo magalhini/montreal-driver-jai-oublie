@@ -182,7 +182,6 @@ export class Menu {
     this.listEl = q(".menu-list");
     this.hintEl = q(".menu-hint");
     parent.appendChild(this.root);
-    this.syncLook();
     window.addEventListener("keydown", (e) => this.onKey(e));
   }
 
@@ -375,7 +374,7 @@ export class Menu {
     return [
       {
         label: "GRAPHICS",
-        hint: "Scanlines, glow, the retro look",
+        hint: "Glow, grain, the retro look",
         run: () => this.graphics(g, from, index),
       },
     ];
@@ -392,7 +391,6 @@ export class Menu {
         g.set(opt.key, on);
         item.html = `${opt.label}${mark(on)}`;
         this.renderList();
-        this.syncLook();
       };
       item = {
         label: opt.label,
@@ -409,12 +407,6 @@ export class Menu {
     items.push({ label: "BACK", hint: "", run: back });
     this.show({ heading: "GRAPHICS", sub: "◀ ▶ to toggle", items, back });
     this.root.classList.add("gfx-page");
-  }
-
-  /** Title-screen scanlines follow the SCANLINES toggle (the city itself is the post pass). */
-  private syncLook(): void {
-    const on = this.host.graphics?.get("scanlines") ?? true;
-    this.root.classList.toggle("scanlines", on);
   }
 
   /** Step the selected slider (no-op on other items). */
@@ -447,7 +439,6 @@ export class Menu {
     this.bodyEl.innerHTML = page.body ?? "";
     this.listEl.classList.remove("vol-list");
     this.root.classList.remove("vol-page", "gfx-page", "tut-page");
-    this.syncLook();
     this.sel = 0;
     this.renderList();
   }

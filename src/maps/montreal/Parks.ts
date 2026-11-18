@@ -12,9 +12,9 @@ const PATH = 5;
 const GATE = 10;
 
 /**
- * Turn each full-block lawn into a garden: a smaller road-level square, a gravel path in from the street,
- * trees, lamps, stone lanterns and benches. The street wall stays; buildings that fall in the garden are
- * pulled back to its edge. Own random stream.
+ * Turn each full-block lawn into a garden: a smaller road-level square, a plowed road in one side and out
+ * the other, trees, lamps, stone lanterns and benches. The street wall stays; buildings that fall in the
+ * garden are pulled back to its edge. Own random stream.
  */
 export function layParks(city: CityModel, seed: number): void {
   const rng = new Rng(seed + 41);
@@ -24,11 +24,16 @@ export function layParks(city: CityModel, seed: number): void {
     const park = layoutPark(block, rng);
     if (!park) continue;
     parks.push(park);
-    city.features.driveways.push(park.gate);
+    const mouths = [park.gate, ...(park.gates ?? [])];
+    city.features.driveways.push(...mouths);
+    for (const g of mouths) {
+      const ns = g.maxZ - g.minZ >= g.maxX - g.minX;
+      city.features.alleys.push({ block: block.id, axis: ns ? 'z' : 'x', box: g, lit: 'lamps' });
+    }
   }
   city.features.parks = parks;
   if (!parks.length) return;
-  const holes = parks.flatMap((p) => [p.lawn, p.gate]);
+  const holes = parks.flatMap((p) => [p.lawn, p.gate, ...(p.gates ?? [])]);
   const kept: Building[] = [];
   for (const b of city.buildings) {
     const next = carveBuilding(b, holes);
@@ -53,7 +58,9 @@ function layoutPark(block: Block, rng: Rng): CityPark | null {
   const cz = (iz0 + iz1) / 2;
   const lawn: AABB = { minX: cx - span / 2, maxX: cx + span / 2, minZ: cz - span / 2, maxZ: cz + span / 2 };
   const side = entrance(block);
+  const farSide: Facing = side === 'N' ? 'S' : side === 'S' ? 'N' : side === 'W' ? 'E' : 'W';
   const gate = gateBox(block, lawn, side);
+  const far = gateBox(block, lawn, farSide);
   const path = pathBox(lawn, side);
   const trees = plant(lawn, path, rng);
   const lamps = corners(lawn, 3.2).filter((p) => !hits(p, path, 1.5));
@@ -65,6 +72,8 @@ function layoutPark(block: Block, rng: Rng): CityPark | null {
     lawn,
     path,
     gate,
+    gates: [far],
+    enclosed: true,
     trees,
     lamps,
     lanterns,

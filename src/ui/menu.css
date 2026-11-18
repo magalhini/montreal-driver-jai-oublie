@@ -26,14 +26,6 @@
 .menu.title {
   background: radial-gradient(ellipse at 50% 42%, rgba(10, 4, 24, 0.15) 0%, rgba(10, 4, 24, 0.55) 55%, rgba(4, 0, 12, 0.9) 100%);
 }
-/* Scanlines over the attract view, when SCANLINES is on */
-.menu.title.scanlines::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: repeating-linear-gradient(to bottom, rgba(0, 0, 0, 0.18) 0 1px, transparent 1px 3px);
-}
 .menu > * {
   position: relative;
 }

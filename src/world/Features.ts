@@ -172,8 +172,19 @@ export interface CityPark {
   lawn: AABB;
   /** Gravel walk across the lawn, in line with the gate. */
   path: AABB;
+  /** More walks (the other arm of a crossing, a link from a gate that is off center). */
+  paths?: AABB[];
   /** Curb cut from the street to the lawn. Also listed in `driveways`. */
   gate: AABB;
+  /** Further curb cuts, when the garden opens onto more than one street. Also listed in `driveways`. */
+  gates?: AABB[];
+  /**
+   * Inside the street wall, with a gate instead of an open side. The chase camera lifts to the top view
+   * while the car is on the lawn or in a gate (`CameraRig.courts`).
+   */
+  enclosed?: boolean;
+  /** A pavilion or a column standing off the paths. */
+  monument?: { kind: 'kiosk' | 'column'; pos: Vec2 };
   trees: { pos: Vec2; r: number; pink: boolean }[];
   lamps: Vec2[];
   lanterns: Vec2[];

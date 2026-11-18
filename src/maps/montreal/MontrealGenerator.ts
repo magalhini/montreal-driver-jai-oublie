@@ -16,6 +16,7 @@ import { dressSkyline } from '../../world/Skyline';
 import { Terrain } from '../../world/Terrain';
 import { layPort, portWaterZ } from './Harbor';
 import { fitHeights, openCourtyards, placeArena, placeBasilica, placeSilos } from './Massing';
+import { layCourtyards } from './Courtyards';
 import { layParks } from './Parks';
 import { laySquares } from './Squares';
 import { ARENA, BASILICA, CANAL_ROW, SILOS, START, STREET_CLASSES, X_RAW, Z_RAW, classWidth, colClass, colName, districtAt, heightOf, isPark, isSquare, junctionControl, rowClass, rowName } from './layout';
@@ -216,6 +217,7 @@ export function generateMontreal(seed = CONFIG.SEED): CityModel {
   }
   openCourtyards(city);
   layParks(city, seed);
+  layCourtyards(city, seed);
   laySquares(city);
 
   const x0 = city.xs[0] - city.hwX[0];

@@ -86,6 +86,80 @@ export function grassTexture(): THREE.Texture {
   return t;
 }
 
+/**
+ * Packed December snow: wind drifts, grey slush in the hollows, a crust that catches the light.
+ * One cached pair; lawns share it.
+ */
+let snowTex: { map: THREE.Texture; normalMap: THREE.Texture; rough: THREE.Texture } | null = null;
+export function snowTextures(): { map: THREE.Texture; normalMap: THREE.Texture; rough: THREE.Texture } {
+  if (snowTex) return snowTex;
+  const size = 512;
+  const rng = new Rng(12);
+  const drift = tileNoise(rng, 6);
+  const ridge = tileNoise(rng, 24);
+  const grit = tileNoise(rng, 80);
+  const height = new Float32Array(size * size);
+  const tone = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const v = y / size;
+      const k = y * size + x;
+      const d = drift(u, v);
+      const r = ridge(u * 1.7, v * 0.45);
+      const g = grit(u, v);
+      // Drifts rise, slush sits in the low spots, grit breaks the flat white
+      height[k] = d * 0.75 + r * 0.35 + (g - 0.5) * 0.15;
+      const slush = d < 0.38 ? (0.38 - d) * 1.4 : 0;
+      tone[k] = 0.78 + d * 0.2 + r * 0.06 - slush * 0.34 + (g - 0.5) * 0.05;
+      rough[k] = 0.55 + slush * 0.4 - r * 0.15;
+    }
+  }
+  const [c, g] = canvas(size, size);
+  const img = g.createImageData(size, size);
+  const [cn, gn] = canvas(size, size);
+  const nimg = gn.createImageData(size, size);
+  const [cr, gr] = canvas(size, size);
+  const rimg = gr.createImageData(size, size);
+  const H = (x: number, y: number) => height[((y + size) % size) * size + ((x + size) % size)];
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const k = y * size + x;
+      const t = Math.max(0, Math.min(1, tone[k]));
+      // Cool white on the crust, a little blue in the shade, grey where it has gone to slush
+      img.data[k * 4] = Math.round((0.72 + t * 0.28) * 255);
+      img.data[k * 4 + 1] = Math.round((0.76 + t * 0.24) * 255);
+      img.data[k * 4 + 2] = Math.round((0.82 + t * 0.18) * 255);
+      img.data[k * 4 + 3] = 255;
+      const dx = (H(x + 1, y) - H(x - 1, y)) * 2.4;
+      const dy = (H(x, y + 1) - H(x, y - 1)) * 2.4;
+      const l = Math.hypot(dx, dy, 1);
+      nimg.data[k * 4] = (-dx / l * 0.5 + 0.5) * 255;
+      nimg.data[k * 4 + 1] = (-dy / l * 0.5 + 0.5) * 255;
+      nimg.data[k * 4 + 2] = (1 / l * 0.5 + 0.5) * 255;
+      nimg.data[k * 4 + 3] = 255;
+      const rv = Math.max(0, Math.min(1, rough[k])) * 255;
+      rimg.data[k * 4] = rimg.data[k * 4 + 1] = rimg.data[k * 4 + 2] = rv;
+      rimg.data[k * 4 + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  gn.putImageData(nimg, 0, 0);
+  gr.putImageData(rimg, 0, 0);
+  const map = new THREE.CanvasTexture(c);
+  map.colorSpace = THREE.SRGBColorSpace;
+  const normalMap = new THREE.CanvasTexture(cn);
+  normalMap.colorSpace = THREE.NoColorSpace;
+  const roughMap = new THREE.CanvasTexture(cr);
+  roughMap.colorSpace = THREE.NoColorSpace;
+  for (const t of [map, normalMap, roughMap]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = 8;
+  }
+  return (snowTex = { map, normalMap, rough: roughMap });
+}
+
 /** Soft radial blob (white center to transparent). */
 export function glowTexture(): THREE.Texture {
   const [c, g] = canvas(128, 128);

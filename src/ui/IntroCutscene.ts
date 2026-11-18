@@ -5,17 +5,36 @@ import type { World } from "../core/World";
 import type { Closures } from "../gameplay/Closures";
 import type { Vec2 } from "../types";
 import type { Car } from "../vehicles/Car";
+import type { Cockpit } from "../vehicles/Cockpit";
+import { CHARMS } from "../vehicles/Tuning";
 import { metroSites } from "../world/MetroEntrances";
 import type { Potholes } from "../world/Potholes";
 import { laneOffset } from "../world/RoadGraph";
 
-/** Shot lengths and fades (s). Five shots make the ten seconds. */
+/** Shot lengths and fades (s). The city shots are two seconds; the car scene at the end is its own length. */
 export const INTRO_TUNING = {
   shot: 2,
-  /** Black at the start (out of the title) and at the end (into the driver's seat). */
+  /** Black at the start (out of the title) and at the end (into the drive). */
   fadeIn: 0.45,
   fadeOut: 0.4,
+  /** Close on the mirror charm, then back out through the driver's window. */
+  charm: 2.5,
+  /** How fast the screen goes black as the lens reaches the window. */
+  charmFade: 0.24,
+  /** Black between the window and the car. */
+  gap: 0.16,
+  /** The car, from outside. */
+  reveal: 2.6,
+  /** Fade up onto the car. */
+  revealFade: 0.35,
 };
+
+/** The player's car, its body group, and the cabin the last shot looks around in. */
+export interface IntroRide {
+  car: Car;
+  body(): THREE.Object3D | undefined;
+  cockpit: Cockpit;
+}
 
 /** One shot: the camera dollies `from` -> `to` while looking at `look()` (which may follow a moving car). */
 interface Shot {
@@ -32,10 +51,11 @@ const CURB_SIDE = CONFIG.DRIVE_SIDE === "left" ? 1 : -1;
 const ease = (u: number) => u * u * (3 - 2 * u);
 
 /**
- * Ten seconds of Montreal before the drive (both modes): a rue barrée fence, an ARRÊT sign at an all-way stop,
- * an SPVM cruiser going by, the deepest pothole in town and a métro entrance, each with a caption in the
- * letterbox. The city keeps running underneath (the cruiser is really driving). ESC, F or Space skips it.
- * Shots that the city can't stage this session (no cruiser on the road, no fence rolled) are left out.
+ * Montreal, then the car, before the drive (both modes): a rue barrée fence, an ARRÊT sign at an all-way stop,
+ * an SPVM cruiser going by, the deepest pothole in town and a métro entrance, then the charm on the rearview
+ * mirror and a pull back out of the driver's window onto the car. The city keeps running underneath (the
+ * cruiser is really driving). ESC, F or Space skips it. Shots that the city can't stage this session (no
+ * cruiser on the road, no fence rolled) are left out; the car scene still plays.
  */
 export class IntroCutscene {
   /** Black over the screen (0..1), shared with the HUD fade. */
@@ -45,15 +65,23 @@ export class IntroCutscene {
   private index = -1;
   private ending = -1;
   private done: (() => void) | null = null;
+  /** Which beat of the car scene is on screen ('' during the city shots). */
+  private beat = "";
+  private cam: THREE.PerspectiveCamera | null = null;
   private readonly cine: HTMLElement;
   private readonly caption: HTMLElement;
   private readonly v = new THREE.Vector3();
+  private readonly focus = new THREE.Vector3();
+  private readonly from = new THREE.Vector3();
+  private readonly to = new THREE.Vector3();
+  private readonly at = new THREE.Vector3();
 
   constructor(
     private readonly ui: HTMLElement,
     private readonly world: World,
     private readonly closures: Closures,
     private readonly potholes: Potholes,
+    private readonly ride: IntroRide,
   ) {
     this.cine = document.createElement("div");
     this.cine.className = "cine intro-cine";
@@ -68,17 +96,19 @@ export class IntroCutscene {
     return this.done !== null;
   }
 
+  /** True while the lens is still inside the cabin (show the cockpit, cut the body open). */
+  get inside(): boolean {
+    return this.playing && (this.beat === "charm" || this.beat === "black");
+  }
+
   /** Roll the intro, then call `then` (the briefing, or the free-roam welcome). */
   play(then: () => void): void {
     this.shots = this.stage();
-    if (!this.shots.length) {
-      then();
-      return;
-    }
     this.done = then;
     this.t = 0;
     this.index = -1;
     this.ending = -1;
+    this.beat = "";
     this.fade = 1;
     this.cine.classList.add("show");
     this.ui.classList.add("cinematic");
@@ -103,20 +133,57 @@ export class IntroCutscene {
       return;
     }
     this.t += dt;
-    const total = this.shots.length * T.shot;
-    const i = Math.min(this.shots.length - 1, Math.floor(this.t / T.shot));
-    if (i !== this.index) {
-      this.index = i;
-      const fresh = this.shots[i].restage?.();
-      if (fresh) this.shots[i] = fresh;
-      this.showCaption(this.shots[i]);
+    const city = this.shots.length * T.shot;
+    if (this.t < city) {
+      const i = Math.min(this.shots.length - 1, Math.floor(this.t / T.shot));
+      if (i !== this.index) {
+        this.index = i;
+        const fresh = this.shots[i].restage?.();
+        if (fresh) this.shots[i] = fresh;
+        this.showCaption(this.shots[i], T.shot);
+      }
+      this.fade = Math.max(0, 1 - this.t / T.fadeIn);
+      return;
     }
-    this.fade = Math.max(0, 1 - this.t / T.fadeIn);
-    if (this.t >= total - T.fadeOut) this.ending = this.t - (total - T.fadeOut);
+    // No body yet (the view hasn't built the car): skip the car scene rather than hold a black screen.
+    if (!this.ride.body()) {
+      this.ending = 0;
+      return;
+    }
+    const u = this.t - city;
+    const charmEnd = T.charm;
+    const gapEnd = charmEnd + T.gap;
+    const revealEnd = gapEnd + T.reveal;
+    if (u < charmEnd) {
+      this.mark("charm");
+      const fadeAt = charmEnd - T.charmFade;
+      const out = u <= fadeAt ? 0 : (u - fadeAt) / T.charmFade;
+      const inn = this.shots.length ? 0 : Math.max(0, 1 - u / T.fadeIn);
+      this.fade = Math.max(out, inn);
+      return;
+    }
+    if (u < gapEnd) {
+      this.mark("black");
+      this.fade = 1;
+      return;
+    }
+    this.mark("reveal");
+    const ru = u - gapEnd;
+    this.fade = ru < T.revealFade ? 1 - ru / T.revealFade : 0;
+    if (u >= revealEnd - T.fadeOut) this.ending = u - (revealEnd - T.fadeOut);
   }
 
   /** Put the camera on the current shot. */
   aim(camera: THREE.PerspectiveCamera): void {
+    this.cam = camera;
+    if (
+      this.beat === "charm" ||
+      this.beat === "black" ||
+      this.beat === "reveal"
+    ) {
+      this.aimCar(camera);
+      return;
+    }
     const shot = this.shots[Math.max(0, this.index)];
     if (!shot) return;
     const u = ease(
@@ -134,6 +201,8 @@ export class IntroCutscene {
   }
 
   private finish(): void {
+    this.beat = "";
+    if (this.cam) this.lens(this.cam, 62, 0.3, 1600);
     const then = this.done;
     this.done = null;
     this.cine.classList.remove("show");
@@ -142,12 +211,103 @@ export class IntroCutscene {
     then?.();
   }
 
-  private showCaption(s: Shot): void {
+  private showCaption(s: { title: string; sub: string }, dur: number): void {
     this.caption.innerHTML = `<div class="name">${s.title}</div><div class="jp">${s.sub}</div>`;
-    this.caption.style.animationDuration = `${INTRO_TUNING.shot}s`;
+    this.caption.style.animationDuration = `${dur}s`;
     this.caption.classList.remove("show");
     void this.caption.offsetWidth;
     this.caption.classList.add("show");
+  }
+
+  /** City shots hard-cut into each other. The car scene has its own captions. */
+  private mark(beat: string): void {
+    if (beat === this.beat) return;
+    this.beat = beat;
+    if (beat === "black") {
+      this.caption.classList.remove("show");
+      return;
+    }
+    const T = INTRO_TUNING;
+    if (beat === "charm") this.showCaption(this.charmLine(), T.charm);
+    else this.showCaption(this.carLine(), T.reveal);
+  }
+
+  private charmLine(): { title: string; sub: string } {
+    const id = this.ride.car.look.charm ?? "cone";
+    const charm = CHARMS.find((c) => c.id === id);
+    return {
+      title: id === "cone" ? "Cône orange" : (charm?.name ?? "Porte-bonheur"),
+      sub: "let's go",
+    };
+  }
+
+  private carLine(): { title: string; sub: string } {
+    const spec = this.ride.car.phys.spec.name;
+    const model = spec.split(" ").pop() ?? "Karola";
+    return { title: model, sub: spec.replace(model, "").trim() };
+  }
+
+  /**
+   * Last scene. The lens starts on the charm and backs away through the driver's window — out the glass,
+   * not up through the roof — so the cutaway cabin is never seen from outside. A quick fade covers the
+   * crossing, then the whole car.
+   */
+  private aimCar(camera: THREE.PerspectiveCamera): void {
+    const body = this.ride.body();
+    const cab = this.ride.cockpit;
+    if (!body) return;
+    const T = INTRO_TUNING;
+    const city = this.shots.length * T.shot;
+    const focus = cab.localCharm(this.focus);
+    const side = Math.sign(cab.eye.x) || 1;
+    // Just under the mirror, on the driver's side. Charms face -z, so this sees the face of the cone with the
+    // mirror above it. The exit is the driver's glass, beside the driver's head: backing out through the
+    // window, not up through the roof. The fade lands as the lens reaches the glass.
+    const start = this.from.set(
+      focus.x + side * 0.16,
+      focus.y + 0.01,
+      focus.z - 0.34,
+    );
+    const exit = this.to.set(
+      side * (cab.cabin[2] - 0.16),
+      cab.eye.y - 0.06,
+      cab.eye.z + 0.14,
+    );
+    if (this.beat === "reveal") {
+      const ru = ease(
+        Math.min(1, Math.max(0, (this.t - city - T.charm - T.gap) / T.reveal)),
+      );
+      // Driver's front corner, over the street (the curb is the other side), backing up until the car fits.
+      this.from.set(side * 2.15, 0.72, 2.5);
+      this.to.set(side * 3.3, 1.2, 4.3);
+      this.at.lerpVectors(this.from, this.to, ru);
+      this.lens(camera, 42, 0.3, 1600);
+    } else {
+      const u = Math.min(1, Math.max(0, (this.t - city) / T.charm));
+      const hold = 0.28;
+      const w = u <= hold ? 0 : ease((u - hold) / (1 - hold));
+      this.at.lerpVectors(start, exit, w);
+      this.lens(camera, 46 + w * 10, 0.05, 480);
+    }
+    const look =
+      this.beat === "reveal"
+        ? this.v.set(side * 0.05, 0.58, 0.15)
+        : this.v.copy(focus).setY(focus.y + 0.035);
+    camera.position.copy(this.at).applyMatrix4(body.matrixWorld);
+    camera.lookAt(look.applyMatrix4(body.matrixWorld));
+  }
+
+  private lens(
+    cam: THREE.PerspectiveCamera,
+    fov: number,
+    near: number,
+    far: number,
+  ): void {
+    if (cam.fov === fov && cam.near === near && cam.far === far) return;
+    cam.fov = fov;
+    cam.near = near;
+    cam.far = far;
+    cam.updateProjectionMatrix();
   }
 
   /** Find this session's fence, stop sign, cruiser, pit and métro, and frame each one. */
