@@ -13,4 +13,4 @@ heights       96664 7b5a63a7
 surfaceY      96664 4322d604
 water         96664 dc574185
 potholes       1292 d69744f6
-closures        109 508620a7
+closures        102 e5dff428
