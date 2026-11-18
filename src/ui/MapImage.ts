@@ -396,7 +396,7 @@ export function mapLabels(city: CityModel): MapLabel[] {
   for (const s of f.pitStops) {
     const jacques = s.name === DESTINATION_GARAGE;
     out.push({
-      text: jacques ? 'JACQUES PNEU' : s.name.toUpperCase(),
+      text: jacques ? 'JACQUES-CARTIER PNEUS' : s.name.toUpperCase(),
       sub: 'garage',
       // North of the lot, so the mission pin on the service circle does not sit on the words
       pos: { x: (s.box.minX + s.box.maxX) / 2, z: (jacques ? s.box.minZ - 24 : (s.box.minZ + s.box.maxZ) / 2) },

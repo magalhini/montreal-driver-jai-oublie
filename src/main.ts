@@ -31,6 +31,8 @@ import { formatClock, WinterTires } from "./gameplay/WinterTires";
 import { Snowstorm, SNOWSTORM_TUNING } from "./gameplay/Snowstorm";
 import { TirePickup } from "./gameplay/TirePickup";
 import { TirePickupView } from "./gameplay/TirePickupView";
+import { PortPicnic } from "./gameplay/PortPicnic";
+import { PortPicnicView } from "./gameplay/PortPicnicView";
 import { storageStop } from "./gameplay/MissionRoute";
 import { Recovery } from "./gameplay/Recovery";
 import { Wreck, wreckDetail } from "./gameplay/Wreck";
@@ -376,7 +378,6 @@ const tireStorage = buildTireStorage(r.scene, city, storageStop(city));
 buildHomeBay(r.scene, city);
 const sceneBusy = () =>
   bust.phase !== "free" || wreck.active || breakdown.active || recovery.active;
-game.addSim(mission);
 // The storage stop on Ottawa: stop in its circle and the scene loads the tires into the trunk
 const pickup = new TirePickup(world, storageStop(city));
 pickup.armed = () => mission.needsTires;
@@ -384,6 +385,15 @@ pickup.blocked = sceneBusy;
 pickup.chased = () => police.pursuers > 0;
 pickup.onLoaded = () => mission.loadTires();
 game.addSim(pickup);
+// After the tires: stop in the Vieux-Port lot and he sits down with the lox bagel
+const picnic = new PortPicnic(world);
+picnic.armed = () => mission.wantsPicnic;
+picnic.blocked = sceneBusy;
+picnic.chased = () => police.pursuers > 0;
+picnic.onDone = () => mission.finishPicnic();
+game.addSim(picnic);
+// After the cutscenes, so the clock sees the car taken on the same tick it is taken
+game.addSim(mission);
 pitStops.hint = (stop) => mission.bayHint(stop);
 game.addSim({ update: (dt) => (world.time += dt) });
 events.on("wrecked", (e) => {
@@ -475,6 +485,7 @@ game.onFrame((dt) => {
   const back = input.pressed("pause") || input.pressed("escape");
   // Escape skips the storage scene instead of pausing
   if (pickup.playing && input.pressed("escape") && !menu.open) pickup.skip();
+  if (picnic.playing && input.pressed("escape") && !menu.open) picnic.skip();
   intro.update(dt);
   if (
     intro.playing &&
@@ -491,7 +502,7 @@ game.onFrame((dt) => {
       world.controlLocked = false;
       mission.startClock();
       events.message(
-        "GPS set: tire storage first, then Jacques Pneu Garage. It does not know which streets are closed.",
+        "GPS set: tire storage first, then Jacques-Cartier Pneus Garage. It does not know which streets are closed.",
         "info",
         7,
       );
@@ -517,12 +528,12 @@ game.onFrame((dt) => {
     game.setPaused("map", fullMap.open);
   } else if (intro.playing) {
     // The intro owns the keys until it hands over to the briefing or the car
-  } else if (back && !fullMap.open && !pickup.playing) {
+  } else if (back && !fullMap.open && !pickup.playing && !picnic.playing) {
     game.setPaused("menu", true);
     menu.showPause();
   }
   minimap.visible =
-    !fullMap.open && world.mode !== "menu" && !briefing.open && !intro.playing;
+    !fullMap.open && world.mode !== "menu" && !briefing.open && !intro.playing && !picnic.cinematic;
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
@@ -571,6 +582,9 @@ const pickupView = new TirePickupView(
 );
 game.addView(pickupView);
 let pickupCam = false;
+const picnicView = new PortPicnicView(picnic, uiRoot, r.scene, city.terrain);
+game.addView(picnicView);
+let picnicCam = false;
 const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
   city.terrain.heightAt(x, z),
 );
@@ -614,6 +628,7 @@ game.addView({
     const inCabin =
       !breakdown.playing &&
       !pickup.cinematic &&
+      !picnic.cinematic &&
       (intro.inside || (camRig.interior && !intro.playing));
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
@@ -621,11 +636,13 @@ game.addView({
     else if (breakdown.playing) breakdownView.aim(r.camera);
     else if (intro.playing) intro.aim(r.camera);
     else if (pickup.cinematic) pickupView.aim(r.camera, dt);
+    else if (picnic.cinematic) picnicView.aim(r.camera, dt);
     else {
-      if (pickupCam || introCam) camRig.snap();
+      if (pickupCam || introCam || picnicCam) camRig.snap();
       camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
     }
     pickupCam = pickup.cinematic;
+    picnicCam = picnic.cinematic;
     introCam = intro.playing;
     // Post FX on top of the tuned settings: the wreck's punch
     post.boost.bloom = 0.55 * wreck.fx;
@@ -653,6 +670,7 @@ game.addView({
       shop.fade,
       intro.fade,
       pickup.fade,
+      picnic.fade,
     );
     hud.update(player, dt);
     tiles.update(r.camera);
@@ -762,6 +780,7 @@ const audio: AudioSystem = new AudioSystem({
       shop.fade,
       intro.fade,
       pickup.fade,
+      picnic.fade,
     ),
   hornHeld: () => input.isHeld("horn"),
   pursuit: () => heat.inPursuit,
@@ -775,10 +794,12 @@ mission.warm = () => audio.garage.warm();
 mission.onDone = ({ chases, elapsed, reward }) =>
   hud.stunt(
     "WINTER TIRES",
-    `${formatClock(elapsed)} · ${chases === 0 ? "never chased" : chases === 1 ? "chased once" : `chased ${chases} times`}`,
+    `Done in ${formatClock(elapsed)}. ${chases === 0 ? "Never chased." : chases === 1 ? "Chased once." : `Chased ${chases} times.`}`,
     reward,
     true,
   );
+mission.onFeast = () =>
+  hud.stunt("LOX BAGEL", `By the clock tower, in ${formatClock(mission.elapsed)}.`, false, true);
 const audioFolder = Debug.addFolder("Audio");
 for (const k of Object.keys(audio.mixer.settings) as AudioKey[])
   audioFolder
@@ -840,6 +861,7 @@ function resetSession(): void {
   chantier.reset();
   mission.clear();
   pickup.reset();
+  picnic.reset();
   snowstorm.reset();
   repair(player);
   player.teleport(start.pos, start.yaw);
@@ -891,6 +913,8 @@ function viewHeading(cam: THREE.Camera): number {
   snowstorm,
   pickup,
   pickupView,
+  picnic,
+  picnicView,
   briefing,
   signals,
   effects,

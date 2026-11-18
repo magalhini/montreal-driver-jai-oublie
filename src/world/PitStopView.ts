@@ -11,7 +11,7 @@ import { sharedGlow } from './textures';
 const FONT = "Arial, Helvetica, sans-serif";
 const RED = '#c42018';
 
-/** Two lines for a garage name: "Jacques Pneu Garage" -> "JACQUES PNEU" / "GARAGE". */
+/** Two lines for a garage name: "Jacques-Cartier Pneus Garage" -> "JACQUES-CARTIER PNEUS" / "GARAGE". */
 function nameLines(name: string): string[] {
   const words = name.toUpperCase().split(/\s+/);
   if (words.length <= 2) return words;
@@ -69,10 +69,20 @@ function signTexture(name: string): THREE.Texture {
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillStyle = '#fff';
-  const lines = nameLines(name);
-  const size = lines.some((l) => l.length > 10) ? 26 : 34;
+  const maxW = 232;
+  const width = (s: string, px: number) => {
+    g.font = `bold ${px}px ${FONT}`;
+    return g.measureText(s).width;
+  };
+  let lines = nameLines(name);
+  // A long brand (Jacques-Cartier Pneus) will not fit one line of the red panel; break it into words.
+  if (lines.some((l) => width(l, 20) > maxW)) lines = lines.flatMap((l) => l.split(' '));
+  let size = lines.some((l) => l.length > 12) ? 22 : lines.some((l) => l.length > 10) ? 26 : 34;
+  while (size > 16 && lines.some((l) => width(l, size) > maxW)) size--;
+  const step = size + 8;
+  const y0 = (176 - (lines.length * step - 8)) / 2;
   g.font = `bold ${size}px ${FONT}`;
-  lines.forEach((line, i) => g.fillText(line, 128, 48 + i * (size + 10)));
+  lines.forEach((line, i) => g.fillText(line, 128, y0 + i * step));
   g.fillStyle = '#14141a';
   g.fillRect(16, 204, 224, 160);
   g.fillStyle = '#ffb43e';

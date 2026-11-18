@@ -56,7 +56,7 @@ export const PIT_STOP = {
 };
 
 /** The winter-tire drive ends at this bay (the eastern garage). The sign and the map use the same words. */
-export const DESTINATION_GARAGE = 'Jacques Pneu Garage';
+export const DESTINATION_GARAGE = 'Jacques-Cartier Pneus Garage';
 
 const NAMES = ['Pneus Métro', 'Garage du Canal', 'Mécanique Berri'];
 

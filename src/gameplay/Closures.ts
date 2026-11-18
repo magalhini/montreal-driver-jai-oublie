@@ -650,7 +650,7 @@ export class Closures {
   }
 
   /**
-   * The drive after the tires are in the trunk (storage stop -> Jacques Pneu, the corners the GPS uses) crosses
+   * The drive after the tires are in the trunk (storage stop -> Jacques-Cartier Pneus, the corners the GPS uses) crosses
    * at least `GARAGE_LEG.fences` fences: one on the main boulevard (René-Lévesque, or another boulevard on the
    * leg), the rest on other blocks of it, not next to one already there. Each still has to pass `tryClose`.
    */
@@ -956,7 +956,7 @@ export function closureSalt(): number {
 
 /**
  * Mission ends (PRD 5.1): a lane on the Guy / Sherbrooke side, pointed east, and the garage farthest east
- * (Jacques Pneu, the Berri side). The roll puts fences on both GPS legs between them, and never closes
+ * (Jacques-Cartier Pneus, the Berri side). The roll puts fences on both GPS legs between them, and never closes
  * either of those edges. Free roam uses the same spawn, so it is not inside a work zone either.
  */
 export function defaultAnchors(city: CityModel): ClosureAnchors {

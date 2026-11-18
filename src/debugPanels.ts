@@ -36,6 +36,7 @@ import { addDamage, repair } from './vehicles/Damage';
 import { equipCar, PLAYER_CAR } from './vehicles/Fleet';
 import { addSpecPanel } from './vehicles/SpecPanel';
 import type { Builds } from './gameplay/Builds';
+import { portPicnic } from './gameplay/PortPicnic';
 import type { WinterTires } from './gameplay/WinterTires';
 import type { StorageStop } from './gameplay/MissionRoute';
 import type { PitStop } from './world/PitStops';
@@ -318,7 +319,7 @@ function addAlleyPanel({ city, player, camRig }: DebugSystems): void {
 
 /**
  * Teleports for checking the places the drive goes: every garage (dropped in its circle with the menu open),
- * Jacques Pneu with the winter tires already in the trunk (the TIRES tab's INSTALL row), the storage circle on
+ * Jacques-Cartier Pneus with the winter tires already in the trunk (the TIRES tab's INSTALL row), the storage circle on
  * Ottawa, and the home bay.
  */
 function addTeleportPanel({ city, player, camRig, openPitShop, mission, storage, events }: DebugSystems): void {
@@ -351,6 +352,25 @@ function addTeleportPanel({ city, player, camRig, openPitShop, mission, storage,
       .name(`garage: ${goal.name}, tires in trunk`);
   // A car length back from the circle, in the curb lane, so the stop is still yours to make
   folder.add({ go: () => put({ x: storage.pos.x - Math.sin(storage.yaw) * 12, z: storage.pos.z - Math.cos(storage.yaw) * 12 }, storage.yaw) }, 'go').name('tire storage (short of the circle)');
+  const port = portPicnic(city);
+  if (port)
+    folder
+      .add(
+        {
+          go: () => {
+            if (!mission.active) {
+              events.message('Debug: start the winter-tire drive first (title > Winter tires).', 'warn');
+              return;
+            }
+            mission.debugPicnic();
+            // On the quay, facing the curb cut, so the stop in the lot is still yours to make
+            const yaw = 0;
+            put({ x: port.pin.x, z: port.pin.z - 22 }, yaw);
+          },
+        },
+        'go',
+      )
+      .name('Vieux-Port lot (the bagel)');
   const home = city.features.curb.find((b) => b.legal);
   if (home) folder.add({ go: () => put(home.pos, home.yaw) }, 'go').name('home bay (the start)');
 }

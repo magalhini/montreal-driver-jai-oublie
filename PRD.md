@@ -434,7 +434,7 @@ Each phase ends with `npm run typecheck` passing. Where the phase changes what y
 3. Bust and breakdown return you to the mission.
 4. The destination garage still offers a paid repair before the free mount if the car is damaged.
 5. The mission should appear in a modal upon the game starting. Explain "It's December 1st and you forgot to change to your winter tires. Your goal: make it to the garage to change your tires in the other side of the city. The SPVM is watching: drive too fast, run a red light or a STOP sign and they'll be on your tail. Be careful about potholes: drive over them too fast and your car will be severely damaged."
-6. The garage is called "Jacques Pneu Garage". Show it on the map, it should have a sign outside too.
+6. The garage is called "Jacques-Cartier Pneus Garage". Show it on the map, it should have a sign outside too.
 
 **Done when:** From a cold start you can be sent across the grid, lose the GPS route to a fence, pay or avoid a repair, pick up the police or slip them, and finish in the bay with the winter tires on. Quitting to free roam does not leave the mission destination stuck on the map.
 

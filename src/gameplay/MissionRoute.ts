@@ -11,7 +11,7 @@ import type { CurbBay } from '../world/Features';
  *    storefront on the south side, one block short of de la Montagne, with a circle in the curb lane.
  * 2. North on de la Montagne into downtown, east on Notre-Dame, north on University through the centre,
  *    east on René-Lévesque across it, then south on De Bullion — small streets and the long avenues — to
- *    Jacques Pneu, on the other side of town.
+ *    Jacques-Cartier Pneus, on the other side of town.
  *
  * Grid indexes are `layout.ts` (columns west to east, rows mountain to river).
  */

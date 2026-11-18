@@ -2,7 +2,7 @@ import type * as THREE from "three";
 import type { GarageEvent } from "../audio/GarageAudio";
 import type { Input } from "../core/Input";
 import type { Builds } from "../gameplay/Builds";
-import { TIRE_CUES, type TireCue, type TireOffer } from "../gameplay/WinterTires";
+import { formatClock, TIRE_CUES, type TireCue, type TireOffer } from "../gameplay/WinterTires";
 import { formatCash } from "../gameplay/Economy";
 import type { PostFX } from "../render/PostFX";
 import type { Tone } from "../types";
@@ -102,8 +102,8 @@ export interface ShopHost {
   garage(ev: GarageEvent): void;
   /** What the TIRES tab offers at this garage, or null for no tab. */
   winterTires(stop: PitStop): TireOffer | null;
-  /** Put the winter set on (the drive's goal). Returns the prize paid, or null when the drive can't take it. */
-  installWinterTires(): number | null;
+  /** Put the winter set on (the drive's goal). Returns the prize and the time, or null when the drive can't take it. */
+  installWinterTires(): { reward: number; elapsed: number } | null;
   /** One tool of the tire swap. */
   tireCue(step: TireCue): void;
 }
@@ -760,10 +760,13 @@ export class PitShop {
       tagClass: "free",
       preview: build,
       confirm: () => {
-        const prize = this.host.installWinterTires();
-        if (prize === null) return;
+        const fitted = this.host.installWinterTires();
+        if (fitted === null) return;
         this.cues = TIRE_CUES.map((c) => ({ at: this.t + c.at, step: c.step }));
-        this.say(`Winter tires on. You're legal! Prize: +${formatCash(prize)}`, "good");
+        this.say(
+          `Winter tires on in ${formatClock(fitted.elapsed)}. You're legal! Prize: +${formatCash(fitted.reward)}`,
+          "good",
+        );
       },
     };
   }
