@@ -6,17 +6,18 @@ import "./ui/mobilegate.css";
  * by `scripts/mobile-screens.sh`). `boot.ts` decides; the game bundle never loads on a phone.
  */
 
+/** Each shot carries the next beat of the drive, in order: what you're up against, not what's in the frame. */
 const SHOTS: [file: string, caption: string][] = [
-  ["01-title", "Montreal Driver"],
-  ["02-basilica-notre-dame", "Basilique Notre-Dame"],
-  ["04-metro-mcgill", "Métro McGill"],
-  ["05-rue-barree-detour", "Rue barrée: find the detour"],
-  ["06-cockpit-arret", "Cockpit view at an arrêt"],
-  ["07-vieux-montreal-saint-paul", "Vieux-Montréal, rue Saint-Paul"],
-  ["08-downtown-rene-levesque", "Downtown, boulevard René-Lévesque"],
-  ["10-driving-de-la-commune", "Rue de la Commune"],
-  ["11-winter-tire-pickup", "Picking up the winter tires"],
-  ["12-snow-squall", "Snow squall"],
+  ["01-title", "December 1st. The snow is down and your summer tires are still on."],
+  ["02-basilica-notre-dame", "The tire storage is across town, and the shortest way runs through the old city."],
+  ["04-metro-mcgill", "Downtown traffic doesn't care that you're in a hurry."],
+  ["05-rue-barree-detour", "Rue barrée. The GPS didn't see it coming either, so find another way."],
+  ["06-cockpit-arret", "Every arrêt is a choice: stop like a tourist, or roll it and hope nobody's watching."],
+  ["07-vieux-montreal-saint-paul", "Cobblestones, tight corners, and someone double-parked right where you need to be."],
+  ["08-downtown-rene-levesque", "Running a red on René-Lévesque saves ten seconds, unless the SPVM is behind you."],
+  ["10-driving-de-la-commune", "Keep one eye on the road and the other on the mirror."],
+  ["11-winter-tire-pickup", "Make it to the storage in one piece and the winter tires are yours."],
+  ["12-snow-squall", "Take too long and the squalls roll in. On summer tires."],
 ];
 
 /**
@@ -45,12 +46,18 @@ export function showMobileGate(): void {
   page.innerHTML = `
     <header class="mg-head">
       <h1>MONTREAL<br />DRIVER</h1>
-      <p class="mg-note">Desktop only</p>
+      <p class="mg-tag">J'ai oublié</p>
       <p class="mg-text">
-        Montreal Driver isn't available on phones or tablets. It needs a keyboard or a gamepad and a computer
-        to drive the city. Come back on a desktop or laptop.
+        <em>Montreal Driver: J'ai oublié</em> is a driving game that takes place in Downtown Montreal. It's
+        December 1st and you forgot to change to your winter tires: now you have to drive across town to change your
+        tires without drawing attention from the SPVM. As any good Montreal driver, you're impatient and prone to
+        driving recklessly so this is no easy feat. To make matters more difficult, the roads are full of potholes
+        and partially blocked, which makes it pretty difficult to find your way.
       </p>
-      <p class="mg-sub">Here's what's waiting for you:</p>
+      <div class="mg-note">
+        <span>Desktop only</span>
+        <p>The game isn't available on phones or tablets. Come back on a computer with a keyboard or a gamepad.</p>
+      </div>
     </header>
     <section class="mg-shots">
       ${SHOTS.map(

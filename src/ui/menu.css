@@ -257,17 +257,24 @@
   font-size: 20px;
   color: rgba(255, 255, 255, 0.5);
 }
-/* Build version, bottom right of the title screen */
+/* Credit bottom left and build version bottom right, title screen only */
+.menu-credit,
 .menu-version {
   display: none;
   position: absolute !important;
-  right: 24px;
   bottom: 22px;
   font-family: 'Press Start 2P', monospace;
   font-size: 10px;
   letter-spacing: 0.1em;
   color: rgba(255, 255, 255, 0.4);
 }
+.menu-credit {
+  left: 24px;
+}
+.menu-version {
+  right: 24px;
+}
+.menu.title .menu-credit,
 .menu.title .menu-version {
   display: block;
 }

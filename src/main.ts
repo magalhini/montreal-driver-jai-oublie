@@ -550,6 +550,7 @@ game.onFrame((dt) => {
     !briefing.open &&
     !intro.playing &&
     !picnic.cinematic;
+  warnFirstPatrol();
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
@@ -906,6 +907,15 @@ function resetSession(): void {
   gps.setWaypoint(null);
   gps.setDestination(null);
   camRig.snap();
+}
+
+let patrolWarned = false;
+/** The first patrol car on the radar while driving, once per page load: what the SPVM pulls you over for. */
+function warnFirstPatrol(): void {
+  if (patrolWarned || !minimap.visible || world.controlLocked || police.pursuers > 0) return;
+  if (minimap.patrolsOnRadar === 0) return;
+  patrolWarned = true;
+  events.message("The SPVM is nearby! Don't run red lights or speed until they're gone.", "warn", 6);
 }
 
 let greeted = false;

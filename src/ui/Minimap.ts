@@ -24,6 +24,8 @@ const LEAD = 0.3;
  */
 export class Minimap implements ViewSystem {
   visible = true;
+  /** Patrol cops (not pursuers) drawn inside the radar on the last frame. Zero while the radar is hidden. */
+  patrolsOnRadar = 0;
   private readonly root: HTMLElement;
   private readonly canvas: HTMLCanvasElement;
   private readonly ctx: CanvasRenderingContext2D;
@@ -62,6 +64,7 @@ export class Minimap implements ViewSystem {
 
   sync(alpha: number, frameDt: number): void {
     this.root.classList.toggle('hidden', !this.visible);
+    this.patrolsOnRadar = 0;
     if (!this.visible) return;
     this.resize();
     const { ctx, t, q, size, dpr } = this;
@@ -108,6 +111,7 @@ export class Minimap implements ViewSystem {
       const pursuit = cop.state === 'pursuit';
       const inside = this.place(cop.car.interpPos(alpha), rim);
       if (!inside && !pursuit) continue;
+      if (inside && !pursuit) this.patrolsOnRadar++;
       drawBlip(ctx, q.x, q.y, (pursuit ? (inside ? 4.8 : 3.8) : 3.2) * dpr, copColor(pursuit, now), pursuit);
     }
     const target = this.gps.target;

@@ -23,26 +23,42 @@ body.mg-body {
   margin: 8px 0 18px;
   letter-spacing: 2px;
 }
+.mg-tag {
+  margin: -6px 0 22px;
+  font-family: 'Marker Felt', 'Bradley Hand', 'Segoe Print', 'Comic Sans MS', cursive;
+  font-size: 26px;
+  color: #ff4a3d;
+  transform: rotate(-4deg);
+}
+.mg-text {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 17px;
+  line-height: 1.6;
+  color: rgba(196, 220, 255, 0.95);
+  margin: 0 0 24px;
+  text-align: left;
+}
 .mg-note {
+  margin: 0 0 28px;
+  padding: 14px 16px;
+  border: 2px solid rgba(255, 59, 48, 0.9);
+  background: rgba(255, 59, 48, 0.12);
+  text-align: left;
+}
+.mg-note span {
   display: inline-block;
-  margin: 0 0 18px;
-  padding: 8px 12px;
+  padding: 6px 8px;
   font-family: 'Press Start 2P', monospace;
-  font-size: 11px;
+  font-size: 10px;
   color: #fff;
   background: rgba(255, 59, 48, 0.9);
 }
-.mg-text,
-.mg-sub {
+.mg-note p {
+  margin: 10px 0 0;
   font-family: Georgia, 'Times New Roman', serif;
-  font-size: 17px;
-  line-height: 1.5;
-  color: rgba(196, 220, 255, 0.95);
-  margin: 0 0 14px;
-}
-.mg-sub {
-  margin: 22px 0 18px;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 16px;
+  line-height: 1.45;
+  color: #f4f6f8;
 }
 .mg-shots {
   display: grid;
@@ -62,8 +78,9 @@ body.mg-body {
 .mg-shots figcaption {
   margin-top: 8px;
   font-family: 'VT323', monospace;
-  font-size: 20px;
-  color: rgba(255, 255, 255, 0.7);
+  font-size: 21px;
+  line-height: 1.15;
+  color: rgba(255, 255, 255, 0.78);
 }
 .mg-foot {
   margin-top: 30px;

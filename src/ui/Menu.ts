@@ -174,6 +174,7 @@ export class Menu {
       <div class="menu-head"></div><div class="menu-sub"></div><div class="menu-body"></div>
       <div class="menu-list"></div><div class="menu-hint"></div>
       <div class="menu-foot"><span><kbd>↑ ↓</kbd> select</span><span><kbd>ENTER</kbd> confirm</span><span><kbd>ESC</kbd> back</span></div>
+      <div class="menu-credit">Made by Ricardo Magalhães, 2026</div>
       <div class="menu-version">${VERSION}</div>`;
     const q = (c: string) => this.root.querySelector<HTMLElement>(c)!;
     this.headEl = q(".menu-head");
