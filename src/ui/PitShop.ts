@@ -397,7 +397,7 @@ export class PitShop {
   /** The car's saved build, or the highlighted rim / paint / charm on top of it while browsing those. */
   private previewBuild(): CarBuild {
     if (!this.id)
-      return { ...STOCK_BUILD, charm: this.host.car().look.charm ?? "cone" };
+      return { ...STOCK_BUILD, charm: this.host.car().look.charm ?? STOCK_BUILD.charm };
     const build = this.builds.of(this.id);
     if (this.phase !== "menu" || this.focus !== "rows") return build;
     const tab = this.tabs()[this.tab].id;

@@ -5,7 +5,7 @@ import type { CarLook } from '../vehicles/Car';
 import { buildCarParts, carMaterial } from '../vehicles/CarModel';
 import { wheelPair } from '../vehicles/CarWheel';
 import { charmGeometry } from '../vehicles/Charms';
-import type { CharmId } from '../vehicles/Tuning';
+import { STOCK_BUILD, type CharmId } from '../vehicles/Tuning';
 import { HIP, lerpPose, Person, POSE, type ArmPose, type PersonLook } from './People';
 import { concreteTexture, corrugatedTexture, pegboardTexture, posterTexture, screenTexture, signTexture, streetTexture } from './PitGarageTextures';
 import { sharedGlow } from './textures';
@@ -632,7 +632,7 @@ export class PitGarage {
     // Face the toy toward the bench shot's camera
     this.charm.rotation.y = Math.atan2(-(BENCH_CAM.x - (x - 0.15)), -(BENCH_CAM.z - z));
     this.charmPivot.add(this.charm);
-    this.setCharm('cone');
+    this.setCharm(STOCK_BUILD.charm);
     // A little spot on the display
     const spot = new THREE.SpotLight(0xfff0dd, 6, 3, 0.5, 0.6, 1.5);
     spot.position.set(x - 0.6, 2.2, z + 0.5);

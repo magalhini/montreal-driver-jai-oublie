@@ -3,7 +3,7 @@ import { clamp, damp } from '../core/math';
 import type { Car } from './Car';
 import { carMaterial } from './CarMaterial';
 import { charmGeometry } from './Charms';
-import type { CharmId } from './Tuning';
+import { STOCK_BUILD, type CharmId } from './Tuning';
 import { CLUSTER_H, CLUSTER_W, DIAL_R, DIAL_X, RadioDisplay, SPEEDO_MAX, SWEEP, SWEEP_START, TACH_MAX, clusterTexture } from './CockpitGauges';
 import { buildCockpit, type Placement } from './CockpitModel';
 
@@ -78,7 +78,7 @@ export class Cockpit {
       this.mount(car);
       this.builtKey = key;
     }
-    const charm = car.look.charm ?? 'cone';
+    const charm = car.look.charm ?? STOCK_BUILD.charm;
     if (charm !== this.charmId) {
       this.charmId = charm;
       const g = charmGeometry(charm);

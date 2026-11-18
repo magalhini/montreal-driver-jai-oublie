@@ -4,8 +4,8 @@ import { CHROME, GLOW, MATTE, PAINT, rgb } from './CarMaterial';
 import type { CharmId } from './Tuning';
 
 /**
- * Charms that hang from the rearview mirror (picked at the pit garage): the orange cone every car comes with,
- * and a bagel, a croissant and a Tim Hortons cup for sale. Pivot at the origin (the mirror),
+ * Charms that hang from the rearview mirror (picked at the pit garage): the Tim Hortons cup every car comes with,
+ * and an orange cone, a bagel and a croissant for sale. Pivot at the origin (the mirror),
  * hanging down -y, face toward -z (the driver). About 5 cm tall. Drawn with a `carMaterial`.
  */
 const GOLD = look(rgb(0.9, 0.62, 0.2), CHROME);
@@ -22,7 +22,7 @@ function cord(k: Kit, len = 0.056): void {
   k.add(box(0.007, 0.006, 0.006, 0, -len - 0.002, 0), GOLD);
 }
 
-/** A Montreal orange traffic cone: black base, white reflective bands. The free one. */
+/** A Montreal orange traffic cone: black base, white reflective bands. */
 function cone2(k: Kit): void {
   const orange = look(rgb(0.85, 0.09, 0.0), PAINT);
   const band = look(rgb(0.92, 0.92, 0.9), GLOW);
@@ -76,7 +76,7 @@ function croissant(k: Kit): void {
   }
 }
 
-/** A Tim Hortons cup: red paper, white lid, the white script panel toward the driver. */
+/** A Tim Hortons cup: red paper, white lid, the white script panel toward the driver. The free one. */
 function timmies(k: Kit): void {
   const red = look(rgb(0.62, 0.03, 0.04), MATTE);
   const white = look(rgb(0.9, 0.88, 0.85), MATTE);
@@ -89,11 +89,18 @@ function timmies(k: Kit): void {
   k.add(flat(new THREE.CylinderGeometry(0.0123, 0.0123, 0.003, 14)).translate(0, top + 0.0012, 0), white);
   k.add(flat(new THREE.CylinderGeometry(0.0095, 0.0112, 0.003, 14)).translate(0, top + 0.004, 0), white);
   k.add(box(0.004, 0.0015, 0.0025, 0, top + 0.0058, -0.0075), brown);
-  // The name panel, script squiggles in red on it
+  // The name panel, a red cursive hint on it: a long crossbar over forward-slanted strokes, two tall capitals
+  // and the small letters after them. The driver sees it from -z, so the line reads from +x to -x.
   const zf = -0.0108;
   k.add(box(0.012, 0.009, 0.001, 0, top - 0.013, zf), white);
-  k.add(box(0.009, 0.0012, 0.0012, 0, top - 0.0115, zf - 0.0006), red);
-  k.add(box(0.007, 0.0012, 0.0012, 0.0005, top - 0.0148, zf - 0.0006), red);
+  const stroke = (x: number, y: number, h: number, tilt = 0.35) =>
+    k.add(flat(new THREE.BoxGeometry(0.0009, h, 0.0012)).rotateZ(tilt).translate(x, y, zf - 0.0006), red);
+  stroke(0.0003, top - 0.0106, 0.0098, Math.PI / 2 - 0.06); // crossbar, rising a touch to the driver's right
+  stroke(0.0036, top - 0.0136, 0.0056); // T
+  for (const x of [0.0021, 0.0012, 0.0003]) stroke(x, top - 0.0148, 0.0028); // im
+  stroke(-0.0013, top - 0.0136, 0.0056); // H
+  stroke(-0.0027, top - 0.0136, 0.0056);
+  for (const x of [-0.0038, -0.0047]) stroke(x, top - 0.0148, 0.0028); // ortons
 }
 
 const BUILDERS: Record<CharmId, (k: Kit) => void> = { cone: cone2, bagel, croissant, timmies };

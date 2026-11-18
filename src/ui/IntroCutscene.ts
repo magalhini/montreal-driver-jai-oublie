@@ -6,7 +6,7 @@ import type { Closures } from "../gameplay/Closures";
 import type { Vec2 } from "../types";
 import type { Car } from "../vehicles/Car";
 import type { Cockpit } from "../vehicles/Cockpit";
-import { CHARMS } from "../vehicles/Tuning";
+import { CHARMS, STOCK_BUILD } from "../vehicles/Tuning";
 import { metroSites } from "../world/MetroEntrances";
 import type { Potholes } from "../world/Potholes";
 import { laneOffset } from "../world/RoadGraph";
@@ -233,7 +233,7 @@ export class IntroCutscene {
   }
 
   private charmLine(): { title: string; sub: string } {
-    const id = this.ride.car.look.charm ?? "cone";
+    const id = this.ride.car.look.charm ?? STOCK_BUILD.charm;
     const charm = CHARMS.find((c) => c.id === id);
     return {
       title: id === "cone" ? "Cône orange" : (charm?.name ?? "Porte-bonheur"),
@@ -260,7 +260,7 @@ export class IntroCutscene {
     const city = this.shots.length * T.shot;
     const focus = cab.localCharm(this.focus);
     const side = Math.sign(cab.eye.x) || 1;
-    // Just under the mirror, on the driver's side. Charms face -z, so this sees the face of the cone with the
+    // Just under the mirror, on the driver's side. Charms face -z, so this sees the face of the charm with the
     // mirror above it. The exit is the driver's glass, beside the driver's head: backing out through the
     // window, not up through the roof. The fade lands as the lens reaches the glass.
     const start = this.from.set(

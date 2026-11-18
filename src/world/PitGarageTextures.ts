@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { SCRIPT, scriptFontReady } from './ScriptFont';
 
 /** Canvas textures for the pit garage interior (`PitGarage.ts`). */
 const FONT = "'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif";
@@ -177,6 +178,18 @@ export function signTexture(): THREE.CanvasTexture {
 /** The night street seen through the open door: towers, lit windows, neon signs, the wet road. */
 export function streetTexture(): THREE.CanvasTexture {
   const [c, g] = canvas(1024, 512);
+  drawStreet(g);
+  const t = texture(c);
+  // The Tim Hortons neon is in the script font: paint the street again once it's in.
+  void scriptFontReady().then((ok) => {
+    if (!ok) return;
+    drawStreet(g);
+    t.needsUpdate = true;
+  });
+  return t;
+}
+
+function drawStreet(g: CanvasRenderingContext2D): void {
   const sky = g.createLinearGradient(0, 0, 0, 380);
   sky.addColorStop(0, '#05030f');
   sky.addColorStop(0.7, '#1a0c34');
@@ -201,20 +214,26 @@ export function streetTexture(): THREE.CanvasTexture {
     x += w;
   }
   // Neon signs
-  const neon = (text: string, x0: number, y0: number, color: string, size: number, vertical = false) => {
+  const neon = (text: string, x0: number, y0: number, color: string, size: number, script = false) => {
     g.save();
-    g.font = `bold ${size}px ${FONT}`;
+    g.font = script ? `400 ${size}px ${SCRIPT}` : `bold ${size}px ${FONT}`;
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.shadowColor = color;
     g.shadowBlur = 22;
     g.fillStyle = color;
-    if (vertical) [...text].forEach((ch, i) => g.fillText(ch, x0, y0 + i * size * 1.05));
-    else g.fillText(text, x0, y0);
+    g.fillText(text, x0, y0);
+    if (script) {
+      // One light weight: a same-color outline gives the tube a heavier brush.
+      g.strokeStyle = color;
+      g.lineJoin = 'round';
+      g.lineWidth = size * 0.05;
+      g.strokeText(text, x0, y0);
+    }
     g.restore();
   };
   neon('IGA', 150, 200, '#ff2a2a', 52);
-  neon('TIM HORTONS', 430, 155, '#ff3b3b', 28);
+  neon('Tim Hortons', 430, 155, '#ff3b3b', 44, true);
   neon('PROVIGO', 680, 220, '#ffd000', 32);
   neon('POUTINE', 920, 170, '#ffe14a', 26);
   // Wet street and the reflections in it
@@ -235,7 +254,6 @@ export function streetTexture(): THREE.CanvasTexture {
   streak(640, 'rgba(255,180,62,0.3)');
   g.fillStyle = 'rgba(255,220,120,0.6)';
   for (let i = 0; i < 8; i++) g.fillRect(40 + i * 130, 446, 60, 4);
-  return texture(c);
 }
 
 const POSTER = '"Arial Black", "Arial Bold", Arial, sans-serif';

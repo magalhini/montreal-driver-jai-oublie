@@ -44,7 +44,7 @@ export const STOCK_BUILD: Readonly<CarBuild> = {
   brakes: 0,
   wheels: "stock",
   paint: null,
-  charm: "cone",
+  charm: "timmies",
   burnout: false,
 };
 
@@ -212,8 +212,8 @@ export const CHARMS: {
   sub: string;
   price: number;
 }[] = [
-  { id: "cone", name: "Traffic cone", sub: "cône orange", price: 0 },
+  { id: "timmies", name: "Tim Hortons cup", sub: "double-double", price: 0 },
+  { id: "cone", name: "Traffic cone", sub: "cône orange", price: 200 },
   { id: "bagel", name: "Bagel", sub: "sésame", price: 200 },
   { id: "croissant", name: "Chocolatine", sub: "pur beurre", price: 200 },
-  { id: "timmies", name: "Tim Hortons cup", sub: "double-double", price: 200 },
 ];

@@ -5,6 +5,7 @@ import { frameOf } from "./BuildingFrame";
 import { openingTop } from "./Interiors";
 import { hasMetro } from "./MetroEntrances";
 import type { Building, Facing } from "../types";
+import { SCRIPT, scriptFontReady } from "./ScriptFont";
 
 /**
  * Storefront boards (PRD 11B): IGA, Provigo, Starbucks, Tim Hortons, and a poutine counter.
@@ -13,10 +14,11 @@ import type { Building, Facing } from "../types";
  */
 
 const FONT = '"Arial Black", "Arial Bold", Arial, sans-serif';
-
 interface Brand {
   id: string;
   draw: (g: CanvasRenderingContext2D, w: number, h: number) => void;
+  /** Written in the script font: redrawn once it has loaded. */
+  script?: boolean;
 }
 
 const fill = (
@@ -45,6 +47,30 @@ const label = (
   while (g.measureText(text).width > w * 0.86 && s > 18)
     g.font = `700 ${(s -= 4)}px ${FONT}`;
   g.fillText(text, w / 2, y);
+};
+
+/** A name in cursive, filling most of the board. */
+const script = (
+  g: CanvasRenderingContext2D,
+  text: string,
+  color: string,
+  w: number,
+  y: number,
+  size: number,
+) => {
+  g.fillStyle = color;
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  let s = size;
+  g.font = `400 ${s}px ${SCRIPT}`;
+  while (g.measureText(text).width > w * 0.88 && s > 18)
+    g.font = `400 ${(s -= 4)}px ${SCRIPT}`;
+  g.fillText(text, w / 2, y);
+  // The font is one light weight; an outline in the same color gives it a heavier brush.
+  g.strokeStyle = color;
+  g.lineJoin = "round";
+  g.lineWidth = s * 0.045;
+  g.strokeText(text, w / 2, y);
 };
 
 const BRANDS: Brand[] = [
@@ -101,11 +127,9 @@ const BRANDS: Brand[] = [
     id: "tims",
     draw: (g, w, h) => {
       fill(g, "#c8102e", w, h);
-      g.fillStyle = "#fff";
-      g.fillRect(0, h * 0.62, w, h * 0.38);
-      label(g, "TIM", "#ffffff", w, h * 0.34, h * 0.4);
-      label(g, "HORTONS", "#c8102e", w, h * 0.8, h * 0.28);
+      script(g, "Tim Hortons", "#ffffff", w, h * 0.5, h * 0.78);
     },
+    script: true,
   },
   {
     id: "aircanada",
@@ -136,10 +160,19 @@ function texture(brand: Brand): THREE.CanvasTexture {
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
-  brand.draw(c.getContext("2d")!, w, h);
+  const g = c.getContext("2d")!;
+  brand.draw(g, w, h);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
+  // Drawn in the fallback script first; the bundled one replaces it as soon as it's in.
+  if (brand.script)
+    void scriptFontReady().then((ok) => {
+      if (!ok) return; // the fallback script stays up
+      g.clearRect(0, 0, w, h);
+      brand.draw(g, w, h);
+      t.needsUpdate = true;
+    });
   return t;
 }
 
