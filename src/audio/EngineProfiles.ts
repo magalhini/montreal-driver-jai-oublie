@@ -1,4 +1,4 @@
-import type { EngineProfile } from './dsp/EngineDSP';
+import type { EngineProfile } from "./dsp/EngineDSP";
 
 /**
  * Engine voices. `level` normalizes them to the same loudness at full load (measured offline with
@@ -138,17 +138,17 @@ export const ENGINES = {
 export type EngineId = keyof typeof ENGINES;
 
 const BY_SPEC: Record<string, EngineId> = {
-  '1972 Toyoda Karola': 'straightSix',
-  '1973 Mame': 'cityFour',
-  'SPVM Cruiser': 'vEight',
-  'Box Truck': 'diesel',
-  'Kei Truck': 'triple',
-  Pickup: 'four',
-  'Traffic Sedan': 'four',
+  "2013 Toyoda Karola": "straightSix",
+  "1973 Mame": "cityFour",
+  "SPVM Cruiser": "vEight",
+  "Box Truck": "diesel",
+  "Kei Truck": "triple",
+  Pickup: "four",
+  "Traffic Sedan": "four",
 };
 
 /** Engine for a car spec name and body style (kei-sized traffic cars share the sedan spec). */
 export function engineFor(specName: string, style: string): EngineId {
-  if (style === 'kei' || style === 'keitruck') return 'triple';
-  return BY_SPEC[specName] ?? 'four';
+  if (style === "kei" || style === "keitruck") return "triple";
+  return BY_SPEC[specName] ?? "four";
 }

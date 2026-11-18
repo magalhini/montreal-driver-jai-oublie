@@ -12,8 +12,8 @@ import type { CityModel } from '../../world/RoadGraph';
  * street, trees, and sometimes a pavilion or a column. The buildings around it stay. The other blocks
  * stay built, so a through-lane runs between them the whole way.
  *
- * The garden is enclosed. The chase camera lifts over it (`enclosed`) rather than hunting for a gap in
- * the buildings behind the car.
+ * The garden is enclosed. The chase camera lifts over the lawn (`enclosed`) rather than hunting for a gap
+ * in the buildings behind the car. The lanes in are narrow: there it takes the driver's seat instead.
  */
 
 const MIN_LAWN = 30;

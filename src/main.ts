@@ -629,7 +629,7 @@ game.addView({
       !breakdown.playing &&
       !pickup.cinematic &&
       !picnic.cinematic &&
-      (intro.inside || (camRig.interior && !intro.playing));
+      (intro.inside || (camRig.cabinAt(player.interpPos(alpha)) && !intro.playing));
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     if (wreck.playing) wreckView.aim(r.camera);

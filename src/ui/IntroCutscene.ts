@@ -237,7 +237,7 @@ export class IntroCutscene {
     const charm = CHARMS.find((c) => c.id === id);
     return {
       title: id === "cone" ? "Cône orange" : (charm?.name ?? "Porte-bonheur"),
-      sub: "let's go",
+      sub: "we're all set, let's go",
     };
   }
 

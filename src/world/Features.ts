@@ -179,8 +179,8 @@ export interface CityPark {
   /** Further curb cuts, when the garden opens onto more than one street. Also listed in `driveways`. */
   gates?: AABB[];
   /**
-   * Inside the street wall, with a gate instead of an open side. The chase camera lifts to the top view
-   * while the car is on the lawn or in a gate (`CameraRig.courts`).
+   * Inside the street wall, with a gate instead of an open side. On the lawn the chase camera lifts to the
+   * top view. In a gate (a narrow lane) it takes the driver's seat (`CameraRig`).
    */
   enclosed?: boolean;
   /** A pavilion or a column standing off the paths. */

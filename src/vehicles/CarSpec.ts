@@ -40,7 +40,7 @@ export interface CarSpec {
 }
 
 export const KAROLA: CarSpec = {
-  name: "1972 Toyoda Karola",
+  name: "2013 Toyoda Karola",
   mass: 1100,
   inertiaScale: 1.0,
   cgToFront: 1.24,
@@ -49,7 +49,7 @@ export const KAROLA: CarSpec = {
   halfWidth: 0.84,
   halfLength: 2.12,
   wheelRadius: 0.31,
-  peakTorque: 190,
+  peakTorque: 180,
   idleRpm: 900,
   peakRpm: 4600,
   redline: 7000,

@@ -70,13 +70,16 @@ export class CameraRig {
   /** Alleys (IMPROVEMENTS #19): while the car or the camera is between their buildings, the camera keeps in line with the lane. */
   alleys: Alley[] = [];
   /**
-   * Enclosed gardens (the lawn and each gate). Inside one, the chase view eases up to the top camera and
-   * back to the player's mode on the way out. A lens behind the car rattles there: buildings stand on
-   * every side, and the wall test gains and loses them as the car turns.
+   * Enclosed gardens (the lawn and each gate). On the lawn the chase view eases up to the top camera and
+   * back to the player's mode on the way out: buildings stand on every side, and a lens behind the car
+   * rattles as the wall test gains and loses them. The gates are narrow lanes. There the chase views take
+   * the driver's seat instead of that top camera.
    */
   courts: AABB[] = [];
-  /** 0..1 blend from the current chase framing up to the top view. */
+  /** 0..1 blend from the current chase framing up to the top view (the open lawn, not the lanes in). */
   private court = 0;
+  /** Chase view is sitting in the driver's seat because the car is in a garden's lane. */
+  private laneSeat = false;
   /** Alley the camera was last inside (keeps holding it there until it leaves the block). */
   private lastAlley: Alley | null = null;
   /** Player car's body group and the driver's eye in its frame, for the cockpit view. */
@@ -99,7 +102,18 @@ export class CameraRig {
 
   /** True while the camera sits in the driver's seat (the cockpit model should be shown). */
   get interior(): boolean {
-    return this.enabled && !this.orbit && !this.focus && !this.lookBack && this.mode === 'cockpit' && this.cockpit !== null;
+    return this.seatOpen() && (this.mode === 'cockpit' || this.laneSeat);
+  }
+
+  /**
+   * The cabin should be drawn for a car at `p`. True in the cockpit, and in a narrow lane into a garden
+   * while a chase view is selected: that lane would otherwise lift to the top camera. Call this before the
+   * cockpit is shown; `update` moves the lens on the same rule.
+   */
+  cabinAt(p: Vec2): boolean {
+    if (!this.seatOpen()) return false;
+    if (this.mode === 'cockpit') return true;
+    return this.inCourtLane(p);
   }
 
   addShake(amount: number): void {
@@ -133,8 +147,12 @@ export class CameraRig {
     const s = car.phys.state;
     const carY = car.interpY(alpha);
     const speed = Math.hypot(s.vel.x, s.vel.z);
-    const overCourt = (this.mode === 'near' || this.mode === 'far') && !this.focus && this.insideCourt(p);
-    this.court += ((overCourt ? 1 : 0) - this.court) * damp(3.4, dt);
+    // A garden lane takes the seat before the lawn's overhead blend, and drops that blend so the
+    // chase view is itself again at the mouth.
+    this.laneSeat = this.seatOpen() && this.mode !== 'cockpit' && this.inCourtLane(p);
+    const overCourt = (this.mode === 'near' || this.mode === 'far') && !this.focus && !this.laneSeat && this.insideCourt(p);
+    if (this.laneSeat) this.court = 0;
+    else this.court += ((overCourt ? 1 : 0) - this.court) * damp(3.4, dt);
     const velYaw = Math.atan2(s.vel.x, s.vel.z);
     let target = yaw;
     if (speed > 4 && s.speed > 0) target = yaw + wrapAngle(velYaw - yaw) * 0.55;
@@ -300,6 +318,28 @@ export class CameraRig {
     const m = 0.5;
     if (b.maxX - b.minX > m * 2 + 0.4) pos.x = clamp(pos.x, b.minX + m, b.maxX - m);
     if (b.maxZ - b.minZ > m * 2 + 0.4) pos.z = clamp(pos.z, b.minZ + m, b.maxZ - m);
+  }
+
+  /** Driver's seat can show: a chase view, or the cockpit the player already picked. Not bumper, top, look-back, or the bust framing. */
+  private seatOpen(): boolean {
+    return this.enabled && !this.orbit && !this.focus && !this.lookBack && this.cockpit !== null && (this.mode === 'near' || this.mode === 'far' || this.mode === 'cockpit');
+  }
+
+  /**
+   * Inside a gate of an enclosed garden. Those boxes are alleys as well as courts; the lawn is only a court.
+   * A point on the grass is not a lane, so the overhead view stays there.
+   */
+  private inCourtLane(p: Vec2): boolean {
+    if (this.mode !== 'near' && this.mode !== 'far') return false;
+    if (!this.insideCourt(p)) return false;
+    for (const a of this.alleys) {
+      const b = a.box;
+      if (p.x <= b.minX || p.x >= b.maxX || p.z <= b.minZ || p.z >= b.maxZ) continue;
+      for (const c of this.courts) {
+        if (c.minX === b.minX && c.maxX === b.maxX && c.minZ === b.minZ && c.maxZ === b.maxZ) return true;
+      }
+    }
+    return false;
   }
 
   /** True when `p` is on an enclosed garden's lawn or in one of its gates (not on the street in front). */

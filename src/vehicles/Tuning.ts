@@ -99,10 +99,10 @@ const BURNOUT_PRICE = 500;
 
 /** Price of each stage before the car's scale. */
 const BASE_PRICE: Record<PartKind, number[]> = {
-  engine: [15000, 28000, 48000],
-  weight: [6000, 12000, 20000],
-  handling: [8000, 15000, 26000],
-  brakes: [5000, 9000, 15000],
+  engine: [1500, 2800, 3300],
+  weight: [600, 1200, 2000],
+  handling: [800, 1500, 2600],
+  brakes: [500, 900, 1200],
 };
 
 interface CarParts {
@@ -214,6 +214,6 @@ export const CHARMS: {
 }[] = [
   { id: "cone", name: "Traffic cone", jp: "cône orange", price: 0 },
   { id: "bagel", name: "Bagel", jp: "sésame", price: 200 },
-  { id: "croissant", name: "Croissant", jp: "pur beurre", price: 200 },
+  { id: "croissant", name: "Chocolatine", jp: "pur beurre", price: 200 },
   { id: "timmies", name: "Tim Hortons cup", jp: "double-double", price: 200 },
 ];
