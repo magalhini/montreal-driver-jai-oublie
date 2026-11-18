@@ -1,10 +1,10 @@
-import { KMH } from '../config';
-import { clamp, lerp } from '../core/math';
-import type { World } from '../core/World';
-import type { SimSystem } from '../types';
-import type { Car } from '../vehicles/Car';
-import { addDamage } from '../vehicles/Damage';
-import type { Pothole, Potholes } from '../world/Potholes';
+import { KMH } from "../config";
+import { clamp, lerp } from "../core/math";
+import type { World } from "../core/World";
+import type { SimSystem } from "../types";
+import type { Car } from "../vehicles/Car";
+import { addDamage } from "../vehicles/Damage";
+import type { Pothole, Potholes } from "../world/Potholes";
 
 /**
  * Thresholds and kicks for the potholes (PRD 5.4, Phase 6). Damage is per wheel that drops in, so a big pit
@@ -46,7 +46,11 @@ export const POTHOLE_TUNING = {
   messageCooldown: 25,
 };
 
-const LINES = ['That was a pothole.', "Another pothole. It wasn't there yesterday.", 'The street is more hole than street here.'];
+const LINES = [
+  "That was a pothole. Drive under 30km/h to avoid damage.",
+  "Another pothole. It wasn't there yesterday.",
+  "Tabarnak, so many nids-de-poule.",
+];
 
 /** Small pits are shallower: they kick and cost this share of a big one's kick. */
 const SMALL_KICK = 0.45;
@@ -66,7 +70,7 @@ interface Track {
 export interface PotholeHitInfo {
   kmh: number;
   damage: number;
-  depth: Pothole['depth'];
+  depth: Pothole["depth"];
 }
 
 /**
@@ -105,13 +109,20 @@ export class PotholeHits implements SimSystem {
     if (!player) return;
     const range2 = POTHOLE_TUNING.aiRange ** 2;
     for (const car of this.world.cars) {
-      if (car.removed || car.parked || car.kind === 'parked') continue;
-      if (car !== player && (car.pos.x - player.pos.x) ** 2 + (car.pos.z - player.pos.z) ** 2 > range2) continue;
-      const driving = car === player && this.world.mode !== 'menu';
-      this.check(car, driving || car.kind === 'police', driving);
+      if (car.removed || car.parked || car.kind === "parked") continue;
+      if (
+        car !== player &&
+        (car.pos.x - player.pos.x) ** 2 + (car.pos.z - player.pos.z) ** 2 >
+          range2
+      )
+        continue;
+      const driving = car === player && this.world.mode !== "menu";
+      this.check(car, driving || car.kind === "police", driving);
     }
     // Forget cars that left the range or the world
-    if (this.stepNo % 120 === 0) for (const [id, t] of this.tracks) if (this.stepNo - t.seen > 60) this.tracks.delete(id);
+    if (this.stepNo % 120 === 0)
+      for (const [id, t] of this.tracks)
+        if (this.stepNo - t.seen > 60) this.tracks.delete(id);
   }
 
   /** `hurt` applies the kick and the damage. `tell` is the player's HUD line and the debug last-hit. */
@@ -119,7 +130,12 @@ export class PotholeHits implements SimSystem {
     const s = car.phys.state;
     let t = this.tracks.get(car.id);
     if (!t) {
-      t = { prev: new Float64Array(8), inPit: new Int32Array(4).fill(-1), fresh: true, seen: 0 };
+      t = {
+        prev: new Float64Array(8),
+        inPit: new Int32Array(4).fill(-1),
+        fresh: true,
+        seen: 0,
+      };
       this.tracks.set(car.id, t);
     }
     if (this.stepNo - t.seen > 1) t.fresh = true;
@@ -169,12 +185,23 @@ export class PotholeHits implements SimSystem {
   }
 
   /** Wheel `i` just dropped into `p`, `d` m from its centre. */
-  private drop(car: Car, hurt: boolean, tell: boolean, i: number, p: Pothole, d: number, lx: number, lz: number, wx: number, wz: number): void {
+  private drop(
+    car: Car,
+    hurt: boolean,
+    tell: boolean,
+    i: number,
+    p: Pothole,
+    d: number,
+    lx: number,
+    lz: number,
+    wx: number,
+    wz: number,
+  ): void {
     const T = POTHOLE_TUNING;
     const s = car.phys.state;
     const speed = Math.hypot(s.vel.x, s.vel.z);
     const kmh = speed / KMH;
-    const deep = p.depth === 'big' ? 1 : SMALL_KICK;
+    const deep = p.depth === "big" ? 1 : SMALL_KICK;
     // Through the middle is deeper than clipping the rim
     const centre = 1 - 0.5 * (d / p.r) ** 2;
     const k = deep * centre;
@@ -194,7 +221,11 @@ export class PotholeHits implements SimSystem {
       const u = clamp((kmh - T.feelKmh) / 60, 0, 1);
       const ride = (0.55 + 0.85 * u) * k;
       s.heaveV = Math.max(-2.5, s.heaveV - T.heave * ride);
-      s.susPitchV = clamp(s.susPitchV + (front ? -1 : 0.65) * T.nod * ride, -2, 2);
+      s.susPitchV = clamp(
+        s.susPitchV + (front ? -1 : 0.65) * T.nod * ride,
+        -2,
+        2,
+      );
     }
     if (!hurt) return;
 
@@ -209,9 +240,12 @@ export class PotholeHits implements SimSystem {
     if (!tell) return;
     this.hits++;
     this.last = { kmh, damage: dmg, depth: p.depth };
-    if (dmg > 0 && p.depth === 'big' && this.cooldown <= 0) {
-      const line = this.told === 0 ? LINES[0] : LINES[1 + ((this.told - 1) % (LINES.length - 1))];
-      this.world.events.message(line, 'warn');
+    if (dmg > 0 && p.depth === "big" && this.cooldown <= 0) {
+      const line =
+        this.told === 0
+          ? LINES[0]
+          : LINES[1 + ((this.told - 1) % (LINES.length - 1))];
+      this.world.events.message(line, "warn");
       this.told++;
       this.cooldown = T.messageCooldown;
     }
@@ -219,20 +253,36 @@ export class PotholeHits implements SimSystem {
 }
 
 /** Damage for one wheel through a pit's centre at `kmh` (PRD 5.4: none under `safeKmh`, small to `hardKmh`, serious above). */
-export function damageFor(depth: Pothole['depth'], kmh: number): number {
+export function damageFor(depth: Pothole["depth"], kmh: number): number {
   const T = POTHOLE_TUNING;
   if (kmh < T.safeKmh) return 0;
-  const big = depth === 'big';
+  const big = depth === "big";
   if (kmh < T.hardKmh) {
     const u = (kmh - T.safeKmh) / Math.max(1, T.hardKmh - T.safeKmh);
-    return T.damageScale * (big ? lerp(T.bigLow, T.bigHigh, u) : lerp(T.smallLow, T.smallHigh, u));
+    return (
+      T.damageScale *
+      (big ? lerp(T.bigLow, T.bigHigh, u) : lerp(T.smallLow, T.smallHigh, u))
+    );
   }
   const over = kmh - T.hardKmh;
-  return T.damageScale * Math.min(T.wheelCap, big ? T.bigHard + T.bigPerKmh * over : T.smallHard + T.smallPerKmh * over);
+  return (
+    T.damageScale *
+    Math.min(
+      T.wheelCap,
+      big ? T.bigHard + T.bigPerKmh * over : T.smallHard + T.smallPerKmh * over,
+    )
+  );
 }
 
 /** Distance from (px, pz) to the segment (ax, az) -> (bx, bz). */
-function segDist(px: number, pz: number, ax: number, az: number, bx: number, bz: number): number {
+function segDist(
+  px: number,
+  pz: number,
+  ax: number,
+  az: number,
+  bx: number,
+  bz: number,
+): number {
   const dx = bx - ax;
   const dz = bz - az;
   const l2 = dx * dx + dz * dz;

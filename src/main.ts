@@ -238,13 +238,17 @@ equipCar(player, PLAYER_CAR, builds.of(PLAYER_CAR));
 world.player = player;
 world.addCar(player);
 // A red the player is sitting at changes 25% sooner, for their direction only
-lights.forWaiting(() => (world.mode === "free" && !world.controlLocked ? player : null));
+lights.forWaiting(() =>
+  world.mode === "free" && !world.controlLocked ? player : null,
+);
 
 const camRig = new CameraRig(r.camera);
 camRig.groundAt = (x, z) => city.terrain.surfaceY(x, z);
 camRig.rooms = city.features.interiors;
 camRig.alleys = city.features.alleys;
-camRig.courts = (city.features.parks ?? []).filter((p) => p.enclosed).flatMap((p) => [p.lawn, p.gate, ...(p.gates ?? [])]);
+camRig.courts = (city.features.parks ?? [])
+  .filter((p) => p.enclosed)
+  .flatMap((p) => [p.lawn, p.gate, ...(p.gates ?? [])]);
 camRig.walls = new SpatialHash(city.buildings.flatMap(solidParts));
 const carView = new CarView(r.scene, () => world.cars, r.camera);
 carView.groundAt = (x, z) => city.terrain.heightAt(x, z);
@@ -289,7 +293,9 @@ snowstorm.tireSet = () => tires.set;
 if (winter) game.addSim(snowstorm);
 game.addSim({
   update: () =>
-    (VehiclePhysics.surfaceGrip = winter ? tires.grip * snowstorm.gripScale(tires.set) : weather.grip),
+    (VehiclePhysics.surfaceGrip = winter
+      ? tires.grip * snowstorm.gripScale(tires.set)
+      : weather.grip),
 });
 game.addSim(lights);
 const limiter = new SpeedLimiter(world);
@@ -536,7 +542,11 @@ game.onFrame((dt) => {
     menu.showPause();
   }
   minimap.visible =
-    !fullMap.open && world.mode !== "menu" && !briefing.open && !intro.playing && !picnic.cinematic;
+    !fullMap.open &&
+    world.mode !== "menu" &&
+    !briefing.open &&
+    !intro.playing &&
+    !picnic.cinematic;
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
@@ -633,7 +643,8 @@ game.addView({
       !breakdown.playing &&
       !pickup.cinematic &&
       !picnic.cinematic &&
-      (intro.inside || (camRig.cabinAt(player.interpPos(alpha)) && !intro.playing));
+      (intro.inside ||
+        (camRig.cabinAt(player.interpPos(alpha)) && !intro.playing));
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     if (wreck.playing) wreckView.aim(r.camera);
@@ -754,11 +765,23 @@ if (CONFIG.SKY === "winterDay") {
   game.addView({ sync: () => (snowView.storm = snowstorm.intensity) });
   game.addView(snowView);
   const snowFolder = Debug.addFolder("Snow");
-  snowFolder.add({ go: () => snowstorm.toggle() }, "go").name("start / end a squall");
-  snowFolder.add(SNOWSTORM_TUNING, "firstAfter", 10, 600, 10).name("first squall after (s)");
-  snowFolder.add(SNOWSTORM_TUNING, "hold", 10, 400, 10).name("squall lasts (s)");
-  snowFolder.add(SNOWSTORM_TUNING, "summerGrip", 0.5, 1, 0.01).name("summer grip in squall");
-  Debug.watch("snow", () => `${snowstorm.status()}  grip x${VehiclePhysics.surfaceGrip.toFixed(2)}`);
+  snowFolder
+    .add({ go: () => snowstorm.toggle() }, "go")
+    .name("start / end a squall");
+  snowFolder
+    .add(SNOWSTORM_TUNING, "firstAfter", 10, 600, 10)
+    .name("first squall after (s)");
+  snowFolder
+    .add(SNOWSTORM_TUNING, "hold", 10, 400, 10)
+    .name("squall lasts (s)");
+  snowFolder
+    .add(SNOWSTORM_TUNING, "summerGrip", 0.5, 1, 0.01)
+    .name("summer grip in squall");
+  Debug.watch(
+    "snow",
+    () =>
+      `${snowstorm.status()}  grip x${VehiclePhysics.surfaceGrip.toFixed(2)}`,
+  );
   snowFolder.add(SNOW_TUNING, "fall", 0.2, 4, 0.05).name("fall m/s");
   snowFolder.add(SNOW_TUNING, "size", 0.01, 0.15, 0.005).name("flake size m");
   snowFolder.add(SNOW_TUNING, "opacity", 0, 1, 0.05);
@@ -803,7 +826,12 @@ mission.onDone = ({ chases, elapsed, reward }) =>
     true,
   );
 mission.onFeast = () =>
-  hud.stunt("LOX BAGEL", `By the clock tower, in ${formatClock(mission.elapsed)}.`, false, true);
+  hud.stunt(
+    "LOX BAGEL",
+    `By the clock tower, in ${formatClock(mission.elapsed)}.`,
+    false,
+    true,
+  );
 const audioFolder = Debug.addFolder("Audio");
 for (const k of Object.keys(audio.mixer.settings) as AudioKey[])
   audioFolder
@@ -891,10 +919,10 @@ function greet(): void {
   hint(3, "Press M for the city map: the GPS routes you.");
   hint(
     9,
-    "Don't let the SPVM see you drive too fast. Hit L for the speed limiter",
+    "Don't let the SPVM see you drive too fast. Hit 'L' for the speed limiter",
   );
   if (city.features.pitStops.length)
-    hint(16, "Garages are marked on the map: you can repair your car");
+    hint(16, "Garages are marked on the map: you can repair your car there");
 }
 
 /** Yaw of the screen's up direction on the ground (camera forward + up, projected), for the heading-up minimap. */

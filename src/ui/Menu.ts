@@ -261,12 +261,12 @@ export class Menu {
       items: [
         {
           label: "MISSION: PUT ON WINTER TIRES",
-          hint: "December 1st, and you forgot to change your summer tires. Avoid the SPVM.",
+          hint: "December 1st, and you forgot to change your summer tires. Avoid the SPVM and the potholes.",
           run: () => this.host.start("mission"),
         },
         {
-          label: "FREE ROAM: DRIVE THROUGH MONTREAL",
-          hint: `No destination, drive through Montreal. Careful with the potholes.`,
+          label: "FREE ROAM: DRIVE AROUND MONTREAL",
+          hint: `No destination, drive around Montreal. Careful with the potholes.`,
           run: () => this.host.start("free"),
         },
         {

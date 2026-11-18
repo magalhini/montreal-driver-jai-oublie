@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Build the game for https://<host>/neon-driver/ and upload it to the droplet: `npm run deploy`.
+# Build the game for https://magalhini.duckdns.org/montreal-driver/ and upload it to the droplet: `npm run deploy`.
 # Settings come from .env.deploy (git-ignored, like every .env.*):
 #   DEPLOY_HOST=root@203.0.113.10        ssh destination
-#   DEPLOY_PATH=/var/www/neon-driver     where nginx serves /neon-driver/ from
+#   DEPLOY_PATH=/var/www/montreal-driver where nginx serves /montreal-driver/ from
 #   DEPLOY_SSH_KEY=~/.ssh/id_ed25519     optional: the one key to offer (avoids "too many authentication failures")
 # Uploads in three passes so players mid-load never get an index.html pointing at missing files: the new
 # hashed assets first, then index.html, then the old files are removed.
@@ -11,8 +11,8 @@ cd "$(dirname "$0")/.."
 
 [ -f .env.deploy ] && . ./.env.deploy
 : "${DEPLOY_HOST:?set DEPLOY_HOST in .env.deploy}"
-: "${DEPLOY_PATH:=/var/www/neon-driver}"
-BASE=/neon-driver/
+: "${DEPLOY_PATH:=/var/www/montreal-driver}"
+BASE=/montreal-driver/
 OUT=dist-deploy
 
 SSH=(ssh -o ConnectTimeout=15)

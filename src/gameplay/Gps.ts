@@ -1,7 +1,7 @@
-import { stitchRoute, type Pathfinder, type Route } from '../ai/Pathfinding';
-import { dist, fwd } from '../core/math';
-import type { World } from '../core/World';
-import type { SimSystem, Vec2 } from '../types';
+import { stitchRoute, type Pathfinder, type Route } from "../ai/Pathfinding";
+import { dist, fwd } from "../core/math";
+import type { World } from "../core/World";
+import type { SimSystem, Vec2 } from "../types";
 
 export const GPS_TUNING = {
   /** Seconds between re-plans (a wrong turn shows a new route within this). */
@@ -23,7 +23,7 @@ export class Gps implements SimSystem {
   waypoint: Vec2 | null = null;
   destination: Vec2 | null = null;
   /** Radar word for `destination` ('DEST', or 'SUSPECT' while a patrol call is live). */
-  destName = 'DEST';
+  destName = "DEST";
   route: Route | null = null;
   /** Fixed destinations ignore map clicks. Career guidance does not. */
   private fixed = false;
@@ -50,7 +50,7 @@ export class Gps implements SimSystem {
   /** Custom waypoint (snapped to the nearest road centerline); null clears it. A fixed destination ignores a click. */
   setWaypoint(p: Vec2 | null): void {
     if (this.fixed && p) {
-      this.world.events.message('The GPS is set for this drive.', 'info');
+      this.world.events.message("The GPS is ready.", "info");
       return;
     }
     this.waypoint = p ? { ...this.finder.snap(p).pos } : null;
@@ -62,7 +62,7 @@ export class Gps implements SimSystem {
     this.vias = [];
     this.destination = p ? { ...p } : null;
     this.fixed = fixed && this.destination !== null;
-    if (!this.destination) this.destName = 'DEST';
+    if (!this.destination) this.destName = "DEST";
     this.replan();
   }
 
@@ -85,12 +85,13 @@ export class Gps implements SimSystem {
     // Arriving clears the click and falls back to the gameplay destination, if there is one.
     if (wp && !this.fixed && dist(pos, wp) < GPS_TUNING.arrive) {
       this.waypoint = null;
-      this.world.events.message('Waypoint reached', 'good');
+      this.world.events.message("Waypoint reached", "good");
       this.replan();
       return;
     }
     if (this.vias.length && dist(pos, this.vias[0]) < GPS_TUNING.arrive) {
-      while (this.vias.length && dist(pos, this.vias[0]) < GPS_TUNING.arrive) this.vias.shift();
+      while (this.vias.length && dist(pos, this.vias[0]) < GPS_TUNING.arrive)
+        this.vias.shift();
       this.replan();
       return;
     }
@@ -109,7 +110,9 @@ export class Gps implements SimSystem {
     const p = this.world.player;
     const heading = p.speed > 2 ? p.vel : fwd(p.yaw);
     if (this.vias.length) {
-      this.route = stitchRoute(this.finder, [p.pos, ...this.vias, target], heading) ?? this.finder.findRoute(p.pos, target, { heading });
+      this.route =
+        stitchRoute(this.finder, [p.pos, ...this.vias, target], heading) ??
+        this.finder.findRoute(p.pos, target, { heading });
       return;
     }
     this.route = this.finder.findRoute(p.pos, target, { heading });
