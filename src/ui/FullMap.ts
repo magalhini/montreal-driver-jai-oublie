@@ -4,7 +4,7 @@ import type { Input } from '../core/Input';
 import type { Gps } from '../gameplay/Gps';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
-import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawMetro, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawGear, drawMetro, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
 import { metroSites, type MetroSite } from '../world/MetroEntrances';
 import { mapLabels, streetLabels, type MapImage, type MapLabel, type StreetLabel } from './MapImage';
 import './map.css';
@@ -34,7 +34,7 @@ const HELP = [
 
 /**
  * Full-screen map (M): pan (drag, WASD / arrows), zoom (wheel around the cursor, + / -), district and landmark
- * labels, dispatch icon, police, GPS route. Clicking sets a waypoint (snapped to the nearest road) and routes
+ * labels, garage cogs, dispatch icon, police, GPS route. Clicking sets a waypoint (snapped to the nearest road) and routes
  * to it, replacing the path already on the map; clicking it again or right-clicking clears it. The game is
  * paused while it is open (main.ts).
  */
@@ -93,6 +93,7 @@ export class FullMap {
       ['route', 'route'],
       ['waypoint', 'waypoint'],
       ['station', 'SPVM station'],
+      ['garage', 'garage'],
       ['metro', 'métro'],
       ['alley', 'alley / underpass'],
       ['police', 'SPVM'],
@@ -169,6 +170,10 @@ export class FullMap {
       t.toScreen(m.pos, q);
       drawMetro(ctx, q.x, q.y, 14 * dpr);
     }
+    for (const s of this.city.features.pitStops) {
+      t.toScreen({ x: (s.canopy.minX + s.canopy.maxX) / 2, z: (s.canopy.minZ + s.canopy.maxZ) / 2 }, q);
+      drawGear(ctx, q.x, q.y, 18 * dpr);
+    }
     const station = this.city.features.station;
     if (station) {
       t.toScreen(station.dispatch, q);
@@ -209,6 +214,11 @@ export class FullMap {
     if (this.city.features.station) {
       t.toScreen(this.city.features.station.dispatch, q);
       placed.push({ x0: q.x - 48 * dpr, y0: q.y - 13 * dpr, x1: q.x + 48 * dpr, y1: q.y + 38 * dpr });
+    }
+    for (const s of this.city.features.pitStops) {
+      t.toScreen({ x: (s.canopy.minX + s.canopy.maxX) / 2, z: (s.canopy.minZ + s.canopy.maxZ) / 2 }, q);
+      const h = 12 * dpr;
+      placed.push({ x0: q.x - h, y0: q.y - h, x1: q.x + h, y1: q.y + h });
     }
     // Métro icons, and the station names under them when there is room
     for (const m of this.metro) {

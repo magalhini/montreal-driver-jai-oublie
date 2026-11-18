@@ -179,11 +179,12 @@ export class PotholeHits implements SimSystem {
     const centre = 1 - 0.5 * (d / p.r) ** 2;
     const k = deep * centre;
     const front = i < 2;
-    // Suspension thump (the view's landing bounce, the camera shake and the thud read these)
+    // Suspension thump (the view's landing bounce, the camera shake and the pothole rumble read these)
     const thump = Math.min(8, T.thump * speed * k);
     if (thump > s.landImpact * Math.exp(-s.landT * 6)) {
       s.landImpact = thump;
       s.landT = 0;
+      s.landPit = true;
     }
     const f = Math.min(1.5, kmh / 60);
     // Front wheel in: the nose dips. Rear wheel: the tail drops and the nose comes up.

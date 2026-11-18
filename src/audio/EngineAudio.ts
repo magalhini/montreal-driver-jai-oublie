@@ -24,7 +24,7 @@ const TICK_SPAN = 40;
 
 /**
  * Vehicle sounds (T34): the player's car (engine, tires, road, wind, scrapes, horn, turn signal relay,
- * gear clunks, landings, ignition and the cooling ticks after switching off), and a pool of voices lent
+ * gear clunks, landings, potholes, ignition and the cooling ticks after switching off), and a pool of voices lent
  * to the AI cars nearest the listener (engine with doppler, tires, road noise). Pursuing cops get priority.
  */
 export class EngineAudio {
@@ -123,8 +123,13 @@ export class EngineAudio {
     // Gear change
     if (s.gear !== this.lastGear && p.phys.engineOn && speed > 1) this.sfx.clunk(spot, ls.cabin ? 0.12 : 0.05);
     this.lastGear = s.gear;
-    // Landing
-    if (s.landT < this.lastLandT && s.landImpact > 1.5) this.sfx.thump({ ...spot, cat: 'crashes', wet: 0.2 }, clamp(s.landImpact / 9, 0.15, 1));
+    // Landing from the air, or a wheel dropping into a pothole (a low rumble, not a car crash)
+    if (s.landT < this.lastLandT && s.landImpact > 1.5) {
+      const k = clamp(s.landImpact / 9, 0.15, 1);
+      const hit = { ...spot, cat: 'crashes' as const, wet: 0.2 };
+      if (s.landPit) this.sfx.pothole(hit, k);
+      else this.sfx.thump(hit, k);
+    }
     this.lastLandT = s.landT;
     // Ignition: key click on the starter and on switching off, then the exhaust ticks as it cools
     const on = p.phys.engineOn;

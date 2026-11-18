@@ -49,6 +49,9 @@ export function surfaceAt(city: CityModel, p: Vec2): SurfaceKind {
   for (const r of f.interiors) if (inBox(p, r.box)) return 'interior';
   const b = city.blockAt(p);
   if (!b) {
+    // The wheel's island and footbridge are past the water line, and still raised pavement people stand on
+    const wheel = f.port?.wheel;
+    if (wheel && (inBox(p, wheel.deck) || inBox(p, wheel.bridge))) return 'sidewalk';
     const o = city.bounds;
     if (!(p.x > o.minX && p.x < o.maxX && p.z < city.waterZ)) return 'outside';
     // The Old Port's parking lot and its curb cuts; the rest of the promenade is raised pavement

@@ -4,7 +4,7 @@ import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import { LOOK } from '../render/Look';
 import type { AABB, Vec2 } from '../types';
-import type { PlazaDressing } from './Features';
+import type { PlazaDressing, PortClosure } from './Features';
 import type { CityModel } from './RoadGraph';
 import { lawnSnowMaterial, snowMaterial } from './SnowCover';
 import { SurfaceBuilder } from './SurfaceBuilder';
@@ -56,6 +56,10 @@ export function buildPlazas(city: CityModel, scene: THREE.Scene): void {
   }
   for (const s of squares) props.fountain(s.fountain.pos, s.fountain.r, s.monument);
   for (const p of port?.piers ?? []) props.pier(p.deck, p.shed, curb);
+  if (port?.closure) {
+    props.closure(port.closure);
+    for (const bench of port.closure.benches) props.bench(bench.pos, bench.yaw);
+  }
   if (port) props.bayLines(port.lot, f.parking, (x, z) => t.heightAt(x, z));
   props.build(scene);
 }
@@ -161,6 +165,36 @@ class Props {
       ring(new THREE.CircleGeometry(2.05, 20).rotateX(-Math.PI / 2).translate(0, 2.21, 0), this.snow, 0);
       ring(new THREE.CylinderGeometry(0.25, 0.35, 1.1, 10).translate(0, 2.75, 0), this.stone, 0);
       ring(new THREE.CylinderGeometry(1.0, 0.3, 0.35, 16).translate(0, 3.4, 0), this.stone, 0);
+    }
+  }
+
+  /**
+   * The end of the promenade past the clock: a stone wall on the map edge, a low parapet along the water,
+   * and a kiosk against the wall. Their boxes are the colliders.
+   */
+  closure(c: PortClosure): void {
+    const block = (r: { minX: number; maxX: number; minZ: number; maxZ: number }, h: number, list: THREE.BufferGeometry[], lift = 0) => {
+      const x = (r.minX + r.maxX) / 2;
+      const z = (r.minZ + r.maxZ) / 2;
+      const y = this.Y(x, z) + lift;
+      list.push(new THREE.BoxGeometry(r.maxX - r.minX, h, r.maxZ - r.minZ).translate(x, y + h / 2, z));
+    };
+    block(c.wall, c.wallH, this.stone);
+    block(c.wall, 0.1, this.snow, c.wallH + 0.01);
+    block(c.parapet, c.parapetH, this.stone);
+    block(c.parapet, 0.08, this.snow, c.parapetH + 0.01);
+    for (const k of c.kiosks) {
+      const x = (k.minX + k.maxX) / 2;
+      const z = (k.minZ + k.maxZ) / 2;
+      const y = this.Y(x, z);
+      const w = k.maxX - k.minX;
+      const d = k.maxZ - k.minZ;
+      this.stone.push(new THREE.BoxGeometry(w + 0.12, 0.16, d + 0.12).translate(x, y + 0.08, z));
+      const bodyH = c.kioskH - 0.28;
+      this.shed.push(new THREE.BoxGeometry(w, bodyH, d).translate(x, y + 0.16 + bodyH / 2, z));
+      // Counter window toward the promenade (west)
+      this.glass.push(new THREE.BoxGeometry(0.06, 1.15, d - 0.7).translate(k.minX - 0.02, y + 1.55, z));
+      this.snow.push(new THREE.BoxGeometry(w + 0.35, 0.16, d + 0.35).translate(x, y + c.kioskH - 0.08, z));
     }
   }
 

@@ -254,11 +254,24 @@ function addHarbor(scene: THREE.Scene, city: CityModel, day: boolean): void {
   water.rotation.x = -Math.PI / 2;
   water.position.set(0, -0.6, city.waterZ + 600);
   scene.add(water);
-  // Quay wall, in short runs: one 3 km face has the same near-plane flash as the water
+  // Quay wall, in short runs: one 3 km face has the same near-plane flash as the water.
+  // The footbridge to the wheel cuts one run in two.
   const span = 40;
   const runs = Math.ceil(3000 / span);
-  const wall = new THREE.InstancedMesh(new THREE.BoxGeometry(span, 2, 1), new THREE.MeshStandardMaterial({ color: day ? 0x6a6660 : 0x2a2a30 }), runs);
+  const gap = city.features.port?.wheel?.bridge;
+  const pieces: { x: number; w: number }[] = [];
+  for (let i = 0; i < runs; i++) {
+    const a = -1500 + i * span;
+    const b = a + span;
+    const cut = gap && gap.minX < b && gap.maxX > a;
+    if (!cut) pieces.push({ x: (a + b) / 2, w: span });
+    else {
+      if (gap.minX - a > 0.4) pieces.push({ x: (a + gap.minX) / 2, w: gap.minX - a });
+      if (b - gap.maxX > 0.4) pieces.push({ x: (gap.maxX + b) / 2, w: b - gap.maxX });
+    }
+  }
+  const wall = new THREE.InstancedMesh(new THREE.BoxGeometry(1, 2, 1), new THREE.MeshStandardMaterial({ color: day ? 0x6a6660 : 0x2a2a30 }), Math.max(1, pieces.length));
   const wallM = new THREE.Matrix4();
-  for (let i = 0; i < runs; i++) wall.setMatrixAt(i, wallM.makeTranslation(-1500 + (i + 0.5) * span, -0.5, city.waterZ + 0.5));
+  pieces.forEach((p, i) => wall.setMatrixAt(i, wallM.makeScale(p.w, 1, 1).setPosition(p.x, -0.5, city.waterZ + 0.5)));
   scene.add(wall);
 }

@@ -164,15 +164,43 @@ export class WalkGraph {
         this.sidewalkEdges.push(w(corner(b, ca), mid), w(mid, corner(b, cb)), w(mid, ring[rk]));
       }
     }
-    // The Old Port's promenade: one long walk by the water (walkers turn round at its ends)
+    // The Old Port's promenade: one long walk by the water (walkers turn round at its ends), and a branch
+    // across the footbridge onto the wheel's island
     const port = city.features.port;
     if (port) {
       const { z, x0, x1 } = port.stroll;
+      const wheel = port.wheel;
       const n = Math.max(1, Math.round((x1 - x0) / PED_TUNING.promenadeStep));
+      const hop = (a: number, b: number) => this.sidewalkEdges.push(this.link(a, b, null, 'harbor', 1, PED_TUNING.promenadeBoost));
+      let ring: number[] | null = null;
+      const island = () => {
+        if (ring || !wheel) return ring;
+        const c = wheel.pos;
+        const r = 10;
+        ring = [0, 1, 2, 3].map((k) => this.node({ x: c.x + Math.cos((k * Math.PI) / 2) * r, z: c.z + Math.sin((k * Math.PI) / 2) * r }));
+        for (let k = 0; k < 4; k++) hop(ring[k], ring[(k + 1) % 4]);
+        return ring;
+      };
       let prev = this.node({ x: x0, z });
       for (let k = 1; k <= n; k++) {
         const next = this.node({ x: x0 + ((x1 - x0) * k) / n, z });
-        this.sidewalkEdges.push(this.link(prev, next, null, 'harbor', 1, PED_TUNING.promenadeBoost));
+        const px = this.nodes[prev].pos.x;
+        const nx = this.nodes[next].pos.x;
+        const cuts = wheel ? wheel.gaps.filter((gx) => px < gx && gx <= nx) : [];
+        if (!cuts.length) hop(prev, next);
+        else {
+          const loop = island()!;
+          let cursor = prev;
+          for (const gx of cuts) {
+            const gate = this.node({ x: gx, z });
+            hop(cursor, gate);
+            const land = this.node({ x: gx, z: wheel!.deck.minZ + 2.4 });
+            hop(gate, land);
+            hop(land, loop[3]);
+            cursor = gate;
+          }
+          hop(cursor, next);
+        }
         prev = next;
       }
     }

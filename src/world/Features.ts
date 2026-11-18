@@ -106,6 +106,7 @@ export interface CitySquare extends PlazaDressing {
 /**
  * Vieux-Port: a long pedestrian promenade between the quay road and the St. Lawrence (raised: no cars), lawns
  * along the road, a paved walk by the water, and at the east end a road-level parking lot and the clock tower.
+ * La Grande Roue stands on an island in the river, off a footbridge cars cannot take.
  */
 export interface OldPort extends PlazaDressing {
   /** Road curb to the water. */
@@ -120,6 +121,44 @@ export interface OldPort extends PlazaDressing {
   stroll: { z: number; x0: number; x1: number };
   /** Quays out into the river with a long hangar on each (scenery past the quay wall: not reachable). */
   piers: { deck: AABB; shed: AABB }[];
+  /** La Grande Roue, on an island just west of the clock tower. */
+  wheel?: PortWheel;
+  /**
+   * The dead end past the clock tower. The map wall there is solid; these are the stone wall, the water
+   * parapet and the kiosks that show it (their boxes are also in `colliders`).
+   */
+  closure?: PortClosure;
+}
+
+/**
+ * The wheel's island. The quay wall is open only across `bridge`, and `gate` splits that mouth into two gaps
+ * (`gaps`) narrower than any car. People walk those lines; the mesh is `world/FerrisWheel.ts`.
+ */
+export interface PortWheel {
+  deck: AABB;
+  /** Slab from the water line out to the island. */
+  bridge: AABB;
+  /** Center barrier in the bridge mouth. `top` stops a car and stays low enough to read as a gate. */
+  gate: AABB;
+  pos: Vec2;
+  /** Rim radius. */
+  radius: number;
+  /** x of the two walking lines through the mouth, west then east. */
+  gaps: [number, number];
+}
+
+/** What closes the promenade east of the clock, so the map edge is something you can see. */
+export interface PortClosure {
+  /** Along the east edge, from the quay road to the water. */
+  wall: AABB;
+  /** Along the water, from the clock's east side to that wall. */
+  parapet: AABB;
+  kiosks: AABB[];
+  /** Benches in front of the kiosks. Not part of `OldPort.benches` (that list is the waterfront stroll). */
+  benches: { pos: Vec2; yaw: number }[];
+  wallH: number;
+  parapetH: number;
+  kioskH: number;
 }
 
 /** Notre-Dame: front on Notre-Dame (facing -Z), two towers at the front corners, the nave behind. */
@@ -179,8 +218,8 @@ export interface CityPark {
   /** Further curb cuts, when the garden opens onto more than one street. Also listed in `driveways`. */
   gates?: AABB[];
   /**
-   * Inside the street wall, with a gate instead of an open side. On the lawn the chase camera lifts to the
-   * top view. In a gate (a narrow lane) it takes the driver's seat (`CameraRig`).
+   * Inside the street wall, with a gate instead of an open side. The chase camera takes the driver's seat
+   * on the lawn and in the gates, until the car leaves (`CameraRig`).
    */
   enclosed?: boolean;
   /** A pavilion or a column standing off the paths. */

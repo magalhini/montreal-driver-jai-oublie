@@ -320,7 +320,7 @@ function addAlleyPanel({ city, player, camRig }: DebugSystems): void {
 /**
  * Teleports for checking the places the drive goes: every garage (dropped in its circle with the menu open),
  * Jacques-Cartier Pneus with the winter tires already in the trunk (the TIRES tab's INSTALL row), the storage circle on
- * Ottawa, and the home bay.
+ * Ottawa, the home bay, and the clock tower's parking lot.
  */
 function addTeleportPanel({ city, player, camRig, openPitShop, mission, storage, events }: DebugSystems): void {
   const folder = Debug.addFolder('Teleport');
@@ -371,6 +371,19 @@ function addTeleportPanel({ city, player, camRig, openPitShop, mission, storage,
         'go',
       )
       .name('Vieux-Port lot (the bagel)');
+  const lot = city.features.port?.lot;
+  if (lot)
+    folder
+      .add(
+        {
+          go: () => {
+            // North aisle, mid-lot, facing the clock at the east end. Already in the stalls, not short of the curb cut.
+            put({ x: (lot.minX + lot.maxX) / 2, z: lot.minZ + 3.8 }, Math.PI / 2);
+          },
+        },
+        'go',
+      )
+      .name('clock tower parking lot');
   const home = city.features.curb.find((b) => b.legal);
   if (home) folder.add({ go: () => put(home.pos, home.yaw) }, 'go').name('home bay (the start)');
 }

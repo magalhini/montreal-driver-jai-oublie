@@ -4,7 +4,7 @@ import type { Gps } from '../gameplay/Gps';
 import type { ViewSystem, Vec2 } from '../types';
 import type { Car } from '../vehicles/Car';
 import type { CityModel } from '../world/RoadGraph';
-import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawMetro, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
+import { MAP_INK, MapTransform, copColor, drawArrow, drawBase, drawBlip, drawDispatch, drawGear, drawMetro, drawPin, drawStreetLabels, formatDistance, strokeRoute, type Px } from './MapDraw';
 import { metroSites } from '../world/MetroEntrances';
 import { streetLabels, type MapImage, type StreetLabel } from './MapImage';
 import './map.css';
@@ -18,8 +18,9 @@ const LEAD = 0.3;
 
 /**
  * Corner radar (Canvas 2D): the pre-rendered city rotated to the camera's heading, zooming out with speed,
- * with the GPS route, target pin (pinned to the rim when off-radar), dispatch icon, police blips (flashing
- * and rim-pinned while in pursuit) and the player arrow. The distance to the target sits under the radar.
+ * with the GPS route, target pin (pinned to the rim when off-radar), garage cogs, dispatch icon, police
+ * blips (flashing and rim-pinned while in pursuit) and the player arrow. The distance to the target sits
+ * under the radar.
  */
 export class Minimap implements ViewSystem {
   visible = true;
@@ -93,8 +94,13 @@ export class Minimap implements ViewSystem {
 
     const now = performance.now();
     const rim = R - 7 * dpr;
-    // Métro entrances in reach (no rim pins: they aren't somewhere you need to go)
+    // Métro entrances and garages in reach (no rim pins: they aren't somewhere you need to go).
+    // The cog stays a fixed screen size so a garage reads while driving past, not as a few pale pixels.
     for (const m of metroSites(this.city)) if (this.place(m.pos, rim)) drawMetro(ctx, q.x, q.y, 9 * dpr);
+    for (const s of this.city.features.pitStops) {
+      const at = { x: (s.canopy.minX + s.canopy.maxX) / 2, z: (s.canopy.minZ + s.canopy.maxZ) / 2 };
+      if (this.place(at, rim)) drawGear(ctx, q.x, q.y, 22 * dpr);
+    }
     // Precinct (always shown), then patrol cops (only inside the radar), pursuers (pinned to the rim)
     const station = this.city.features.station;
     if (station) drawDispatch(ctx, q.x, q.y, (this.place(station.dispatch, rim) ? 13 : 9) * dpr, station.color, station.glyph);

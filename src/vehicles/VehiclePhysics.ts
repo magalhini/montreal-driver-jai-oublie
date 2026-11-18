@@ -141,6 +141,7 @@ export class VehiclePhysics {
       water: 0,
       landT: 99,
       landImpact: 0,
+      landPit: false,
       heave: 0,
       heaveV: 0,
       susPitch: 0,
@@ -510,6 +511,7 @@ export class VehiclePhysics {
         const vyGround = this.groundRate(h);
         s.landImpact = Math.max(0, vyGround - s.vy);
         s.landT = 0;
+        s.landPit = false;
         s.y = h;
         s.vy = vyGround;
         s.airborne = false;

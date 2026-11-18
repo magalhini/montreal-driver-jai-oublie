@@ -178,6 +178,45 @@ export class Sfx {
     }
   }
 
+  /**
+   * A wheel dropping into a pothole: a low boom and a short dull crush of asphalt.
+   * Darker than hitting a car — no panel ring, no glass — but still in the band small speakers carry.
+   */
+  pothole(spot: Spot, k: number): void {
+    const mx = this.mx;
+    const t = mx.now + 0.005;
+    const out = this.entry(spot, 1.6);
+    const kk = Math.min(1, Math.max(0.12, k));
+    // Boom, then it falls into a rumble. Lower than a car hit (that one starts near 120 Hz).
+    const body = this.osc('sine', rnd(72, 88), this.env(out, t, 0.42 + 0.4 * kk, 0.004, 0.42), t, 0.7);
+    body.frequency.exponentialRampToValueAtTime(34, t + 0.28);
+    const sub = this.osc('sine', rnd(40, 48), this.env(out, t, 0.18 + 0.16 * kk, 0.008, 0.7), t, 0.9);
+    sub.frequency.exponentialRampToValueAtTime(26, t + 0.4);
+    // The body of the impact: starts with some mid, then settles into the rumble
+    const lp = mx.filter('lowpass', 520, 0.7);
+    lp.frequency.setValueAtTime(640, t);
+    lp.frequency.exponentialRampToValueAtTime(160, t + 0.35);
+    lp.connect(this.env(out, t, 0.35 + 0.35 * kk, 0.003, 0.4));
+    this.noise('brown', lp, t, 0.55);
+    // Dull crush, about an octave below a car's metal crunch
+    const shaper = mx.ctx.createWaveShaper();
+    shaper.curve = crunchCurve();
+    const bp = mx.filter('bandpass', 380 + kk * 80, 0.8);
+    const gate = mx.ctx.createGain();
+    gate.gain.setValueAtTime(0, t);
+    const bursts = 3 + (kk > 0.6 ? 2 : 0);
+    const span = 0.05 + kk * 0.08;
+    for (let i = 0; i < bursts; i++) {
+      const at = t + (i === 0 ? 0 : Math.pow(Math.random(), 1.5) * span);
+      gate.gain.setValueAtTime(rnd(0.55, 1) * (1 - (at - t) / (span + 0.05)), at);
+      gate.gain.setTargetAtTime(0, at + 0.004, rnd(0.01, 0.025));
+    }
+    this.noise('pink', bp, t, span + 0.2);
+    bp.connect(shaper);
+    shaper.connect(gate);
+    gate.connect(mx.gain(out, 0.28 + 0.12 * kk));
+  }
+
   /** Landing or bottoming out: low thud and a suspension clank for big ones. */
   thump(spot: Spot, k: number): void {
     const mx = this.mx;

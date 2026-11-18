@@ -51,8 +51,9 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   // Grid map (Tokyo): outer ring, far ground and canal cuts come from the grid lines (behind `city.grid` in T49)
   const grid = city.nx > 0;
 
-  // Roads between junctions, and the junction areas
-  for (const e of city.edges) roadRibbon(e.cls === 'cobble' ? setts : ground, e);
+  // Roads between junctions, and the junction areas. Over a canal bridge the deck is resampled on the arch.
+  const hump = f.canal ? { z0: f.canal.zc - f.canal.humpHalf, z1: f.canal.zc + f.canal.humpHalf } : null;
+  for (const e of city.edges) roadRibbon(e.cls === 'cobble' ? setts : ground, e, hump);
   for (const n of city.nodes) {
     const r = asRect(n.poly);
     if (r) ground.patch(r.minX, r.minZ, r.maxX, r.maxZ);
@@ -98,12 +99,12 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
     ];
     walk.polygon(box, [outer], curb, 2);
   }
-  for (const q of raised) walk.patch(q.minX, q.minZ, q.maxX, q.maxZ, curb, 4);
+  for (const q of raised) paintWalk(walk, q, hump, curb);
 
   // Curbstones wherever a raised slab meets road level
   const curbColor = new THREE.Color(0.55, 0.55, 0.58);
   const curbAt = (x: number, z: number) => t.curbAt(x, z);
-  for (const q of raised) addCurbs(q, curbAt, H, curbs, curbColor);
+  for (const q of raised) addCurbs(q, curbAt, H, curbs, curbColor, hump);
   for (const p of slabs) polyCurbs(p, 1, curbAt, H, curbs, curbColor);
   if (outer) {
     polyCurbs(outer, -1, curbAt, H, curbs, curbColor);
@@ -193,6 +194,10 @@ function farGround(city: CityModel, ground: SurfaceBuilder): void {
     : [[oz0, city.waterZ]];
   for (const [z0, z1] of sides) far.push(rect(b.minX - PAD, z0, ox0, z1), rect(ox1, z0, b.maxX + PAD, z1));
   for (const q of far) ground.patch(q.minX, q.minZ, q.maxX, q.maxZ, -0.02, 8);
+  // East of the promenade the ring stops at the map wall and the far ground used to start 40 m later: a void
+  // behind the clock tower. Fill that gap so the wall there has ground behind it.
+  const quayZ = city.zs[city.nz - 1] + city.hwZ[city.nz - 1];
+  if (ox1 > b.maxX + 1 && city.waterZ > quayZ) ground.patch(b.maxX, quayZ, ox1, city.waterZ, -0.02, 8);
 }
 
 /** The polygon as a rect when it is an axis-aligned rectangle (grid junctions: keep the patch tessellation). */
@@ -209,7 +214,7 @@ function asRect(poly: Vec2[]): Rect | null {
 }
 
 /** A road's asphalt between its junctions: a patch for a straight axis-aligned road, else a ribbon along `pts`. */
-function roadRibbon(out: SurfaceBuilder, e: RoadEdge): void {
+function roadRibbon(out: SurfaceBuilder, e: RoadEdge, hump: { z0: number; z1: number } | null): void {
   const hw = e.width / 2;
   const p = e.pts;
   if (p.length === 2 && (p[0].x === p[1].x || p[0].z === p[1].z)) {
@@ -219,10 +224,31 @@ function roadRibbon(out: SurfaceBuilder, e: RoadEdge): void {
     const z0 = Math.min(p[0].z, p[1].z);
     const z1 = Math.max(p[0].z, p[1].z);
     if (along) out.patch(x0, z0 - hw, x1, z0 + hw);
-    else out.patch(x0 - hw, z0, x0 + hw, z1);
+    else if (hump && z1 > hump.z0 && z0 < hump.z1) {
+      // The hump is an arc. A single patch across the whole block chords it and leaves a gap beside the parapet.
+      const a = Math.max(z0, hump.z0);
+      const b = Math.min(z1, hump.z1);
+      if (a - z0 > 0.02) out.patch(x0 - hw, z0, x0 + hw, a);
+      out.patch(x0 - hw, a, x0 + hw, b, 0, 0.5);
+      if (z1 - b > 0.02) out.patch(x0 - hw, b, x0 + hw, z1);
+    } else out.patch(x0 - hw, z0, x0 + hw, z1);
     return;
   }
   out.strip(offset(p, hw), offset(p, -hw), 0, 2);
+}
+
+/** Sidewalk over a bridge: the same fine step as the road, so the walk follows the arch instead of a chord. */
+function paintWalk(walk: SurfaceBuilder, q: Rect, hump: { z0: number; z1: number } | null, curb: number): void {
+  const narrow = q.maxX - q.minX <= CONFIG.SIDEWALK + 0.2 && q.maxZ - q.minZ > q.maxX - q.minX;
+  if (!hump || !narrow || q.minZ >= hump.z1 || q.maxZ <= hump.z0) {
+    walk.patch(q.minX, q.minZ, q.maxX, q.maxZ, curb, 4);
+    return;
+  }
+  const a = Math.max(q.minZ, hump.z0);
+  const b = Math.min(q.maxZ, hump.z1);
+  if (a - q.minZ > 0.02) walk.patch(q.minX, q.minZ, q.maxX, a, curb, 4);
+  walk.patch(q.minX, a, q.maxX, b, curb, 0.5);
+  if (q.maxZ - b > 0.02) walk.patch(q.minX, b, q.maxX, q.maxZ, curb, 4);
 }
 
 /** Split [lo, hi] by removing the given intervals. */
@@ -322,14 +348,20 @@ type CurbAt = (x: number, z: number) => number;
 type HeightAt = (x: number, z: number) => number;
 
 /** Curb faces + curbstone band along the edges of a raised rect that border road level. */
-function addCurbs(q: Rect, curbAt: CurbAt, H: HeightAt, out: SurfaceBuilder, color: THREE.Color): void {
+function addCurbs(q: Rect, curbAt: CurbAt, H: HeightAt, out: SurfaceBuilder, color: THREE.Color, hump: { z0: number; z1: number } | null = null): void {
   const edges: { a: [number, number]; b: [number, number]; n: { x: number; z: number } }[] = [
     { a: [q.minX, q.minZ], b: [q.maxX, q.minZ], n: { x: 0, z: -1 } },
     { a: [q.maxX, q.maxZ], b: [q.minX, q.maxZ], n: { x: 0, z: 1 } },
     { a: [q.minX, q.maxZ], b: [q.minX, q.minZ], n: { x: -1, z: 0 } },
     { a: [q.maxX, q.minZ], b: [q.maxX, q.maxZ], n: { x: 1, z: 0 } },
   ];
-  for (const e of edges) curbEdge(e.a, e.b, e.n, curbAt, H, out, color);
+  for (const e of edges) {
+    const z0 = Math.min(e.a[1], e.b[1]);
+    const z1 = Math.max(e.a[1], e.b[1]);
+    // The long edges of a bridge sidewalk run across the arch (their normal is ±x)
+    const alongBridge = !!hump && Math.abs(e.n.x) > 0.5 && z1 > hump.z0 && z0 < hump.z1;
+    curbEdge(e.a, e.b, e.n, curbAt, H, out, color, alongBridge ? 0.5 : 2);
+  }
 }
 
 /**
@@ -350,7 +382,7 @@ function polyCurbs(poly: Vec2[], side: 1 | -1, curbAt: CurbAt, H: HeightAt, out:
 }
 
 /** Curb face + curbstone band along one slab edge a-b (outward normal n), wherever the ground beyond it is low. */
-function curbEdge(a: [number, number], b: [number, number], n: Vec2, curbAt: CurbAt, H: HeightAt, out: SurfaceBuilder, color: THREE.Color): void {
+function curbEdge(a: [number, number], b: [number, number], n: Vec2, curbAt: CurbAt, H: HeightAt, out: SurfaceBuilder, color: THREE.Color, cell = 2): void {
   const curb = CONFIG.CURB_HEIGHT;
   const top = (x: number, z: number) => H(x, z) + curb + 0.004;
   const STEP = 1;
@@ -361,18 +393,18 @@ function curbEdge(a: [number, number], b: [number, number], n: Vec2, curbAt: Cur
   const flush = (k0: number, k1: number) => {
     const [x0, z0] = at(k0);
     const [x1, z1] = at(k1);
-    out.wall(x0, z0, x1, z1, n, (x, z) => H(x, z) - 0.02, top, 2, color);
+    out.wall(x0, z0, x1, z1, n, (x, z) => H(x, z) - 0.02, top, cell, color);
     // curbstone top band, inside the edge
     if (n.x !== 0 && n.z !== 0) {
       const inner = (x: number, z: number) => ({ x: x - n.x * BAND, z: z - n.z * BAND });
-      out.strip([{ x: x0, z: z0 }, { x: x1, z: z1 }], [inner(x0, z0), inner(x1, z1)], curb + 0.006, 2, color);
+      out.strip([{ x: x0, z: z0 }, { x: x1, z: z1 }], [inner(x0, z0), inner(x1, z1)], curb + 0.006, cell, color);
       return;
     }
     const bx0 = Math.min(x0, x1, x0 - n.x * BAND);
     const bx1 = Math.max(x0, x1, x0 - n.x * BAND);
     const bz0 = Math.min(z0, z1, z0 - n.z * BAND);
     const bz1 = Math.max(z0, z1, z0 - n.z * BAND);
-    out.patch(bx0, bz0, bx1, bz1, curb + 0.006, 2, color);
+    out.patch(bx0, bz0, bx1, bz1, curb + 0.006, cell, color);
   };
   let runStart = -1;
   for (let k = 0; k < steps; k++) {

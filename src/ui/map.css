@@ -205,6 +205,19 @@
   background: #12182e;
   box-shadow: 0 0 6px #6aa6ff;
 }
+.fullmap-legend .garage {
+  width: 14px;
+  height: 14px;
+  background: none;
+  color: #ffb43e;
+  font-size: 16px;
+  line-height: 12px;
+  text-align: center;
+  text-shadow: 0 0 6px #ffb43e;
+}
+.fullmap-legend .garage::before {
+  content: '⚙';
+}
 .fullmap-legend .metro {
   border: 1px solid rgba(255, 255, 255, 0.85);
   box-sizing: border-box;

@@ -51,7 +51,8 @@ export function buildCanal(city: CityModel, scene: THREE.Scene): CanalSet | null
   const stoneMat = new THREE.MeshStandardMaterial({ color: 0x9a96a4, map: stone, roughness: 0.85, metalness: 0.05 });
   scene.add(walls.mesh(stoneMat));
 
-  // Bridges: arched underside, fascia + parapets, lamp posts at the four corners
+  // Bridges: the arch, the parapets and their caps share one set of stations, so the side is a single
+  // arc instead of straight chords with gaps under the deck and the sidewalk.
   const bridge = new SurfaceBuilder((x, z) => t.heightAt(x, z), 0.5);
   const half = (k.z1 - k.z0) / 2;
   const deck = (x: number, z: number) => t.base(x, z) + t.hump(x, z);
@@ -62,26 +63,48 @@ export function buildCanal(city: CityModel, scene: THREE.Scene): CanalSet | null
   const lampPosts: THREE.Matrix4[] = [];
   const lampHeads: THREE.Matrix4[] = [];
   const parapetTop = (x: number, z: number) => deck(x, z) + curb + 0.95;
+  const lip = 0.4;
   for (let i = 0; i < nx; i++) {
     const e = city.hwX[i] + sw;
     const xa = city.xs[i] - e;
     const xb = city.xs[i] + e;
     const archAt = (z: number) => arch(city.xs[i], z);
-    // underside, under the whole deck width (including the parapets)
-    const under = new SurfaceBuilder((_x, z) => archAt(z), 0.5);
-    under.patch(xa - 0.35, k.z0, xb + 0.35, k.z1, 0, 1.5, undefined, true);
-    scene.add(under.mesh(stoneMat));
-    // Parapets along the hump: outer faces down to the arch over the water / the lot ground beyond
+    // Inclusive of the quays: the old test was strict, so the end station jumped up to the road and left a hole
+    const onWater = (z: number) => z >= k.z0 - 1e-3 && z <= k.z1 + 1e-3;
+    const outerBottom = (side: number) => (x: number, z: number) => (onWater(z) ? archAt(z) : t.base(x + side * 0.6, z));
     const z0 = k.zc - k.humpHalf;
     const z1 = k.zc + k.humpHalf;
-    const outerBottom = (side: number) => (x: number, z: number) => (z > k.z0 && z < k.z1 ? archAt(z) : t.base(x + side * 0.6, z));
-    bridge.wall(xa - 0.35, z1, xa - 0.35, z0, { x: -1, z: 0 }, outerBottom(-1), parapetTop, 1.5);
-    bridge.wall(xb + 0.35, z0, xb + 0.35, z1, { x: 1, z: 0 }, outerBottom(1), parapetTop, 1.5);
-    bridge.wall(xa, z0, xa, z1, { x: 1, z: 0 }, (x, z) => deck(x, z) + curb, parapetTop, 1.5);
-    bridge.wall(xb, z1, xb, z0, { x: -1, z: 0 }, (x, z) => deck(x, z) + curb, parapetTop, 1.5);
+    const zs = sampleCurve(z0, z1, (z) => outerBottom(0)(city.xs[i], z));
+    // The arch springs from the quay. A station there keeps the side wall and the underside on the same edge.
+    for (const z of [k.z0, k.z1]) if (z > z0 + 1e-3 && z < z1 - 1e-3) zs.push(z);
+    zs.sort((a, b) => a - b);
+    // wall() drops a run shorter than a centimeter, which would open the side. Keep the ends, drop the rest.
+    const kept = [zs[0]];
+    for (let s = 1; s < zs.length - 1; s++) if (zs[s] - kept[kept.length - 1] >= 0.02) kept.push(zs[s]);
+    if (zs[zs.length - 1] - kept[kept.length - 1] < 0.02) kept.pop();
+    kept.push(zs[zs.length - 1]);
+    zs.length = 0;
+    zs.push(...kept);
+    // underside, under the whole deck width (including the parapets), only where the arch is over the water
+    const under = new SurfaceBuilder((_x, z) => archAt(z), 0.5);
+    const waterZs = zs.filter((z) => onWater(z));
+    if (waterZs.length >= 2) under.sheet(xa - lip, xb + lip, waterZs, true);
+    scene.add(under.mesh(stoneMat));
+    const span = (x: number, zA: number, zB: number, normal: { x: number; z: number }, bottom: (x: number, z: number) => number) => {
+      // One quad per station. A long cell keeps wall() from resampling the arc into a different chord.
+      bridge.wall(x, zA, x, zB, normal, bottom, parapetTop, 8);
+    };
+    for (let s = 1; s < zs.length; s++) {
+      const a = zs[s - 1];
+      const b = zs[s];
+      span(xa - lip, b, a, { x: -1, z: 0 }, outerBottom(-1));
+      span(xb + lip, a, b, { x: 1, z: 0 }, outerBottom(1));
+      span(xa, a, b, { x: 1, z: 0 }, (x, z) => deck(x, z) + curb);
+      span(xb, b, a, { x: -1, z: 0 }, (x, z) => deck(x, z) + curb);
+    }
     const cap = new SurfaceBuilder((x, z) => parapetTop(x, z), 0.5);
-    cap.patch(xa - 0.4, z0, xa + 0.05, z1, 0, 1.5);
-    cap.patch(xb - 0.05, z0, xb + 0.4, z1, 0, 1.5);
+    cap.sheet(xa - lip, xa + 0.05, zs);
+    cap.sheet(xb - 0.05, xb + lip, zs);
     scene.add(cap.mesh(stoneMat));
     // Ends of the arch over the water (vertical faces at the quays are the quay walls)
     for (const [x, z] of [
@@ -152,6 +175,33 @@ export function buildCanal(city: CityModel, scene: THREE.Scene): CanalSet | null
       }
     },
   };
+}
+
+/**
+ * Stations along z where the straight chord stays within `tol` of `y`, and no step is longer than a meter.
+ * The arch meets the water almost vertically, so equal steps leave a hole at each springing.
+ */
+function sampleCurve(z0: number, z1: number, y: (z: number) => number, tol = 0.012): number[] {
+  if (!(z1 > z0)) return [z0, z1];
+  const zs = [z0];
+  const off = (a: number, b: number, ya: number, yb: number) => {
+    let e = 0;
+    for (let k = 1; k < 8; k++) {
+      const t = k / 8;
+      e = Math.max(e, Math.abs(y(a + (b - a) * t) - (ya + (yb - ya) * t)));
+    }
+    return e;
+  };
+  const rec = (a: number, b: number, ya: number, yb: number, d: number) => {
+    if (d < 18 && b - a > 0.04 && (off(a, b, ya, yb) > tol || b - a > 1)) {
+      const m = (a + b) / 2;
+      const ym = y(m);
+      rec(a, m, ya, ym, d + 1);
+      rec(m, b, ym, yb, d + 1);
+    } else zs.push(b);
+  };
+  rec(z0, z1, y(z0), y(z1), 0);
+  return zs;
 }
 
 function makeBoat(rng: Rng): THREE.Group {

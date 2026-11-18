@@ -171,6 +171,54 @@ export function drawDispatch(ctx: CanvasRenderingContext2D, x: number, y: number
   ctx.restore();
 }
 
+/**
+ * A garage: an amber cog on a dark disc, large enough to read on the minimap while driving past.
+ * `size` is the disc diameter in canvas pixels.
+ */
+export function drawGear(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
+  const teeth = 6;
+  const step = (Math.PI * 2) / teeth;
+  const root = size * 0.22;
+  const tip = size * 0.4;
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.shadowColor = '#ffb43e';
+  ctx.shadowBlur = size * 0.7;
+  ctx.fillStyle = '#1a1006';
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = Math.max(1, size * 0.06);
+  ctx.strokeStyle = '#ffb43e';
+  ctx.stroke();
+  ctx.fillStyle = '#ffb43e';
+  ctx.beginPath();
+  for (let i = 0; i < teeth; i++) {
+    const a0 = -Math.PI / 2 + i * step;
+    const a1 = a0 + step * 0.2;
+    const a2 = a0 + step * 0.8;
+    const a3 = a0 + step;
+    const p = (a: number, r: number) => [Math.cos(a) * r, Math.sin(a) * r] as const;
+    const [x0, y0] = p(a0, root);
+    const [x1, y1] = p(a1, tip);
+    const [x2, y2] = p(a2, tip);
+    const [x3, y3] = p(a3, root);
+    if (i === 0) ctx.moveTo(x0, y0);
+    else ctx.lineTo(x0, y0);
+    ctx.lineTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.lineTo(x3, y3);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.fillStyle = '#1a1006';
+  ctx.beginPath();
+  ctx.arc(0, 0, size * 0.11, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+}
+
 /** A métro entrance: the STM's white ring and down arrow on a blue square. `size` is the square's side (px). */
 export function drawMetro(ctx: CanvasRenderingContext2D, x: number, y: number, size: number): void {
   const h = size / 2;

@@ -231,6 +231,8 @@ export interface VehicleState {
   /** Seconds since the last landing and the vertical speed it hit the ground with (m/s). */
   landT: number;
   landImpact: number;
+  /** The last landing was a wheel dropping into a pothole, rather than coming down from the air. */
+  landPit: boolean;
   /**
    * Suspension travel after a bump (m, + up, and m/s). The body only: the wheels stay on the ground.
    * A pothole above 30 km/h kicks it downward; the spring brings it back up and lets it settle.

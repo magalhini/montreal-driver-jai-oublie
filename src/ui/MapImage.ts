@@ -247,6 +247,19 @@ export function buildMapImage(city: CityModel): MapImage {
   // Parking bays
   ctx.fillStyle = C.bay;
   for (const s of f.parking) rect(s.pos.x - 1.15, s.pos.z - 2.4, s.pos.x + 1.15, s.pos.z + 2.4);
+
+  // La Grande Roue, drawn after the harbor fill so the island is not painted over as water
+  const wheel = f.port?.wheel;
+  if (wheel) {
+    ctx.fillStyle = C.plaza;
+    rect(wheel.deck.minX, wheel.deck.minZ, wheel.deck.maxX, wheel.deck.maxZ);
+    rect(wheel.bridge.minX, wheel.bridge.minZ, wheel.bridge.maxX, wheel.bridge.maxZ);
+    ctx.beginPath();
+    ctx.arc(wheel.pos.x, wheel.pos.z, wheel.radius, 0, Math.PI * 2);
+    ctx.strokeStyle = '#efe8d6';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
+  }
   return { canvas, x0, z0, width, height };
 }
 
@@ -413,6 +426,10 @@ export function mapLabels(city: CityModel): MapLabel[] {
   }
   // The lot sits right beside the clock tower: one label for both
   if (f.clock) out.push({ text: "TOUR DE L'HORLOGE", sub: f.port ? 'parking' : undefined, pos: { ...f.clock.pos }, kind: 'landmark' });
+  if (f.port?.wheel) {
+    const w = f.port.wheel;
+    out.push({ text: 'LA GRANDE ROUE', sub: 'à pied', pos: { x: w.pos.x, z: w.deck.maxZ + 8 }, kind: 'landmark' });
+  }
   if (f.canal) {
     const i = Math.floor(gx * 0.75);
     out.push({ text: f.canal.label ?? 'CANAL DE LACHINE', sub: f.canal.labelSub, pos: { x: (city.xs[i] + city.xs[i + 1]) / 2, z: f.canal.zc }, kind: 'landmark' });

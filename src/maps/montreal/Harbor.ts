@@ -1,6 +1,6 @@
 import { CONFIG } from '../../config';
 import type { AABB, Building, Vec2 } from '../../types';
-import type { OldPort, PlazaDressing } from '../../world/Features';
+import type { OldPort, PlazaDressing, PortClosure, PortWheel } from '../../world/Features';
 import type { CityModel } from '../../world/RoadGraph';
 
 /**
@@ -8,7 +8,9 @@ import type { CityModel } from '../../world/RoadGraph';
  * the water, runs the Old Port's promenade: a sidewalk band on the road, a lawn strip of bare trees, then a
  * paved walk by the railing. It is raised pavement, so driving on it is the sidewalk offense. At the east end
  * the promenade gives way to a road-level parking lot (two curb cuts off the quay road), then the clock tower
- * stands at the end of the walk. Meters, from the quay road's south curb.
+ * stands at the end of the walk. La Grande Roue is on a little island just offshore of the tower: the quay wall
+ * opens only for its footbridge, and the mouth of that bridge is too narrow for a car. Meters, from the quay
+ * road's south curb.
  */
 export const PORT = {
   /** Curb to water. */
@@ -31,6 +33,13 @@ export const PORT = {
   bayD: 5.4,
   /** Clock tower: shaft side, height, and how far in from the east end and from the water. */
   clock: { side: 9, plinth: 12, height: 45, fromEast: 18, fromWater: 14 },
+  /**
+   * La Grande Roue. The island sits just west of the clock, far enough into the river that a footbridge
+   * crosses open water. The rim is 52 m across and the axle is raised so the top lands near the real
+   * wheel's 60 m. The bridge mouth is split by a pier (`gateW`) so each leftover gap is under the
+   * narrowest car (1.4 m).
+   */
+  wheel: { radius: 26, west: 68, south: 40, halfX: 28, halfZ: 17, bridgeW: 3.6, gateW: 1.05 },
   /** Quai King-Edward and Quai Jacques-Cartier: off these cross streets, this wide and long, a hangar on each. */
   piers: [12, 15],
   pierW: 36,
@@ -44,8 +53,9 @@ export const PORT = {
 export const portWaterZ = (curbZ: number): number => curbZ + PORT.depth;
 
 /**
- * Plan the promenade, the lot and the clock tower. Needs `city.waterZ` and `city.bounds`. Pushes the lot's
- * curb cuts into `driveways`, its bays into `parking`, and the clock tower's collider into `buildings`.
+ * Plan the promenade, the lot, the clock tower and the wheel's island. Needs `city.waterZ` and `city.bounds`.
+ * Pushes the lot's curb cuts into `driveways`, its bays into `parking`, and the clock tower's collider into
+ * `buildings`. Opens the quay wall for the footbridge.
  */
 export function layPort(city: CityModel): void {
   const f = city.features;
@@ -90,14 +100,34 @@ export function layPort(city: CityModel): void {
       dress.trees.push({ x: tx, z: tz });
     }
   }
-  // Globe lamps along the walk's landward edge and by the railing; benches facing the water
+  const wheel = planWheel(clock, z1);
+  // Globe lamps along the walk's landward edge and by the railing; benches facing the water.
+  // The pocket east of the clock is the closure (wall, parapet, kiosks), so nothing is planted in it.
+  // The footbridge mouth stays clear of posts too.
+  const clockEast = clock.x + P.clock.plinth / 2;
+  const bridgeHere = (x: number) => Math.abs(x - wheel.pos.x) < P.wheel.bridgeW / 2 + 0.8;
   for (let lx = b.minX + 12; lx < b.maxX - 8; lx += P.lampStep) {
-    if (Math.abs(lx - clock.x) < P.clock.plinth) continue;
-    dress.lamps.push({ x: lx, z: walk.minZ - 1 });
-    dress.lamps.push({ x: lx + P.lampStep / 2, z: z1 - 1.2 });
+    if (Math.abs(lx - clock.x) < P.clock.plinth || bridgeHere(lx)) continue;
+    if (lx < clockEast) dress.lamps.push({ x: lx, z: walk.minZ - 1 });
+    const waterLamp = lx + P.lampStep / 2;
+    if (waterLamp < clockEast && !bridgeHere(waterLamp)) dress.lamps.push({ x: waterLamp, z: z1 - 1.2 });
   }
-  for (let bx = b.minX + 20; bx < clock.x - P.clock.plinth; bx += P.benchStep) dress.benches.push({ pos: { x: bx, z: z1 - 4.2 }, yaw: 0 });
-  dress.colliders.push(...dress.trees.map((p) => post(p, 0.35)), ...dress.lamps.map((p) => post(p, 0.16)), ...dress.benches.map((q) => post(q.pos, 0.9)));
+  for (let bx = b.minX + 20; bx < clock.x - P.clock.plinth; bx += P.benchStep) {
+    if (bridgeHere(bx)) continue;
+    dress.benches.push({ pos: { x: bx, z: z1 - 4.2 }, yaw: 0 });
+  }
+  const closure = portClosure(b.maxX, z0, z1, clockEast);
+  dress.colliders.push(
+    ...dress.trees.map((p) => post(p, 0.35)),
+    ...dress.lamps.map((p) => post(p, 0.16)),
+    ...dress.benches.map((q) => post(q.pos, 0.9)),
+    wheel.gate,
+    ...wheelRails(wheel),
+    closure.wall,
+    closure.parapet,
+    ...closure.kiosks,
+    ...closure.benches.map((q) => post(q.pos, 0.9)),
+  );
 
   const piers = P.piers.map((i) => {
     const cx = city.xs[i];
@@ -115,8 +145,11 @@ export function layPort(city: CityModel): void {
     mouths,
     stroll: { z: (walk.minZ + walk.maxZ) / 2, x0: b.minX + 16, x1: clock.x - P.clock.plinth },
     piers,
+    wheel,
+    closure,
   };
   f.port = port;
+  openQuayWall(city, wheel.bridge.minX, wheel.bridge.maxX);
 
   // The clock tower: its mesh is `LandmarkView`; this box is the collider and the map footprint
   const h = P.clock.plinth / 2;
@@ -134,4 +167,74 @@ export function layPort(city: CityModel): void {
   };
   city.buildings.push(tower);
   f.clock = { pos: clock, side: P.clock.side, height: P.clock.height, y: CONFIG.CURB_HEIGHT };
+}
+
+/**
+ * Island, footbridge and the mouth that keeps cars off it. The two walking lines sit in the gaps between the
+ * center pier and the side rails; each gap is under 1.4 m, the narrowest car.
+ */
+function planWheel(clock: Vec2, waterZ: number): PortWheel {
+  const W = PORT.wheel;
+  const cx = clock.x - W.west;
+  const cz = waterZ + W.south;
+  const deck: AABB = { minX: cx - W.halfX, maxX: cx + W.halfX, minZ: cz - W.halfZ, maxZ: cz + W.halfZ };
+  const bridge: AABB = { minX: cx - W.bridgeW / 2, maxX: cx + W.bridgeW / 2, minZ: waterZ, maxZ: deck.minZ };
+  const rail = 0.18;
+  const inner = W.bridgeW / 2 - rail;
+  const halfGate = W.gateW / 2;
+  const pass = (inner + halfGate) / 2;
+  const gate: AABB = {
+    minX: cx - halfGate,
+    maxX: cx + halfGate,
+    minZ: waterZ - 2.6,
+    maxZ: waterZ + 1.4,
+    top: CONFIG.CURB_HEIGHT + 1.3,
+  };
+  return { deck, bridge, gate, pos: { x: cx, z: cz }, radius: W.radius, gaps: [cx - pass, cx + pass] };
+}
+
+/** Side rails of the footbridge, from the promenade approach out to the island. */
+function wheelRails(w: PortWheel): AABB[] {
+  const rail = 0.18;
+  const z0 = w.gate.minZ - 0.2;
+  const top = CONFIG.CURB_HEIGHT + 1.15;
+  const side = (x0: number): AABB => ({ minX: x0, maxX: x0 + rail, minZ: z0, maxZ: w.bridge.maxZ, top });
+  return [side(w.bridge.minX), side(w.bridge.maxX - rail)];
+}
+
+/** The south boundary wall is one slab. Leave a slot the width of the footbridge. */
+function openQuayWall(city: CityModel, x0: number, x1: number): void {
+  const i = city.walls.findIndex((w) => w.minZ === city.waterZ && w.maxX - w.minX > 80);
+  if (i < 0) return;
+  const w = city.walls[i];
+  city.walls.splice(
+    i,
+    1,
+    { minX: w.minX, maxX: x0, minZ: w.minZ, maxZ: w.maxZ },
+    { minX: x1, maxX: w.maxX, minZ: w.minZ, maxZ: w.maxZ },
+  );
+}
+
+/**
+ * The promenade's east end, past the clock. The map already collides here; this is the stone that shows it:
+ * a wall on the east edge, a parapet along the water, three kiosks and a bench at each.
+ */
+function portClosure(edge: number, z0: number, zWater: number, clockEast: number): PortClosure {
+  const wallH = 1.7;
+  const parapetH = 1.15;
+  const kioskH = 3.05;
+  const y = CONFIG.CURB_HEIGHT;
+  const wall: AABB = { minX: edge - 0.5, maxX: edge, minZ: z0, maxZ: zWater, top: y + wallH };
+  const parapet: AABB = { minX: clockEast + 0.3, maxX: wall.minX + 0.02, minZ: zWater - 0.5, maxZ: zWater, top: y + parapetH };
+  const kioskAt = (z: number): AABB => ({
+    minX: wall.minX - 2.7,
+    maxX: wall.minX + 0.02,
+    minZ: z - 1.45,
+    maxZ: z + 1.45,
+    top: y + kioskH,
+  });
+  // One behind the tower toward the water, one beside it, one up by the quay road
+  const kiosks = [zWater - 4.4, (z0 + zWater) / 2, z0 + 8].map(kioskAt);
+  const benches = kiosks.map((k) => ({ pos: { x: k.minX - 1.55, z: (k.minZ + k.maxZ) / 2 }, yaw: 0 }));
+  return { wall, parapet, kiosks, benches, wallH, parapetH, kioskH };
 }

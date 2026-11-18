@@ -206,6 +206,35 @@ export class SurfaceBuilder {
   }
 
   /**
+   * Surface over x in [x0, x1] at each z in `zs` (ascending). One quad per step, so a caller that sampled
+   * `zs` for an arch can share those stations with a wall. `down` faces the surface downward.
+   */
+  sheet(x0: number, x1: number, zs: number[], down = false, c?: THREE.Color): void {
+    if (zs.length < 2 || x1 - x0 < 0.01) return;
+    const base = this.vertexCount;
+    const e = 0.3;
+    for (let j = 0; j < zs.length; j++) {
+      const z = zs[j];
+      for (const x of [x0, x1]) {
+        const y = this.h(x, z);
+        const dx = (this.h(x + e, z) - this.h(x - e, z)) / (2 * e);
+        const dz = (this.h(x, z + e) - this.h(x, z - e)) / (2 * e);
+        const l = Math.hypot(dx, 1, dz) || 1;
+        const s = down ? -1 : 1;
+        this.vert(x, y, z, (s * -dx) / l, s / l, (s * -dz) / l, x * this.uvScale, z * this.uvScale, c);
+      }
+    }
+    for (let j = 0; j < zs.length - 1; j++) {
+      const a = base + j * 2;
+      const b = a + 1;
+      const d = a + 2;
+      const cc = a + 3;
+      if (down) this.idx.push(a, b, d, b, cc, d);
+      else this.idx.push(a, d, b, b, d, cc);
+    }
+  }
+
+  /**
    * Vertical wall along a line from (x0,z0) to (x1,z1) facing `normal`, from bottom(x,z) to top(x,z).
    * UV: u = distance along the wall, v = height.
    */

@@ -264,10 +264,22 @@ function buildHarbor(city: CityModel, scene: THREE.Scene, rng: Rng, colliders: A
   scene.add(instanced(unitBox, crane, legs));
   scene.add(instanced(new THREE.SphereGeometry(1, 8, 6), AVIATION, reds));
 
-  // Quay railing
+  // Quay railing. The parapet east of the clock takes the last stretch, and the wheel's footbridge opens a gap.
   const posts: M[] = [];
-  for (let x = city.bounds.minX; x < city.bounds.maxX; x += 2.5) posts.push(box(0.12, 1.0, 0.12, x, H, wz - 0.3));
-  posts.push(box(city.bounds.maxX - city.bounds.minX, 0.1, 0.12, (city.bounds.minX + city.bounds.maxX) / 2, H + 1.0, wz - 0.3));
+  const parapet = city.features.port?.closure?.parapet;
+  const railTo = parapet ? Math.min(city.bounds.maxX, parapet.minX) : city.bounds.maxX;
+  const mouth = city.features.port?.wheel?.bridge;
+  const railSpans: [number, number][] =
+    mouth && mouth.minX > city.bounds.minX && mouth.maxX < railTo
+      ? [
+          [city.bounds.minX, mouth.minX],
+          [mouth.maxX, railTo],
+        ]
+      : [[city.bounds.minX, railTo]];
+  for (const [a, b] of railSpans) {
+    for (let x = a + 0.4; x < b - 0.2; x += 2.5) posts.push(box(0.12, 1.0, 0.12, x, H, wz - 0.3));
+    if (b - a > 1) posts.push(box(b - a, 0.1, 0.12, (a + b) / 2, H + 1.0, wz - 0.3));
+  }
   // The promenade's railing is black iron like its lamps
   scene.add(instanced(unitBox, new THREE.MeshStandardMaterial({ color: oldPort ? 0x1c1c20 : 0x8a8a95, metalness: oldPort ? 0.5 : 0.7, roughness: oldPort ? 0.5 : 0.3 }), posts));
 }
