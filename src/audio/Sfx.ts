@@ -179,42 +179,31 @@ export class Sfx {
   }
 
   /**
-   * A wheel dropping into a pothole: a low boom and a short dull crush of asphalt.
-   * Darker than hitting a car — no panel ring, no glass — but still in the band small speakers carry.
+   * A wheel dropping into a pothole: a low boom, a rumble, and a short dull crash.
+   * The crash sits above the road noise and below a car hit (that crunch is up around 2 kHz, with ringing panels
+   * and glass). Nothing here rings above the burst.
    */
   pothole(spot: Spot, k: number): void {
     const mx = this.mx;
     const t = mx.now + 0.005;
-    const out = this.entry(spot, 1.6);
-    const kk = Math.min(1, Math.max(0.12, k));
-    // Boom, then it falls into a rumble. Lower than a car hit (that one starts near 120 Hz).
-    const body = this.osc('sine', rnd(72, 88), this.env(out, t, 0.42 + 0.4 * kk, 0.004, 0.42), t, 0.7);
-    body.frequency.exponentialRampToValueAtTime(34, t + 0.28);
-    const sub = this.osc('sine', rnd(40, 48), this.env(out, t, 0.18 + 0.16 * kk, 0.008, 0.7), t, 0.9);
-    sub.frequency.exponentialRampToValueAtTime(26, t + 0.4);
-    // The body of the impact: starts with some mid, then settles into the rumble
-    const lp = mx.filter('lowpass', 520, 0.7);
-    lp.frequency.setValueAtTime(640, t);
-    lp.frequency.exponentialRampToValueAtTime(160, t + 0.35);
-    lp.connect(this.env(out, t, 0.35 + 0.35 * kk, 0.003, 0.4));
-    this.noise('brown', lp, t, 0.55);
-    // Dull crush, about an octave below a car's metal crunch
-    const shaper = mx.ctx.createWaveShaper();
-    shaper.curve = crunchCurve();
-    const bp = mx.filter('bandpass', 380 + kk * 80, 0.8);
-    const gate = mx.ctx.createGain();
-    gate.gain.setValueAtTime(0, t);
-    const bursts = 3 + (kk > 0.6 ? 2 : 0);
-    const span = 0.05 + kk * 0.08;
-    for (let i = 0; i < bursts; i++) {
-      const at = t + (i === 0 ? 0 : Math.pow(Math.random(), 1.5) * span);
-      gate.gain.setValueAtTime(rnd(0.55, 1) * (1 - (at - t) / (span + 0.05)), at);
-      gate.gain.setTargetAtTime(0, at + 0.004, rnd(0.01, 0.025));
-    }
-    this.noise('pink', bp, t, span + 0.2);
-    bp.connect(shaper);
-    shaper.connect(gate);
-    gate.connect(mx.gain(out, 0.28 + 0.12 * kk));
+    const out = this.entry(spot, 1.4);
+    const kk = Math.min(1, Math.max(0.35, k));
+    // Boom, then it falls into a rumble. A car hit starts higher, near 120 Hz.
+    const body = this.osc('sine', rnd(78, 96), this.env(out, t, 0.62 + 0.3 * kk, 0.002, 0.28), t, 0.5);
+    body.frequency.exponentialRampToValueAtTime(36, t + 0.2);
+    const sub = this.osc('sine', rnd(42, 50), this.env(out, t, 0.22 + 0.16 * kk, 0.004, 0.5), t, 0.65);
+    sub.frequency.exponentialRampToValueAtTime(28, t + 0.28);
+    const rumble = mx.filter('lowpass', 260, 0.6);
+    rumble.connect(this.env(out, t, 0.32 + 0.22 * kk, 0.003, 0.4));
+    this.noise('brown', rumble, t, 0.45);
+    // Short crash held above the road rumble, which reaches about 700 Hz at speed.
+    // A car hit is a crunch around 2 kHz plus ringing panels and glass; this stays a blunt band.
+    const bp = mx.filter('bandpass', 1050, 0.9);
+    bp.connect(this.env(out, t, 2.2 + 0.5 * kk, 0.001, 0.09));
+    this.noise('white', bp, t, 0.16);
+    const body2 = mx.filter('bandpass', 460, 0.8);
+    body2.connect(this.env(out, t, 0.4 + 0.15 * kk, 0.002, 0.12));
+    this.noise('pink', body2, t, 0.2);
   }
 
   /** Landing or bottoming out: low thud and a suspension clank for big ones. */

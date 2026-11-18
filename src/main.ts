@@ -644,12 +644,6 @@ game.addView({
     else {
       if (pickupCam || introCam || picnicCam) camRig.snap();
       camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
-      const shot = (window as unknown as { __shot?: { eye: number[]; at: number[] } }).__shot;
-      if (shot) {
-        camRig.enabled = false;
-        r.camera.position.set(shot.eye[0], shot.eye[1], shot.eye[2]);
-        r.camera.lookAt(shot.at[0], shot.at[1], shot.at[2]);
-      }
     }
     pickupCam = pickup.cinematic;
     picnicCam = picnic.cinematic;
@@ -688,27 +682,6 @@ game.addView({
   },
 });
 
-if (import.meta.env.DEV) {
-  const dev = window as unknown as {
-    __view?: {
-      look: (ex: number, ey: number, ez: number, ax: number, ay: number, az: number) => void;
-      clock: () => { x: number; z: number } | undefined;
-      canal: () => { z0: number; z1: number; zc: number } | null;
-      xs: () => number[];
-    };
-  };
-  dev.__view = {
-    look: (ex, ey, ez, ax, ay, az) => {
-      camRig.enabled = false;
-      world.controlLocked = true;
-      r.camera.position.set(ex, ey, ez);
-      r.camera.lookAt(ax, ay, az);
-    },
-    clock: () => city.features.clock?.pos,
-    canal: () => city.features.canal,
-    xs: () => city.xs,
-  };
-}
 Debug.attach({
   renderer: r.renderer,
   camera: r.camera,

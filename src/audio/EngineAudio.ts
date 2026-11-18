@@ -125,10 +125,12 @@ export class EngineAudio {
     this.lastGear = s.gear;
     // Landing from the air, or a wheel dropping into a pothole (a low rumble, not a car crash)
     if (s.landT < this.lastLandT && s.landImpact > 1.5) {
-      const k = clamp(s.landImpact / 9, 0.15, 1);
       const hit = { ...spot, cat: 'crashes' as const, wet: 0.2 };
-      if (s.landPit) this.sfx.pothole(hit, k);
-      else this.sfx.thump(hit, k);
+      if (s.landPit) {
+        // A city-speed pit lands near 3 and caps at 8. Keep the quietest one already clear of the road noise.
+        const k = clamp(0.55 + (s.landImpact - 1.5) / 6, 0.55, 1);
+        this.sfx.pothole(hit, k);
+      } else this.sfx.thump(hit, clamp(s.landImpact / 9, 0.15, 1));
     }
     this.lastLandT = s.landT;
     // Ignition: key click on the starter and on switching off, then the exhaust ticks as it cools
