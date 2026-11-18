@@ -14,7 +14,7 @@ import { blockRoads, type CityModel } from './RoadGraph';
 export interface PoliceStation {
   block: number;
   name: string;
-  jp: string;
+  mark: string;
   glyph: string;
   color: string;
   lot: AABB;
@@ -57,7 +57,7 @@ const overlaps = (a: AABB, b: AABB, m = 0) => a.minX < b.maxX + m && a.maxX > b.
 const CRUISER: CarLook = { style: 'police', color: 0xf4f4f2, detail: 'patrol' };
 
 /**
- * Pick a downtown or shotengai block near the station's spot, clear of alleys and other curb cuts, and swap
+ * Pick a downtown or oldtown block near the station's spot, clear of alleys and other curb cuts, and swap
  * the buildings on the lot for the precinct. Own random stream, after the other lot landmarks, so nothing
  * else in the city moves. Mutates `city.features` and `city.buildings`.
  */
@@ -80,7 +80,7 @@ export function planPoliceStation(city: CityModel): void {
   const ti = 0.3 * (gx - 1);
   const tj = 0.36 * (gz - 1);
   const blocks = city.blocks
-    .filter((b) => f.kinds[b.id] === 'normal' && (b.district === 'downtown' || b.district === 'shotengai') && b.gj !== f.canal?.row && roomy(b))
+    .filter((b) => f.kinds[b.id] === 'normal' && (b.district === 'downtown' || b.district === 'oldtown') && b.gj !== f.canal?.row && roomy(b))
     .filter((b) => taken().every((o) => Math.abs(o.gi - b.gi) + Math.abs(o.gj - b.gj) > 2))
     .sort((a, b) => Math.hypot(a.gi - ti, a.gj - tj) - Math.hypot(b.gi - ti, b.gj - tj));
   for (const bl of blocks) {
@@ -143,7 +143,7 @@ function layout(city: CityModel, bl: Block, rng: Rng): PoliceStation {
   return {
     block: bl.id,
     name: 'Montréal',
-    jp: 'SPVM',
+    mark: 'SPVM',
     glyph: '+',
     color: '#6aa6ff',
     lot,

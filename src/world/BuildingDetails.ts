@@ -111,7 +111,7 @@ class Batch {
 
 /**
  * Aviation obstruction lights (tower masts, harbor cranes): one shared material, slowly pulsed in sync across
- * the skyline by `blinkAviation` like the real red beacons over Tokyo.
+ * the skyline by `blinkAviation`, the red beacons on the tall masts.
  */
 export const AVIATION = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.0, 0.12, 0.12), toneMapped: false });
 const AV_ON = new THREE.Color(2.6, 0.14, 0.12);
@@ -261,7 +261,7 @@ export function buildBuildingDetails(buildings: Building[], scene: THREE.Scene):
           if (boardY + boardH < shaftTop - 1) glow.add(facadeBox(s0, s0 + bw, 0.7, boardY, boardH, pull), accent);
         }
       }
-      if (b.district === 'shotengai' && len > 3) {
+      if (b.district === 'oldtown' && len > 3) {
         const n = Math.max(1, Math.round(len / 4.5));
         const sw = len / n;
         for (let k = 0; k < n; k++) {
@@ -338,7 +338,7 @@ export function buildBuildingDetails(buildings: Building[], scene: THREE.Scene):
       if (inNotch(b, lb, px, pz, sx, sz)) continue;
       machines.add(place(box(sx, hy, sz, px, top, pz)), new THREE.Color().setScalar(shade));
     }
-    if ((b.district === 'residential' || b.district === 'shotengai') && rng.chance(0.45) && rw > 6 && rd > 6) {
+    if ((b.district === 'residential' || b.district === 'oldtown') && rng.chance(0.45) && rw > 6 && rd > 6) {
       const x = rng.range(roof.minX + 2.5, roof.maxX - 2.5);
       const z = rng.range(roof.minZ + 2.5, roof.maxZ - 2.5);
       const r = rng.range(0.9, 1.3);

@@ -121,7 +121,7 @@ const unit = new THREE.BoxGeometry(1, 1, 1);
 const BLOB = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
 
 /**
- * The NEO OIL pit garage: a little workshop with the player's car in the middle, drawn in place of the city
+ * The pit garage: a little workshop with the player's car in the middle, drawn in place of the city
  * while the pit shop is open (`PostFX.setOverlay` with its own camera). The car rolls in through the open
  * roll-up door (the night street behind it), and three mechanics get to work: one kneels at a front wheel
  * with an impact wrench, one types on a diagnostic laptop on the hood and fetches tools, one is on a creeper
@@ -516,15 +516,22 @@ export class PitGarage {
     this.add(unit, ceil, [2 * W, 0.1, FRONT - BACK], [0, H + 0.05, (FRONT + BACK) / 2]);
     const steel = new THREE.MeshStandardMaterial({ color: 0x4a4e54, roughness: 0.6, metalness: 0.6 });
     for (let z = BACK + 2; z < FRONT - 1; z += 3.2) this.add(unit, steel, [2 * W, 0.24, 0.14], [0, H - 0.12, z]);
-    // Posters
-    const poster = (kind: 'tires' | 'oil', x: number, z: number, ry: number) => {
-      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.26), new THREE.MeshStandardMaterial({ map: posterTexture(kind), roughness: 0.7 }));
+    // Posters on the left wall, facing the bay: the concert and the deli, then the shop ads
+    const maps = new Map<string, THREE.CanvasTexture>();
+    const poster = (kind: 'tires' | 'oil' | 'dion' | 'schwartz', x: number, z: number, ry: number) => {
+      let map = maps.get(kind);
+      if (!map) {
+        map = posterTexture(kind);
+        maps.set(kind, map);
+      }
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.26), new THREE.MeshStandardMaterial({ map, roughness: 0.7 }));
       m.position.set(x, 2.1, z);
       m.rotation.y = ry;
       s.add(m);
     };
-    poster('tires', -W + 0.04, -1.5, Math.PI / 2);
-    poster('oil', -W + 0.04, 0.0, Math.PI / 2);
+    poster('dion', -W + 0.04, -1.8, Math.PI / 2);
+    poster('schwartz', -W + 0.04, -0.5, Math.PI / 2);
+    poster('tires', -W + 0.04, 1.0, Math.PI / 2);
     poster('oil', 2.6, BACK + 0.04, 0);
   }
 

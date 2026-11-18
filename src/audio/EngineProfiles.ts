@@ -6,7 +6,7 @@ import type { EngineProfile } from "./dsp/EngineDSP";
  * count and firing spacing, pulse width (rasp), pipe length, muffler resonances and how far the tone opens.
  */
 export const ENGINES = {
-  /** 1972 Toyoda Karola: twin-carb straight six, warm at idle, a hard metallic rasp near the redline. */
+  /** The player's coupe: twin-carb straight six, warm at idle, a hard metallic rasp near the redline. */
   straightSix: {
     cyl: 6,
     spread: 0.12,
@@ -69,48 +69,6 @@ export const ENGINES = {
     drive: 1.3,
     level: 0.46,
   },
-  /** Kei cars and trucks: a buzzy 660 cc triple. */
-  triple: {
-    cyl: 3,
-    spread: 0.15,
-    jitter: 0.3,
-    pulse: 1.3,
-    pipe: 2.6,
-    fb: -0.35,
-    body: [
-      [140, 1.4, 0.5],
-      [450, 2, 0.45],
-      [1300, 3, 0.25],
-    ],
-    tone: [800, 4200],
-    intake: 0.6,
-    intakeHz: [900, 2800],
-    mech: 0.18,
-    rumble: 0.2,
-    drive: 1.5,
-    level: 0.51,
-  },
-  /** 1973 Mame: a short-stroke four, busy and bright, never strained. */
-  cityFour: {
-    cyl: 4,
-    spread: 0.08,
-    jitter: 0.2,
-    pulse: 1.4,
-    pipe: 2.4,
-    fb: -0.42,
-    body: [
-      [160, 1.4, 0.55],
-      [480, 2.2, 0.4],
-      [1400, 2.8, 0.28],
-    ],
-    tone: [750, 4800],
-    intake: 0.85,
-    intakeHz: [900, 3000],
-    mech: 0.16,
-    rumble: 0.18,
-    drive: 1.7,
-    level: 0.43,
-  },
   /** Box trucks: a clattering four-cylinder diesel. */
   diesel: {
     cyl: 4,
@@ -138,17 +96,14 @@ export const ENGINES = {
 export type EngineId = keyof typeof ENGINES;
 
 const BY_SPEC: Record<string, EngineId> = {
-  "2013 Toyoda Karola": "straightSix",
-  "1973 Mame": "cityFour",
+  "2013 Coupe": "straightSix",
   "SPVM Cruiser": "vEight",
   "Box Truck": "diesel",
-  "Kei Truck": "triple",
   Pickup: "four",
   "Traffic Sedan": "four",
 };
 
-/** Engine for a car spec name and body style (kei-sized traffic cars share the sedan spec). */
-export function engineFor(specName: string, style: string): EngineId {
-  if (style === "kei" || style === "keitruck") return "triple";
+/** Engine for a car spec name. Unknown names get the traffic four. */
+export function engineFor(specName: string): EngineId {
   return BY_SPEC[specName] ?? "four";
 }

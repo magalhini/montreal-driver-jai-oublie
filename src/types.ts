@@ -1,7 +1,7 @@
 export type Vec2 = { x: number; z: number };
 
 export type Axis = 'x' | 'z';
-export type DistrictType = 'downtown' | 'shotengai' | 'harbor' | 'residential' | 'depot';
+export type DistrictType = 'downtown' | 'oldtown' | 'harbor' | 'residential' | 'depot';
 export type TurnType = 'straight' | 'left' | 'right';
 export type Facing = 'N' | 'S' | 'E' | 'W'; // N = -Z, S = +Z, E = +X, W = -X (local axes on rotated buildings)
 

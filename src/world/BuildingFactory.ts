@@ -8,9 +8,9 @@ import { partFaces, subtractRect } from './Interiors';
 import { LOOK } from '../render/Look';
 import { snowMaterial } from './SnowCover';
 
-const LIT: Record<DistrictType, number> = { downtown: 0.5, shotengai: 0.45, residential: 0.42, harbor: 0.25, depot: 0.6 };
+const LIT: Record<DistrictType, number> = { downtown: 0.5, oldtown: 0.45, residential: 0.42, harbor: 0.25, depot: 0.6 };
 /** Facade style ids used by the shader: 0 office, 1 shops, 2 warehouse, 3 apartments. Style 4 (media) is set per building. */
-const STYLE: Record<DistrictType, number> = { downtown: 0, shotengai: 1, residential: 3, harbor: 2, depot: 1 };
+const STYLE: Record<DistrictType, number> = { downtown: 0, oldtown: 1, residential: 3, harbor: 2, depot: 1 };
 /** A few facade families per district, so a block isn't one tint of the same concrete. */
 const PALETTE: Record<DistrictType, [number, number, number][]> = {
   downtown: [
@@ -21,7 +21,7 @@ const PALETTE: Record<DistrictType, [number, number, number][]> = {
     [0.072, 0.112, 0.108],
     [0.1, 0.102, 0.118],
   ],
-  shotengai: [
+  oldtown: [
     [0.15, 0.09, 0.085],
     [0.11, 0.07, 0.09],
     [0.17, 0.11, 0.075],
@@ -91,7 +91,7 @@ const DAY_MIX: Record<DistrictType, [Finish, number][]> = {
     ['darkStone', 0.25],
     ['brick', 0.25],
   ],
-  shotengai: [
+  oldtown: [
     ['brick', 0.55],
     ['limestone', 0.35],
     ['darkStone', 0.1],

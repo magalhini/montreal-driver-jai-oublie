@@ -114,79 +114,6 @@ const COUPE: BodyProfile = {
   flare: 0.014,
 };
 
-/** Hayate: low and short, a long hood, a raked screen running into a fastback, a short rounded tail. */
-const SPORTS: BodyProfile = {
-  L: 4.0,
-  W: 1.66,
-  r: 0.29,
-  wf: 1.2,
-  wr: -1.16,
-  sill: 0.2,
-  belt: 0.76,
-  nose: [
-    [1.9, 0.215],
-    [1.97, 0.25],
-    [1.995, 0.3],
-    [2.0, 0.36],
-    [1.99, 0.43],
-    [1.94, 0.497], // keeps the headlight panel (0.43 to 0.565) flat
-    [1.89, 0.565],
-    [1.81, 0.605],
-  ],
-  hood: [
-    [1.68, 0.635],
-    [1.45, 0.67],
-    [1.2, 0.7],
-    [0.9, 0.725],
-    [0.6, 0.745],
-    [0.34, 0.76],
-  ],
-  deck: [
-    [-1.56, 0.76],
-    [-1.7, 0.764],
-    [-1.8, 0.761],
-    [-1.9, 0.745],
-    [-1.965, 0.715],
-  ],
-  tail: [
-    [-1.99, 0.67],
-    [-2.0, 0.56],
-    [-1.995, 0.36],
-    [-1.975, 0.28],
-    [-1.92, 0.225],
-  ],
-  ws: [
-    [0.34, 0.76],
-    [-0.24, 1.135],
-  ],
-  roof: [
-    [-0.35, 1.16],
-    [-0.56, 1.168],
-    [-0.76, 1.158],
-  ],
-  bl: [
-    [-0.88, 1.13],
-    [-1.56, 0.76],
-  ],
-  gW: 1.38,
-  tumble: 0.76,
-  pillar: 0.03,
-  cPillar: 0.09,
-  wins: [{ front: [-0.96, -0.68] }, { rear: [-1.02, -0.74], front: [-1.38, -0.86] }],
-  winInset: 0.035,
-  doors: [0.3, -0.96],
-  handles: [-0.86],
-  arch: [0.045, 0],
-  bevel: 0.12,
-  // Corner tuck once the nose is split across its width. Larger than the sedans, still a shallow curve.
-  round: { front: [0.12, 0.06], rear: [0.1, 0.05] },
-  flare: 0.016,
-};
-
-/**
- * Current midsize sedan (PRD 11B): longer hood, raked screen, low belt, lamp panel still flat so the
- * headlight quads in `CarEnds` sit on the face. The cruiser is this shape, scaled.
- */
 const SEDAN: BodyProfile = {
   L: 4.82,
   W: 1.82,
@@ -305,127 +232,6 @@ const WAGON: BodyProfile = {
   handles: [-0.15, -0.9],
 };
 
-const KEI: BodyProfile = {
-  L: 3.3,
-  W: 1.42,
-  r: 0.27,
-  wf: 1.05,
-  wr: -1.0,
-  sill: 0.22,
-  belt: 0.86,
-  nose: [
-    [1.59, 0.255],
-    [1.638, 0.29],
-    [1.65, 0.33],
-    [1.65, 0.665],
-    [1.638, 0.705],
-    [1.6, 0.73],
-  ],
-  hood: [
-    [1.4, 0.765],
-    [1.18, 0.81],
-    [1.03, 0.86],
-  ],
-  deck: [
-    [-1.58, 0.86],
-    [-1.62, 0.853],
-  ],
-  tail: [
-    [-1.65, 0.82],
-    [-1.65, 0.33],
-    [-1.638, 0.29],
-    [-1.59, 0.255],
-  ],
-  ws: [
-    [1.03, 0.86],
-    [0.46, 1.49],
-  ],
-  roof: [
-    [0.36, 1.523],
-    [-0.5, 1.533],
-    [-1.36, 1.523],
-  ],
-  bl: [
-    [-1.47, 1.5],
-    [-1.58, 0.86],
-  ],
-  gW: 1.3,
-  tumble: 0.9,
-  pillar: 0.045,
-  cPillar: 0.07,
-  wins: [{ front: [-0.34, -0.3] }, { rear: [-0.34, -0.3], front: [-1.3, -1.18] }],
-  winInset: 0.042,
-  doors: [0.68, -0.42],
-  handles: [-0.34],
-};
-
-/**
- * Bubble city car: short snub nose, a tall arched roof, wheels pushed to the corners.
- * Proportions follow a late-60s rounded minicar (about 3 m long and nearly as tall as it is wide).
- */
-const CITY: BodyProfile = {
-  L: 3.05,
-  W: 1.4,
-  r: 0.28,
-  wf: 1.02,
-  wr: -0.88,
-  sill: 0.22,
-  belt: 0.82,
-  nose: [
-    [1.36, 0.22],
-    [1.44, 0.26],
-    [1.5, 0.34],
-    [1.525, 0.42],
-    [1.525, 0.6],
-    [1.49, 0.68],
-    [1.38, 0.75],
-    [1.24, 0.79],
-  ],
-  hood: [
-    [1.08, 0.81],
-    [0.92, 0.82],
-  ],
-  deck: [
-    [-1.18, 0.82],
-    [-1.3, 0.8],
-    [-1.4, 0.74],
-    [-1.46, 0.66],
-  ],
-  tail: [
-    [-1.5, 0.56],
-    [-1.525, 0.42],
-    [-1.51, 0.3],
-    [-1.44, 0.24],
-    [-1.34, 0.22],
-  ],
-  ws: [
-    [0.92, 0.82],
-    [0.55, 1.24],
-  ],
-  roof: [
-    [0.4, 1.3],
-    [0.02, 1.345],
-    [-0.38, 1.33],
-    [-0.68, 1.26],
-  ],
-  bl: [
-    [-0.8, 1.2],
-    [-1.18, 0.82],
-  ],
-  gW: 1.26,
-  tumble: 0.86,
-  pillar: 0.026,
-  cPillar: 0.055,
-  wins: [{ front: [-0.28, -0.16] }, { rear: [-0.28, -0.16], front: [-1.02, -0.72] }],
-  winInset: 0.03,
-  doors: [0.62, -0.46],
-  handles: [0.05],
-  arch: [0.05, 0.01],
-  bevel: 0.1,
-  round: { front: [0.1, 0.08], rear: [0.12, 0.1] },
-  flare: 0.009,
-};
-
 /** Same design stretched to other dimensions (police cruiser = bigger sedan). */
 function scaled(s: BodyProfile, L: number, W: number, r: number, wf: number, wr: number, dy: number): BodyProfile {
   const k = L / s.L;
@@ -456,11 +262,8 @@ function scaled(s: BodyProfile, L: number, W: number, r: number, wf: number, wr:
 
 export const PROFILES: Record<CarStyle, BodyProfile> = {
   coupe: COUPE,
-  sports: SPORTS,
   sedan: SEDAN,
   wagon: WAGON,
-  kei: KEI,
-  city: CITY,
   police: scaled(SEDAN, 4.6, 1.76, 0.33, 1.45, -1.4, 0.01),
 };
 

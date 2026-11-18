@@ -10,10 +10,10 @@ export type Blinker = 'left' | 'right' | null;
 /** Turn signal flash cycle (s) and lit part of it (about 80 flashes a minute). */
 const BLINK_PERIOD = 0.75;
 const BLINK_ON = 0.42;
-/** `sports` is the player's Hayate: a low, rounded two-seat coupe (no traffic car uses it). `city` and `kei` stay in the library; traffic no longer spawns them (PRD 11B). */
-export type CarStyle = 'coupe' | 'sports' | 'sedan' | 'wagon' | 'kei' | 'city' | 'police';
-/** Trucks built by `TruckModel`, not from side profiles: a box van, a conventional pickup, and the unused kei flatbed. */
-export type TruckStyle = 'truck' | 'pickup' | 'keitruck';
+/** Cars built from side profiles. Trucks are separate (`TruckStyle`). */
+export type CarStyle = 'coupe' | 'sedan' | 'wagon' | 'police';
+/** Trucks built by `TruckModel`, not from side profiles: a box van and a conventional pickup. */
+export type TruckStyle = 'truck' | 'pickup';
 export type BodyStyle = CarStyle | TruckStyle;
 /**
  * Extra bodywork for a car the player drives. Traffic leaves this off, so a shared silhouette stays cheaper.
@@ -21,7 +21,7 @@ export type BodyStyle = CarStyle | TruckStyle;
  */
 export type CarDetail = 'taxi' | 'patrol' | 'work' | 'driver';
 
-export const isTruck = (s: BodyStyle): s is TruckStyle => s === 'truck' || s === 'pickup' || s === 'keitruck';
+export const isTruck = (s: BodyStyle): s is TruckStyle => s === 'truck' || s === 'pickup';
 
 export interface CarLook {
   style: BodyStyle;

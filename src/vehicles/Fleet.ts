@@ -1,6 +1,6 @@
 import { clamp } from '../core/math';
 import type { Car, CarLook } from './Car';
-import { KAROLA, type CarSpec } from './CarSpec';
+import { COUPE, type CarSpec } from './CarSpec';
 import { STOCK_BUILD, tunedSpec, type CarBuild } from './Tuning';
 
 interface FleetCar {
@@ -13,11 +13,11 @@ interface FleetCar {
  * tables keep their shape.
  */
 export const FLEET = {
-  karola: { spec: KAROLA, look: { style: 'coupe' as const, color: 0xd2381f, detail: 'driver' as const } },
+  coupe: { spec: COUPE, look: { style: 'coupe' as const, color: 0xd2381f, detail: 'driver' as const } },
 } satisfies Record<string, FleetCar>;
 
 /** The car the player drives. */
-export const PLAYER_CAR: FleetId = 'karola';
+export const PLAYER_CAR: FleetId = 'coupe';
 
 export type FleetId = keyof typeof FLEET;
 

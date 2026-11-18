@@ -5,7 +5,7 @@ import type { DistrictType, SimSystem, Vec2 } from '../types';
 import type { Pedestrians } from './Pedestrians';
 
 /** Share of pedestrians spawned with a dog, per district (residential streets have the most). */
-export const DOG_SHARE: Record<DistrictType, number> = { residential: 0.14, harbor: 0.08, shotengai: 0.06, downtown: 0.04, depot: 0.03 };
+export const DOG_SHARE: Record<DistrictType, number> = { residential: 0.14, harbor: 0.08, oldtown: 0.06, downtown: 0.04, depot: 0.03 };
 /** Live-tunable multiplier on DOG_SHARE (debug panel). */
 export const DOG_TUNING = { share: 1 };
 /** Leash reach from the owner's hand, measured on the ground (m). */

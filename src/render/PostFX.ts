@@ -39,7 +39,7 @@ const GRAPHICS_DEFAULTS: Record<GraphicsKey, boolean> = {
   curve: false,
 };
 
-export const GRAPHICS_KEY = 'neonDriver.graphics';
+export const GRAPHICS_KEY = 'montrealDriver.graphics';
 
 function loadGraphics(): Record<GraphicsKey, boolean> {
   const out = { ...GRAPHICS_DEFAULTS };

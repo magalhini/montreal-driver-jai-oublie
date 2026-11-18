@@ -9,7 +9,7 @@ export interface GarageSound {
 }
 
 /**
- * Recorded sounds for the NEO OIL pit garage (`ui/PitShop.ts`, `world/PitGarage.ts`; CC0 recordings from
+ * Recorded sounds for the pit garage (`ui/PitShop.ts`, `world/PitGarage.ts`; CC0 recordings from
  * freesound.org, credited in `public/audio/CREDITS.md`). `garageRoom` (a quiet workshop with a motor humming
  * in the back, 60 s loop) is the room bed; the files here hold one-shots cut from the recordings, each burst
  * peak-normalized to -3 dBFS (set the level per use), 0.2 s apart: play a cue with `SampleBank.get(id)` and
@@ -139,14 +139,14 @@ export const GARAGE_SOUNDS = {
       typing: [0.10, 3.80],
     },
   },
-  /** Mirror charms: `suzu` one shake of Japanese suzu bells (omamori, teru teru bozu, daruma: hang it), `suzuShake`..`suzuShake3` softer swings, `squeak` a squeaky toy (panda, shiba, lucky cat), `duck` the rubber duck, `dice` / `dice2` dice rattled in a cup (fuzzy dice). CHARMS previews and confirm. */
+  /** Mirror charms: `bell` one shake, `bellSoft`..`bellLong` softer swings, `squeak` a squeaky toy, `duck` the rubber duck, `dice` / `dice2` dice rattled in a cup. CHARMS previews and confirm. */
   charm: {
     id: 'charm',
     cues: {
-      suzu: [0.10, 2.80],
-      suzuShake: [3.10, 0.90],
-      suzuShake2: [4.20, 1.70],
-      suzuShake3: [6.10, 2.00],
+      bell: [0.10, 2.80],
+      bellSoft: [3.10, 0.90],
+      bellSwing: [4.20, 1.70],
+      bellLong: [6.10, 2.00],
       squeak: [8.30, 0.40],
       duck: [8.90, 0.73],
       dice: [9.83, 2.65],

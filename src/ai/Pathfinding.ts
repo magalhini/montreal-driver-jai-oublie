@@ -34,7 +34,7 @@ export interface RoadPoint {
 
 /** Extra seconds added on top of length / speedLimit. */
 export interface PathCosts {
-  /** Turn that keeps to the curb side (left in Japan). */
+  /** Turn that keeps to the curb side. */
   easyTurn: number;
   /** Turn across oncoming traffic. */
   hardTurn: number;

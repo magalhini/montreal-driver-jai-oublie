@@ -97,7 +97,7 @@ export class Sirens {
 
   private makeNode(v: SirenVoice): AudioWorkletNode | null {
     if (!this.mx.ready) return null;
-    const n = new AudioWorkletNode(this.mx.ctx, 'neon-siren', {
+    const n = new AudioWorkletNode(this.mx.ctx, 'car-siren', {
       numberOfInputs: 0,
       outputChannelCount: [1],
       processorOptions: { offset: Math.random() * 3 },

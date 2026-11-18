@@ -243,7 +243,7 @@ export class IntroCutscene {
 
   private carLine(): { title: string; sub: string } {
     const spec = this.ride.car.phys.spec.name;
-    const model = spec.split(" ").pop() ?? "Karola";
+    const model = spec.split(" ").pop() ?? "Coupe";
     return { title: model, sub: spec.replace(model, "").trim() };
   }
 

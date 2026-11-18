@@ -30,38 +30,38 @@ import "./pitshop.css";
 
 type Tab = "tires" | "repair" | PartKind | "burnout" | "wheels" | "paint" | "charm";
 
-const TABS: { id: Tab; label: string; jp: string; shot: ShopShot }[] = [
+const TABS: { id: Tab; label: string; sub: string; shot: ShopShot }[] = [
   // Only at the winter-tire drive's garage (`ShopHost.winterTires`), and then always first
-  { id: "tires", label: "TIRES", jp: "タイヤ", shot: "wheel" },
-  { id: "repair", label: "REPAIR", jp: "修理", shot: "overview" },
+  { id: "tires", label: "TIRES", sub: "pneus", shot: "wheel" },
+  { id: "repair", label: "REPAIR", sub: "réparation", shot: "overview" },
   {
     id: "engine",
     label: PART_INFO.engine.label,
-    jp: PART_INFO.engine.jp,
+    sub: PART_INFO.engine.sub,
     shot: "front",
   },
   {
     id: "weight",
     label: PART_INFO.weight.label,
-    jp: PART_INFO.weight.jp,
+    sub: PART_INFO.weight.sub,
     shot: "side",
   },
   {
     id: "handling",
     label: PART_INFO.handling.label,
-    jp: PART_INFO.handling.jp,
+    sub: PART_INFO.handling.sub,
     shot: "rear",
   },
   {
     id: "brakes",
     label: PART_INFO.brakes.label,
-    jp: PART_INFO.brakes.jp,
+    sub: PART_INFO.brakes.sub,
     shot: "wheel",
   },
-  { id: "burnout", label: "BURNOUT", jp: "バーンアウト", shot: "rear" },
-  { id: "wheels", label: "WHEELS", jp: "ホイール", shot: "wheel" },
-  { id: "paint", label: "PAINT", jp: "塗装", shot: "side" },
-  { id: "charm", label: "CHARMS", jp: "porte-bonheur", shot: "bench" },
+  { id: "burnout", label: "BURNOUT", sub: "patinage", shot: "rear" },
+  { id: "wheels", label: "WHEELS", sub: "jantes", shot: "wheel" },
+  { id: "paint", label: "PAINT", sub: "peinture", shot: "side" },
+  { id: "charm", label: "CHARMS", sub: "porte-bonheur", shot: "bench" },
 ];
 
 const isPart = (t: Tab): t is PartKind =>
@@ -115,7 +115,7 @@ const HOLD_REPEAT = 0.12;
 const css = (hex: number) => `#${hex.toString(16).padStart(6, "0")}`;
 
 /**
- * NEO OIL pit garage (stop in a pit stop's service circle). The city fades out, a short cutscene plays (the
+ * Pit garage (stop in a pit stop's service circle). The city fades out, a short cutscene plays (the
  * car rolls into the workshop and the crew gets to work: any key skips it), then the menu comes up over the
  * workshop with the mechanics busy on the car. Repairs and performance parts cost money; parts come in
  * stages tailored to each car, and the top stage of each can be taken off for 80% of its price. The burnout kit is
@@ -132,7 +132,7 @@ export class PitShop {
     | "cash"
     | "tabs"
     | "title"
-    | "jp"
+    | "sub"
     | "car"
     | "note"
     | "rows"
@@ -182,7 +182,7 @@ export class PitShop {
     this.root = document.createElement("div");
     this.root.className = "pit-shop";
     this.root.innerHTML = `
-      <div class="ps-top"><div class="ps-kicker">NEO OIL PIT GARAGE</div><div class="ps-jp">ネオ石油 整備工場</div><div class="ps-station"></div></div>
+      <div class="ps-top"><div class="ps-kicker">GARAGE</div><div class="ps-jp">PNEUS · RÉPARATION</div><div class="ps-station"></div></div>
       <div class="ps-cash"><span>CASH</span><b></b></div>
       <div class="ps-tabs"></div>
       <div class="ps-panel">
@@ -200,7 +200,7 @@ export class PitShop {
       cash: q(".ps-cash b"),
       tabs: q(".ps-tabs"),
       title: q(".ps-title"),
-      jp: q(".ps-title-jp"),
+      sub: q(".ps-title-jp"),
       car: q(".ps-car"),
       note: q(".ps-note"),
       rows: q(".ps-rows"),
@@ -347,7 +347,7 @@ export class PitShop {
               : this.spent < 0
                 ? `${formatCash(-this.spent)} back in your pocket. Drive safe!`
                 : "Come back any time!";
-          this.host.message(`${this.stop?.name ?? "NEO OIL"}: ${bill}`, "good");
+          this.host.message(`${this.stop?.name ?? "GARAGE"}: ${bill}`, "good");
           this.phase = "back";
         }
         return;
@@ -712,7 +712,7 @@ export class PitShop {
       const on = build.charm === c.id;
       const owned = this.builds.owns(c.id);
       return {
-        name: `${c.name}  ${c.jp}`,
+        name: `${c.name}  ${c.sub}`,
         detail: "Hangs from the rearview mirror",
         tag: on ? "HANGING" : owned ? "OWNED" : formatCash(c.price),
         tagClass: on ? "fitted" : owned ? "owned" : "price",
@@ -813,7 +813,7 @@ export class PitShop {
       })
       .join("");
     this.el.title.textContent = tab.label;
-    this.el.jp.textContent = tab.jp;
+    this.el.sub.textContent = tab.sub;
     this.el.car.textContent = this.host.car().phys.spec.name.toUpperCase();
     this.el.note.textContent = id ? this.note(tab.id, build!) : "";
     this.el.rows.innerHTML = rows

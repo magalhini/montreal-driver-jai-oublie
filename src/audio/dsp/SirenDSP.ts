@@ -2,7 +2,7 @@
 export interface SirenParams {
   /** Doppler / slow motion pitch factor. */
   pitch: number;
-  /** 0 = wail (the slow Japanese patrol-car rise and fall), 1 = yelp. Switches at the bottom of a sweep. */
+  /** 0 = wail (the slow rise and fall), 1 = yelp. Switches at the bottom of a sweep. */
   mode: number;
 }
 

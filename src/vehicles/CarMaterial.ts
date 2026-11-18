@@ -48,7 +48,6 @@ export const TRIM = rgb(0.035, 0.035, 0.04);
 export const SPVM_BLUE = rgb(0.012, 0.1, 0.5);
 export const WHITE = rgb(0.86, 0.86, 0.88);
 export const PLATE_WHITE = rgb(0.8, 0.81, 0.76);
-export const PLATE_KEI = rgb(0.85, 0.66, 0.08);
 export const PLATE_TAXI = rgb(0.06, 0.24, 0.12);
 export const PLATE_INK = rgb(0.05, 0.16, 0.08);
 export const AMBER = rgb(0.85, 0.35, 0.03);

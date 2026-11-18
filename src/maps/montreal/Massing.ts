@@ -193,7 +193,7 @@ export function placeBasilica(city: CityModel): void {
     minZ: z0,
     maxZ: z1,
     height,
-    district: 'shotengai',
+    district: 'oldtown',
     faces: [],
     seed,
     landmark: true,

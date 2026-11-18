@@ -7,7 +7,7 @@
  * - CarBody / CarEnds: body, greenhouse and side details / front and rear ends
  * - CarWheel: shared unit wheel
  * - CarDetail: extra bodywork on the cars the player drives (traffic leaves it off)
- * - TruckModel: cab-over trucks (box truck, kei flatbed), same CarParts output
+ * - TruckModel: box truck and pickup, same CarParts output
  */
 import * as THREE from 'three';
 import { isTruck, type BodyStyle, type CarDetail } from './Car';
@@ -49,7 +49,7 @@ export function buildCarParts(style: BodyStyle, color: number, detail?: CarDetai
   const hit = cache.get(key);
   if (hit) return hit;
   if (isTruck(style)) {
-    const t = buildTruckParts(style, color, detail);
+    const t = buildTruckParts(style, color);
     cache.set(key, t);
     return t;
   }

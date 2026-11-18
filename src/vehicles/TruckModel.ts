@@ -1,12 +1,11 @@
 import * as THREE from 'three';
-import type { CarDetail, TruckStyle } from './Car';
+import type { TruckStyle } from './Car';
 import type { CarParts } from './CarModel';
 import { bake, Kit, lensGeo, look, paintBase, type Base } from './CarKit';
 import { BLACK, CHROME, CHROME_C, GLASS, GLASS_C, MATTE, TRIM } from './CarMaterial';
 import { buildBoxTruck } from './TruckBox';
 import { buildPickup } from './TruckPickup';
 import type { P3, TruckCtx } from './TruckCab';
-import { buildKeiTruck, keiLoad } from './TruckKei';
 
 /**
  * Overall dimensions per truck style (m): length, width, wheel radius, front / rear axle z,
@@ -15,7 +14,6 @@ import { buildKeiTruck, keiLoad } from './TruckKei';
 export const TRUCK_DIMS: Record<TruckStyle, { L: number; W: number; r: number; wf: number; wr: number; duals: boolean; tf: number; tr: number; ti: number }> = {
   truck: { L: 5.7, W: 1.94, r: 0.38, wf: 1.75, wr: -1.3, duals: true, tf: 0.8, tr: 0.835, ti: 0.59 },
   pickup: { L: 5.4, W: 1.94, r: 0.36, wf: 1.68, wr: -1.42, duals: false, tf: 0.82, tr: 0.82, ti: 0 },
-  keitruck: { L: 3.4, W: 1.48, r: 0.28, wf: 1.15, wr: -0.85, duals: false, tf: 0.63, tr: 0.63, ti: 0 },
 };
 
 interface TruckBase {
@@ -26,10 +24,10 @@ interface TruckBase {
   tailPos: P3[];
 }
 
-/** Shared geometry per style (and kei load); paint is applied per color, as for the cars. */
+/** Shared geometry per style; paint is applied per color, as for the cars. */
 const bases = new Map<string, TruckBase>();
 
-function buildBase(style: TruckStyle, load: number, detail?: CarDetail): TruckBase {
+function buildBase(style: TruckStyle): TruckBase {
   const d = TRUCK_DIMS[style];
   const c: TruckCtx = {
     kit: new Kit(),
@@ -49,19 +47,17 @@ function buildBase(style: TruckStyle, load: number, detail?: CarDetail): TruckBa
     tailPos: [],
   };
   if (style === 'truck') buildBoxTruck(c);
-  else if (style === 'pickup') buildPickup(c);
-  else buildKeiTruck(c, load, detail === 'work');
+  else buildPickup(c);
   return { base: bake(c.kit), front: lensGeo(c.heads), rear: lensGeo(c.tails), headPos: c.headPos, tailPos: c.tailPos };
 }
 
-/** Truck parts: a box van, a pickup, or the unused kei flatbed. Paint is the cab (and bed) color. */
-export function buildTruckParts(style: TruckStyle, color: number, detail?: CarDetail): CarParts {
+/** Truck parts: a box van or a pickup. Paint is the cab (and bed) color. */
+export function buildTruckParts(style: TruckStyle, color: number): CarParts {
   const d = TRUCK_DIMS[style];
-  const load = style === 'keitruck' && detail !== 'work' ? keiLoad(color) : 0;
-  const key = detail ? `${style}_${load}_${detail}` : `${style}_${load}`;
+  const key = style;
   let b = bases.get(key);
   if (!b) {
-    b = buildBase(style, load, detail);
+    b = buildBase(style);
     bases.set(key, b);
   }
   const wheelPos: P3[] = [

@@ -238,12 +238,83 @@ export function streetTexture(): THREE.CanvasTexture {
   return texture(c);
 }
 
-/** Workshop posters: a tire brand and the house motor oil. */
-export function posterTexture(kind: 'tires' | 'oil'): THREE.CanvasTexture {
+const POSTER = '"Arial Black", "Arial Bold", Arial, sans-serif';
+
+/** Fit a line to the poster width. */
+function posterLine(g: CanvasRenderingContext2D, text: string, y: number, size: number, color: string, max = 196): void {
+  let s = size;
+  g.fillStyle = color;
+  g.font = `bold ${s}px ${POSTER}`;
+  while (s > 14 && g.measureText(text).width > max) g.font = `bold ${(s -= 2)}px ${POSTER}`;
+  g.fillText(text, 128, y);
+}
+
+/** Céline at the Bell Centre. Flat type, not a traced logo. */
+function concertPoster(g: CanvasRenderingContext2D): void {
+  g.fillStyle = '#07060c';
+  g.fillRect(0, 0, 256, 360);
+  g.strokeStyle = '#e4c56a';
+  g.lineWidth = 10;
+  g.strokeRect(14, 14, 228, 332);
+  const glow = g.createRadialGradient(128, 118, 10, 128, 118, 110);
+  glow.addColorStop(0, 'rgba(255, 214, 120, 0.55)');
+  glow.addColorStop(1, 'rgba(255, 214, 120, 0)');
+  g.fillStyle = glow;
+  g.beginPath();
+  g.arc(128, 118, 110, 0, Math.PI * 2);
+  g.fill();
+  g.fillStyle = '#e4c56a';
+  g.font = `bold 16px ${POSTER}`;
+  g.fillText('MONTRÉAL', 128, 48);
+  posterLine(g, 'CÉLINE', 108, 42, '#ffffff');
+  posterLine(g, 'DION', 156, 36, '#e4c56a');
+  g.fillStyle = '#e4c56a';
+  g.fillRect(48, 188, 160, 3);
+  posterLine(g, 'EN CONCERT', 220, 18, '#f4efe6');
+  posterLine(g, 'CENTRE BELL', 258, 22, '#ffffff');
+  posterLine(g, '14 DÉCEMBRE', 302, 18, '#e4c56a');
+}
+
+/** Schwartz's on Saint-Laurent: rye, mustard, a pile of smoked meat. */
+function deliPoster(g: CanvasRenderingContext2D): void {
+  g.fillStyle = '#1a100c';
+  g.fillRect(0, 0, 256, 360);
+  g.fillStyle = '#f2c14e';
+  g.fillRect(0, 0, 256, 18);
+  g.fillRect(0, 342, 256, 18);
+  posterLine(g, "SCHWARTZ'S", 58, 26, '#f2c14e', 200);
+  posterLine(g, 'DELI', 96, 22, '#f4efe6');
+  // A smoked-meat sandwich, stacked, no logo
+  const bread = '#c9843a';
+  const crust = '#8a4e1c';
+  g.fillStyle = crust;
+  g.beginPath();
+  g.roundRect(58, 214, 140, 28, 12);
+  g.fill();
+  g.fillStyle = '#6e1c14';
+  g.fillRect(68, 196, 120, 22);
+  g.fillStyle = '#f2c14e';
+  g.fillRect(74, 190, 108, 8);
+  g.fillStyle = '#8e2418';
+  g.fillRect(66, 174, 124, 18);
+  g.fillStyle = bread;
+  g.beginPath();
+  g.roundRect(54, 150, 148, 28, 14);
+  g.fill();
+  g.fillStyle = crust;
+  g.fillRect(64, 150, 128, 6);
+  posterLine(g, 'SMOKED MEAT', 276, 18, '#f2c14e');
+  posterLine(g, 'SAINT-LAURENT', 312, 14, '#f4efe6');
+}
+
+/** Workshop posters: winter tires, motor oil, a Bell Centre date, and the deli on the Main. */
+export function posterTexture(kind: 'tires' | 'oil' | 'dion' | 'schwartz'): THREE.CanvasTexture {
   const [c, g] = canvas(256, 360);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  if (kind === 'tires') {
+  if (kind === 'dion') concertPoster(g);
+  else if (kind === 'schwartz') deliPoster(g);
+  else if (kind === 'tires') {
     g.fillStyle = '#111014';
     g.fillRect(0, 0, 256, 360);
     g.strokeStyle = '#2a2a2e';
@@ -257,9 +328,9 @@ export function posterTexture(kind: 'tires' | 'oil'): THREE.CanvasTexture {
     g.fill();
     g.fillStyle = '#ffd21e';
     g.font = `bold 40px ${FONT}`;
-    g.fillText('RYUSEI', 128, 282);
+    g.fillText('HIVER', 128, 282);
     g.font = `bold 26px ${FONT}`;
-    g.fillText('流星タイヤ', 128, 322);
+    g.fillText('PNEUS', 128, 322);
   } else {
     g.fillStyle = '#d8301c';
     g.fillRect(0, 0, 256, 360);
@@ -267,8 +338,8 @@ export function posterTexture(kind: 'tires' | 'oil'): THREE.CanvasTexture {
     g.fillRect(16, 16, 224, 328);
     g.fillStyle = '#d8301c';
     g.font = `bold 54px ${FONT}`;
-    g.fillText('NEO', 128, 76);
-    g.fillText('OIL', 128, 132);
+    g.fillText('HUILE', 128, 76);
+    g.fillText('MOTEUR', 128, 132);
     g.fillStyle = '#14141a';
     g.beginPath();
     g.roundRect(84, 168, 88, 118, 10);

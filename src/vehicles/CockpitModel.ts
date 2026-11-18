@@ -100,32 +100,11 @@ interface CabFit {
   ws: [V2, V2];
   roof: V2[];
   bl: [V2, V2];
-  /** Driver's eye (z, y) when it can't follow from the roof and windshield (the cab-over kei). */
-  eye?: V2;
 }
-
-const P = (z: number, y: number): V2 => [z, y];
-
-/**
- * Kei-truck cab (see TruckKei's `CAB`): the driver's eye has to sit over the front axle, not in a sedan cabin. The
- * windshield follows the body's glass; the eye is set by hand, low enough that the header stays above the line of
- * sight (the roof-down rule would put it level with the top of the glass) and back from the upright windshield.
- */
-const KEI_CAB: CabFit = {
-  W: 1.48,
-  gW: 1.36,
-  tumble: 0.96,
-  belt: 1.05,
-  sill: 0.42,
-  ws: [P(1.64, 0.95), P(1.545, 1.62)],
-  roof: [P(1.4, 1.76), P(0.95, 1.78), P(0.62, 1.75)],
-  bl: [P(0.55, 1.68), P(0.48, 1.08)],
-  eye: P(0.97, 1.46),
-};
 
 /** Driver's-eye interior fitted to a body style's greenhouse (car frame: +z forward, y up from the ground). */
 export function buildCockpit(style: BodyStyle): CockpitParts {
-  const st: CabFit = style === 'keitruck' ? KEI_CAB : PROFILES[style === 'truck' || style === 'pickup' ? 'sedan' : style];
+  const st: CabFit = PROFILES[style === 'truck' || style === 'pickup' ? 'sedan' : style];
   const [[bz, by], [tz, ty]] = st.ws; // windshield base and top (z, y)
   const wsZ = (y: number) => bz + ((y - by) / (ty - by)) * (tz - bz);
   const roofY = Math.max(...st.roof.map((p) => p[1]));
@@ -134,7 +113,7 @@ export function buildCockpit(style: BodyStyle): CockpitParts {
   const hwR = (st.gW * st.tumble) / 2 - 0.04; // ... under the roof
   const hwD = st.W / 2 - 0.1; // door trim
   const ex = SIDE * st.W * 0.22;
-  const eye = st.eye ? V(ex, st.eye[1], st.eye[0]) : V(ex, roofY - 0.18, tz - 0.45);
+  const eye = V(ex, roofY - 0.18, tz - 0.45);
   const dashZ = eye.z + 0.62; // dash face toward the driver
   const rearZ = st.bl[0][0];
   const k = new Kit();
@@ -221,7 +200,7 @@ export function buildCockpit(style: BodyStyle): CockpitParts {
   }
 
   // Door mirrors (they are on the body, outside): the black sail at the front of each window that holds them
-  const sailZ = style === 'sports' ? bz - 0.2 : style === 'coupe' || style === 'wagon' ? bz - 0.16 : null;
+  const sailZ = style === 'truck' || style === 'pickup' ? null : bz - 0.16;
   if (sailZ !== null) {
     const xIn = hwD + 0.01;
     const xOut = st.W / 2 + 0.04;

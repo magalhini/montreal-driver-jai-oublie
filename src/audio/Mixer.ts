@@ -24,8 +24,8 @@ export type AudioKey = Category | 'master';
 /** Volume sliders (0..1), saved to `localStorage`. */
 export type AudioSettings = Record<AudioKey, number>;
 
-/** New key for the per-category mix (the old `neonDriver.audio` had three sliders and louder defaults). */
-export const AUDIO_KEY = 'neonDriver.audioMix';
+/** Per-category mix, saved apart from older three-slider layouts. */
+export const AUDIO_KEY = 'montrealDriver.audioMix';
 const MASTER_DEFAULT = 0.8;
 
 function loadSettings(): AudioSettings {

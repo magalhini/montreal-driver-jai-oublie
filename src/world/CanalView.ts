@@ -13,13 +13,13 @@ export interface CanalSet {
 const box = (sx: number, sy: number, sz: number, x: number, y: number, z: number) => new THREE.Matrix4().makeScale(sx, sy, sz).setPosition(x, y, z);
 
 /**
- * The canal: rippling water that mirrors the neon, stone quay walls with railings, arched stone bridges with
- * lamp posts, and lantern-lit yakatabune boats drifting under them.
+ * The canal: rippling water, stone quay walls with railings, arched stone bridges with
+ * lamp posts, and barges drifting under them.
  */
 export function buildCanal(city: CityModel, scene: THREE.Scene): CanalSet | null {
   const k = city.features.canal;
   if (!k) return null;
-  // The canal is a Tokyo (grid) feature: its terrain is the grid `Terrain`
+  // The canal sits in the grid terrain.
   const t = city.terrain as Terrain;
   const sw = CONFIG.SIDEWALK;
   const curb = CONFIG.CURB_HEIGHT;
@@ -155,7 +155,7 @@ export function buildCanal(city: CityModel, scene: THREE.Scene): CanalSet | null
     }),
   ).renderOrder = 1;
 
-  // Yakatabune: lantern-lit house boats drifting along the canal
+  // Barges drifting along the canal
   const boats = Array.from({ length: 4 }, (_, i) => ({ x: k.x0 + 400 + rng.range(0, k.x1 - k.x0 - 800), dir: i % 2 ? 1 : -1, speed: rng.range(1.2, 2.2), group: makeBoat(rng) }));
   for (const b of boats) {
     b.group.position.set(b.x, k.water, k.zc + b.dir * 2.4);
@@ -206,36 +206,26 @@ function sampleCurve(z0: number, z1: number, y: (z: number) => number, tol = 0.0
 
 function makeBoat(rng: Rng): THREE.Group {
   const g = new THREE.Group();
-  const wood = new THREE.MeshStandardMaterial({ color: 0x3a2418, roughness: 0.7 });
-  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.6, 0.7, 11), wood);
+  const hullMat = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.55, metalness: 0.35 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.7, 10), hullMat);
   hull.position.y = 0.1;
   g.add(hull);
-  const bow = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 0.7, 3, 1, false, 0, Math.PI), wood);
+  const bow = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 0.7, 3, 1, false, 0, Math.PI), hullMat);
   bow.rotation.y = Math.PI / 2;
-  bow.position.set(0, 0.1, 5.5);
+  bow.position.set(0, 0.1, 5);
   g.add(bow);
-  // cabin with warm paper windows and a dark roof
   const cabin = new THREE.Mesh(
-    new THREE.BoxGeometry(2.3, 1.3, 7.5),
-    new THREE.MeshStandardMaterial({ color: 0x221510, emissive: new THREE.Color(1.0, 0.55, 0.22), emissiveIntensity: 0.55, roughness: 0.8 }),
+    new THREE.BoxGeometry(2.1, 1.15, 4.2),
+    new THREE.MeshStandardMaterial({ color: 0x3a4038, roughness: 0.7 }),
   );
-  cabin.position.y = 1.1;
+  cabin.position.set(0, 0.95, -1.2);
   g.add(cabin);
-  const roof = new THREE.Mesh(new THREE.BoxGeometry(2.8, 0.18, 8.4), new THREE.MeshStandardMaterial({ color: 0x141018, roughness: 0.6 }));
-  roof.position.y = 1.85;
-  g.add(roof);
-  // red lanterns along the eaves
-  const lanternMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 0.25, 0.12) });
-  const lg = new THREE.SphereGeometry(0.22, 8, 6);
-  const n = 6;
-  const lanterns = new THREE.InstancedMesh(lg, lanternMat, n * 2);
-  let i = 0;
-  for (const side of [-1, 1]) {
-    for (let k = 0; k < n; k++) {
-      lanterns.setMatrixAt(i++, new THREE.Matrix4().makeScale(1, 1.3, 1).setPosition(side * 1.42, 1.6, -3.6 + (7.2 * k) / (n - 1)));
-    }
-  }
-  g.add(lanterns);
-  g.scale.setScalar(rng.range(0.9, 1.1));
+  const glass = new THREE.Mesh(
+    new THREE.BoxGeometry(1.7, 0.42, 1.5),
+    new THREE.MeshStandardMaterial({ color: 0x1a242c, roughness: 0.2, metalness: 0.4 }),
+  );
+  glass.position.set(0, 1.1, 1.5);
+  g.add(glass);
+  g.scale.setScalar(rng.range(0.9, 1.15));
   return g;
 }

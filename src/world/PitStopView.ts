@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import type { AABB } from '../types';
+import type { AABB, Facing } from '../types';
 import type { CityModel } from './RoadGraph';
+import { posterTexture } from './PitGarageTextures';
 import { sharedGlow } from './textures';
 
 /**
@@ -143,6 +144,8 @@ export function buildPitStops(city: CityModel, scene: THREE.Scene): void {
   const stops = city.features.pitStops;
   if (!stops.length) return;
   const t = city.terrain;
+  const dion = new THREE.MeshStandardMaterial({ map: posterTexture('dion'), roughness: 0.7 });
+  const schwartz = new THREE.MeshStandardMaterial({ map: posterTexture('schwartz'), roughness: 0.7 });
   const white: M[] = [];
   const red: M[] = [];
   const concrete: M[] = [];
@@ -198,6 +201,7 @@ export function buildPitStops(city: CityModel, scene: THREE.Scene): void {
       scene.add(m);
     }
     red.push(new THREE.Matrix4().compose(new THREE.Vector3(s.sign.x, ys + 8.4, s.sign.z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), yaw), new THREE.Vector3(2.75, 4.05, 0.4)));
+    hangPosters(s.kiosk, scene, t.heightAt.bind(t), dion, schwartz);
   }
 
   const unit = new THREE.BoxGeometry(1, 1, 1);
@@ -211,6 +215,31 @@ export function buildPitStops(city: CityModel, scene: THREE.Scene): void {
   pools.forEach((m, i) => im.setMatrixAt(i, m));
   im.renderOrder = 1;
   scene.add(im);
+}
+
+/** Concert and deli posters on the kiosk walls that face the forecourt. */
+function hangPosters(kiosk: AABB & { faces: Facing[] }, scene: THREE.Scene, heightAt: (x: number, z: number) => number, dion: THREE.Material, schwartz: THREE.Material): void {
+  const posters: [THREE.Material, number][] = [
+    [dion, -0.85],
+    [schwartz, 0.85],
+  ];
+  for (const face of kiosk.faces) {
+    const ns = face === 'N' || face === 'S';
+    const mid = ns ? (kiosk.minX + kiosk.maxX) / 2 : (kiosk.minZ + kiosk.maxZ) / 2;
+    const wall = face === 'N' ? kiosk.minZ : face === 'S' ? kiosk.maxZ : face === 'E' ? kiosk.maxX : kiosk.minX;
+    const nx = face === 'E' ? 1 : face === 'W' ? -1 : 0;
+    const nz = face === 'S' ? 1 : face === 'N' ? -1 : 0;
+    const ry = face === 'S' ? 0 : face === 'N' ? Math.PI : face === 'E' ? Math.PI / 2 : -Math.PI / 2;
+    for (const [mat, slide] of posters) {
+      const along = mid + slide;
+      const x = ns ? along : wall + nx * 0.08;
+      const z = ns ? wall + nz * 0.08 : along;
+      const m = new THREE.Mesh(new THREE.PlaneGeometry(1.15, 1.62), mat);
+      m.position.set(x, heightAt(x, z) + 2.45, z);
+      m.rotation.y = ry;
+      scene.add(m);
+    }
+  }
 }
 
 function islandParts(i: AABB, y0: number, yc: number, concrete: M[], white: M[], red: M[], screens: M[]): void {

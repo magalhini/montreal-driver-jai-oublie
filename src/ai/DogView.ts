@@ -8,8 +8,8 @@ import type { Pedestrians } from './Pedestrians';
 
 /** Coat / markings colors, overall size, leg length, body length and tail curl per breed (see BREEDS). */
 const BREED = [
-  { coat: 0xc8742a, mark: 0xf2e4c8, size: 1, leg: 1, long: 1, tail: 2.3 }, // shiba
-  { coat: 0x1e1a18, mark: 0xc89a60, size: 1, leg: 1, long: 1, tail: 2.3 }, // black-and-tan shiba
+  { coat: 0xc8742a, mark: 0xf2e4c8, size: 1, leg: 1, long: 1, tail: 2.3 }, // red, curled tail
+  { coat: 0x1e1a18, mark: 0xc89a60, size: 1, leg: 1, long: 1, tail: 2.3 }, // black and tan, curled tail
   { coat: 0xece6da, mark: 0xece6da, size: 1.22, leg: 1.05, long: 1.05, tail: 2.4 }, // big white
   { coat: 0x8a5634, mark: 0x8a5634, size: 0.62, leg: 1, long: 0.9, tail: 1.4 }, // toy poodle
   { coat: 0xd08638, mark: 0xf6f0e6, size: 0.85, leg: 0.55, long: 1.25, tail: 0.6 }, // corgi
@@ -167,7 +167,7 @@ export class DogView implements ViewSystem {
         this.legs.setColorAt(n * 4 + k, this.color.setHex(b.coat));
       });
 
-      // Tail: curled up over the back (shiba) or out behind, wagging
+      // Tail: curled up over the back, or out behind, wagging
       this.e.set(-b.tail, Math.sin(d.wag) * 0.55, 0, 'YXZ');
       this.part.makeRotationFromEuler(this.e).setPosition(0, 0.44, -0.24);
       this.tails.setMatrixAt(n, this.tmp.multiplyMatrices(this.body, this.part));

@@ -39,8 +39,8 @@ export interface CarSpec {
   yawDamping: number;
 }
 
-export const KAROLA: CarSpec = {
-  name: "2013 Toyoda Karola",
+export const COUPE: CarSpec = {
+  name: "2013 Coupe",
   mass: 1100,
   inertiaScale: 1.0,
   cgToFront: 1.24,
@@ -76,7 +76,7 @@ export const KAROLA: CarSpec = {
 };
 
 export const TRAFFIC_SEDAN: CarSpec = {
-  ...KAROLA,
+  ...COUPE,
   name: "Traffic Sedan",
   mass: 1250,
   peakTorque: 190,
@@ -92,7 +92,7 @@ export const TRAFFIC_SEDAN: CarSpec = {
 };
 
 export const POLICE_CRUISER: CarSpec = {
-  ...KAROLA,
+  ...COUPE,
   name: "SPVM Cruiser",
   mass: 1350,
   peakTorque: 300,
@@ -136,7 +136,7 @@ export const BOX_TRUCK: CarSpec = {
   steerSpeed: 2.6,
 };
 
-/** Half-ton pickup (PRD 11B): the kei flatbed's place in traffic. Conventional cab, open bed. */
+/** Half-ton pickup: hood, separate cab, open bed. */
 export const PICKUP: CarSpec = {
   ...TRAFFIC_SEDAN,
   name: "Pickup",
@@ -158,59 +158,6 @@ export const PICKUP: CarSpec = {
   rollingResistance: 18,
   maxSteer: 0.58,
   steerSpeed: 2.8,
-};
-
-/** Kei flatbed truck: kei-car size and weight. Kept so the old mesh still builds; traffic does not spawn it. */
-export const KEI_TRUCK: CarSpec = {
-  ...TRAFFIC_SEDAN,
-  name: "Kei Truck",
-  mass: 820,
-  cgToFront: 1.0,
-  cgToRear: 0.95,
-  halfWidth: 0.74,
-  halfLength: 1.7,
-  wheelRadius: 0.28,
-  peakTorque: 120,
-};
-
-/**
- * Small rounded city car: short wheelbase, light, and quick to turn. Grip is matched to the slight
- * rear weight so it stays neutral, first gear hooks up instead of spinning, and it runs out of breath near 155 km/h.
- */
-export const MAME: CarSpec = {
-  name: "1973 Mame",
-  mass: 720,
-  inertiaScale: 0.95,
-  cgToFront: 1.02,
-  cgToRear: 0.88,
-  cgHeight: 0.44,
-  halfWidth: 0.7,
-  halfLength: 1.53,
-  wheelRadius: 0.28,
-  peakTorque: 128,
-  idleRpm: 950,
-  peakRpm: 4500,
-  redline: 7200,
-  gears: [3.15, 2.02, 1.4, 1.06, 0.84],
-  reverseGear: 3.3,
-  finalDrive: 4.35,
-  driveEfficiency: 0.86,
-  gripFront: 1.38,
-  gripRear: 1.34,
-  corneringStiffness: 9.2,
-  peakFalloff: 0.12,
-  handbrakeGrip: 0.38,
-  brakeForce: 8000,
-  brakeBiasFront: 0.66,
-  handbrakeForce: 2400,
-  drag: 0.4,
-  rollingResistance: 11,
-  maxSteer: 0.64,
-  steerSpeed: 3.3,
-  steerReturn: 5.2,
-  steerSpeedFalloff: 28,
-  driftAssist: 0.66,
-  yawDamping: 0.52,
 };
 
 export function cloneSpec(s: CarSpec): CarSpec {

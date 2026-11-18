@@ -53,7 +53,7 @@ export class DistantEvents {
     const c = this.clock;
     const n = this.next;
     const d = s.district ?? 'residential';
-    const busy = d === 'downtown' || d === 'shotengai' || d === 'depot';
+    const busy = d === 'downtown' || d === 'oldtown' || d === 'depot';
     if (c > n.siren) {
       n.siren = c + rnd(80, 200);
       if (!this.pursuit && !this.indoors) this.farSiren();
@@ -109,7 +109,7 @@ export class DistantEvents {
       lp.connect(sp);
       sp.connect(mx.ambience);
       lp.connect(mx.gain(mx.streetSend, 1.4));
-      const node = new AudioWorkletNode(mx.ctx, 'neon-siren', { numberOfInputs: 0, outputChannelCount: [1] });
+      const node = new AudioWorkletNode(mx.ctx, 'car-siren', { numberOfInputs: 0, outputChannelCount: [1] });
       node.connect(gain);
       this.siren = { node, gain, pan: sp };
     }
@@ -229,7 +229,7 @@ export class DistantEvents {
       lp.connect(sp);
       sp.connect(mx.ambience);
       lp.connect(mx.gain(mx.streetSend, 1.1));
-      const node = new AudioWorkletNode(mx.ctx, 'neon-engine', { numberOfInputs: 0, outputChannelCount: [1], processorOptions: { profile: BIKE, seed: 7 } });
+      const node = new AudioWorkletNode(mx.ctx, 'car-engine', { numberOfInputs: 0, outputChannelCount: [1], processorOptions: { profile: BIKE, seed: 7 } });
       node.connect(gain);
       this.bike = { node, gain, pan: sp };
     }

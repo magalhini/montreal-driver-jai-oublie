@@ -28,7 +28,7 @@ const pick = <T>(xs: readonly T[]): T => xs[Math.floor(Math.random() * xs.length
 const CHARM_CUES: Record<CharmId, CueOf<'charm'> | null> = {
   cone: 'squeak',
   bagel: 'squeak',
-  croissant: 'suzuShake2',
+  croissant: 'bellSwing',
   timmies: 'dice2',
 };
 
@@ -40,7 +40,7 @@ const walkPhase = (t: number) => (t - 6.8) % WALK_LOOP;
 const typing = (lp: number) => lp < 8 || lp >= 15;
 
 /**
- * The NEO OIL pit garage's sound (`GarageSamples.ts`): a recorded workshop bed and one-shots cut from
+ * The pit garage's sound (`GarageSamples.ts`): a recorded workshop bed and one-shots cut from
  * recordings, on the music bus like the café (the city outside is muffled behind the door). `update`
  * follows the cutscene clock (`PitShop.scene`): the crew's choreography in `PitGarage` (rummaging at the
  * bench, the impact wrench's bursts, the laptop, the walker fetching tools, the creeper's ratchet) and some
@@ -187,7 +187,7 @@ export class GarageAudio {
           return;
         }
         // Hung for good: the full shake of the bells, the dice rattled in the cup
-        this.play('charm', ev.fit ? (cue === 'dice2' ? 'dice' : cue.startsWith('suzu') ? 'suzu' : cue) : cue, ev.fit ? 0.35 : 0.28);
+        this.play('charm', ev.fit ? (cue === 'dice2' ? 'dice' : cue.startsWith('bell') ? 'bell' : cue) : cue, ev.fit ? 0.35 : 0.28);
         return;
       }
       case 'repair':

@@ -57,7 +57,7 @@ export function tileTexture(): THREE.Texture {
   return t;
 }
 
-/** Mown lawn: mottled greens with blade speckle (shrine park, IMPROVEMENTS #20). */
+/** Mown lawn: mottled greens with blade speckle (IMPROVEMENTS #20). */
 export function grassTexture(): THREE.Texture {
   const [c, g] = canvas(256, 256);
   const rng = new Rng(21);

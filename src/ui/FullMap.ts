@@ -178,7 +178,7 @@ export class FullMap {
     if (station) {
       t.toScreen(station.dispatch, q);
       drawDispatch(ctx, q.x, q.y, 20 * dpr, station.color, station.glyph);
-      this.text(station.jp, q.x, q.y + 20 * dpr, 8, station.color, station.name);
+      this.text(station.mark, q.x, q.y + 20 * dpr, 8, station.color, station.name);
     }
     const now = performance.now();
     for (const cop of this.police.cops.values()) {

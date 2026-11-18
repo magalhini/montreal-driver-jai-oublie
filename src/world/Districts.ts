@@ -13,7 +13,7 @@ interface Rule {
 /** `depot` blocks are no longer generated (the yard is gone); they build as residential. */
 const RULES: Record<Exclude<DistrictType, 'depot'>, Rule> = {
   downtown: { maxLot: 30, gap: [1.5, 3], height: (r, c) => r.range(28, 70) + c * r.range(20, 70) },
-  shotengai: { maxLot: 9, gap: [0.15, 0.5], height: (r) => (r.chance(0.15) ? r.range(16, 26) : r.range(5, 13)) },
+  oldtown: { maxLot: 9, gap: [0.15, 0.5], height: (r) => (r.chance(0.15) ? r.range(16, 26) : r.range(5, 13)) },
   residential: { maxLot: 20, gap: [1.2, 3], height: (r) => (r.chance(0.3) ? r.range(18, 34) : r.range(8, 16)) },
   // Brick warehouses along the canal and the port: long lots, close together (PRD Phase 5)
   harbor: { maxLot: 40, gap: [1, 2.5], height: (r) => r.range(9, 16) },

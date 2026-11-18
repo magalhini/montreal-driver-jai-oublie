@@ -93,7 +93,7 @@ function varySilhouettes(city: CityModel): void {
       continue;
     }
 
-    if (b.district === 'shotengai') {
+    if (b.district === 'oldtown') {
       // Taller shop houses, still under the mast threshold. The pit-stop kiosk is 4.6 m and lives in the
       // features, so leave anything shorter than a generated shop alone.
       if (b.height >= 5) b.height *= 1 + hash01(b.seed, 4) * 0.28;

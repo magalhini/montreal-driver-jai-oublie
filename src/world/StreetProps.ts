@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { CONFIG } from '../config';
 import { Rng } from '../core/Rng';
 import type { AABB, Facing, Vec2 } from '../types';
-import { AVIATION, buildingBase } from './BuildingDetails';
+import { AVIATION } from './BuildingDetails';
 import { inDriveway as curbCut } from './Features';
 import type { CityModel } from './RoadGraph';
 import { LOOK } from '../render/Look';
@@ -57,10 +57,10 @@ export function buildStreetProps(city: CityModel, scene: THREE.Scene): AABB[] {
 
     // The cobbles are dressed by `OldCityProps` (bare trees, bikes, terraces): no poles or wires there
     if (e.cls === 'cobble') continue;
-    // Utility poles + wires + sakura trees on residential / shotengai sides (street lamps: StreetLamps)
+    // Utility poles + wires + trees on residential / old-city sides (street lamps: StreetLamps)
     for (const s of [1, -1]) {
       const dist = s === 1 ? dPlus : dMinus;
-      if (!e.avenue && (dist === 'residential' || dist === 'shotengai')) {
+      if (!e.avenue && (dist === 'residential' || dist === 'oldtown')) {
         let prev: Vec2 | null = null;
         let prevY = 0;
         for (let t = t0 + 13; t <= t1; t += 34) {
@@ -97,8 +97,7 @@ export function buildStreetProps(city: CityModel, scene: THREE.Scene): AABB[] {
           const sc = rng.range(0.85, 1.3);
           const H = Y(p);
           trunks.push(box(0.3, 2.6 * sc, 0.3, p.x, H, p.z));
-          // A crown of overlapping clumps: sakura (pink) or zelkova (dark green)
-          const sakura = rng.chance(0.55);
+          // A crown of overlapping clumps, dark green under the snow
           const nClumps = rng.int(4, 6);
           for (let k = 0; k < nClumps; k++) {
             const a = (k / nClumps) * Math.PI * 2 + rng.range(-0.4, 0.4);
@@ -112,10 +111,8 @@ export function buildStreetProps(city: CityModel, scene: THREE.Scene): AABB[] {
                 new THREE.Vector3(cs * 1.15, cs * 0.85, cs * 1.15),
               ),
             );
-            const leaf = sakura
-              ? new THREE.Color().setHSL(rng.range(0.9, 0.97), rng.range(0.45, 0.7), rng.range(0.55, 0.75))
-              : new THREE.Color().setHSL(rng.range(0.25, 0.36), rng.range(0.35, 0.5), rng.range(0.12, 0.2));
-            leafCol.push(LOOK.day ? winterCrown(sakura, leaf) : leaf);
+            const leaf = new THREE.Color().setHSL(rng.range(0.25, 0.36), rng.range(0.35, 0.5), rng.range(0.12, 0.2));
+            leafCol.push(LOOK.day ? winterCrown(false, leaf) : leaf);
           }
           if (drop) {
             trunks.length = mark[0];
@@ -171,11 +168,9 @@ function buildShopfrontProps(city: CityModel, scene: THREE.Scene, rng: Rng, coll
   const vend: M[] = [];
   const vendFront: M[] = [];
   const vendCol: THREE.Color[] = [];
-  const lanterns: M[] = [];
-  const lanternCol: THREE.Color[] = [];
   const VEND = [new THREE.Color(1.5, 1.6, 1.9), new THREE.Color(1.9, 0.4, 0.4), new THREE.Color(0.4, 1.0, 1.9), new THREE.Color(1.8, 1.5, 0.5)];
   for (const b of city.buildings) {
-    if (b.district !== 'shotengai' && b.district !== 'residential') continue;
+    if (b.district !== 'oldtown' && b.district !== 'residential') continue;
     for (const f of b.faces) {
       const n = NORMALS[f];
       const along = f === 'N' || f === 'S';
@@ -186,7 +181,7 @@ function buildShopfrontProps(city: CityModel, scene: THREE.Scene, rng: Rng, coll
         if (f === 'E') return { x: b.maxX + out, z: b.minZ + len * s };
         return { x: b.minX - out, z: b.minZ + len * s };
       };
-      if (rng.chance(b.district === 'shotengai' ? 0.35 : 0.2) && len > 3) {
+      if (rng.chance(b.district === 'oldtown' ? 0.35 : 0.2) && len > 3) {
         const p = at(rng.range(0.2, 0.8), 0.42);
         const color = rng.pick(VEND);
         const sx = along ? 1.0 : 0.75;
@@ -200,21 +195,10 @@ function buildShopfrontProps(city: CityModel, scene: THREE.Scene, rng: Rng, coll
           colliders.push({ minX: p.x - sx / 2, maxX: p.x + sx / 2, minZ: p.z - sz / 2, maxZ: p.z + sz / 2 });
         }
       }
-      // Paper lanterns are the Tokyo night kit; Montreal's old city has none (PRD 5.8)
-      if (b.district === 'shotengai' && !LOOK.day) {
-        const nL = Math.max(1, Math.floor(len / 3.5));
-        const red = rng.chance(0.7);
-        for (let k = 0; k < nL; k++) {
-          const p = at((k + 0.5) / nL, 0.7);
-          lanterns.push(new THREE.Matrix4().makeScale(0.42, 0.62, 0.42).setPosition(p.x, buildingBase(b).floor + 2.75, p.z));
-          lanternCol.push(red ? new THREE.Color(2.1, 0.22, 0.12) : new THREE.Color(1.9, 1.6, 1.1));
-        }
-      }
     }
   }
   scene.add(instanced(unitBox, new THREE.MeshStandardMaterial({ color: 0x30303a, roughness: 0.5 }), vend));
   scene.add(instanced(centerBox, new THREE.MeshBasicMaterial({ color: 0xffffff }), vendFront, vendCol));
-  scene.add(instanced(new THREE.CylinderGeometry(0.42, 0.42, 0.9, 10), new THREE.MeshBasicMaterial({ color: 0xffffff }), lanterns, lanternCol));
 }
 
 function buildHarbor(city: CityModel, scene: THREE.Scene, rng: Rng, colliders: AABB[], unitBox: THREE.BufferGeometry): void {

@@ -9,8 +9,8 @@ export interface MapDef extends MapInfo {
 }
 
 /**
- * Signal heads (T43): horizontal heads on far-side arms (Tokyo), vertical heads hung from far-side mast arms
- * (North America, Montreal), or vertical heads on stop-line poles.
+ * Signal heads (T43): horizontal heads on far-side arms, vertical heads hung from far-side mast arms
+ * (Montreal), or vertical heads on stop-line poles.
  */
 export type SignalStyle = 'overhead' | 'mast' | 'pole';
 

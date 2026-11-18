@@ -2,9 +2,9 @@ import { FLEET, type FleetId } from '../vehicles/Fleet';
 import { CHARMS, PAINTS, STOCK_BUILD, WHEELS, type CarBuild, type CharmId, type PartKind } from '../vehicles/Tuning';
 import { defaultStore, type KeyValueStore } from './Economy';
 
-const BUILDS_KEY = 'neonDriver.builds';
+const BUILDS_KEY = 'montrealDriver.builds';
 /** Car ids from older saves. */
-const LEGACY_IDS: Record<string, FleetId> = { kaze: 'karola' };
+const LEGACY_IDS: Record<string, FleetId> = { kaze: 'coupe', karola: 'coupe' };
 
 interface Saved {
   cars: Partial<Record<FleetId, CarBuild>>;
@@ -62,7 +62,7 @@ export class Builds {
       if (!raw) return fresh;
       const v = JSON.parse(raw) as Partial<Saved>;
       const cars: Saved['cars'] = {};
-      // Saves from when there were more cars keep only the one that still exists (the Kaze is now the Karola)
+      // Older saves used other car ids. Keep the one car that still exists.
       for (const [saved, b] of Object.entries(v.cars ?? {})) {
         const id = LEGACY_IDS[saved] ?? saved;
         if (id in FLEET) cars[id as FleetId] = sanitize(b);

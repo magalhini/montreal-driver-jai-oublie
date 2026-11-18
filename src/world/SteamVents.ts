@@ -5,7 +5,7 @@ import { laneOffset, type CityModel } from './RoadGraph';
 
 /**
  * Manhole covers on the streets, and steam rising from some of them in the busy districts (downtown,
- * shotengai), tinted by the neon around. One instanced draw of camera-facing puffs; only vents near the camera
+ * the old city), tinted by the signs around them. One instanced draw of camera-facing puffs; only vents near the camera
  * emit. More steam in the rain (cold air over warm sewers).
  */
 const MAX = 260;
@@ -81,7 +81,7 @@ export class SteamVents implements ViewSystem {
       const fixed = alongX ? a.pos.z : a.pos.x;
       const mid = (t0 + t1) / 2;
       const side = city.blockAt(alongX ? { x: mid, z: fixed + e.width / 2 + 3 } : { x: fixed + e.width / 2 + 3, z: mid });
-      const busy = side && (side.district === 'downtown' || side.district === 'shotengai');
+      const busy = side && (side.district === 'downtown' || side.district === 'oldtown');
       const count = rng.int(1, 2);
       for (let k = 0; k < count; k++) {
         const t = rng.range(t0, t1);

@@ -48,7 +48,7 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   const paving = new SurfaceBuilder(H);
   const curbs = new SurfaceBuilder(H, 2);
 
-  // Grid map (Tokyo): outer ring, far ground and canal cuts come from the grid lines (behind `city.grid` in T49)
+  // Grid map: outer ring, far ground and canal cuts come from the grid lines (behind `city.grid` in T49)
   const grid = city.nx > 0;
 
   // Roads between junctions, and the junction areas. Over a canal bridge the deck is resampled on the arch.
@@ -176,7 +176,7 @@ export function buildRoads(city: CityModel, scene: THREE.Scene, markings?: Marki
   return { asphalt, lots: lotMat, walk: walkMat, setts: settMat };
 }
 
-/** Far ground beyond Tokyo's outer ring (cut around the canal). */
+/** Far ground beyond the outer ring (cut around the canal). */
 function farGround(city: CityModel, ground: SurfaceBuilder): void {
   const sw = CONFIG.SIDEWALK;
   const f = city.features;

@@ -22,22 +22,22 @@ export interface Surroundings {
 }
 
 /**
- * Recorded city beds per district (`public/audio/`): a distant downtown rumble from a rooftop, a Tokyo
- * night from a 6th floor in Shinagawa (far road, a closed station, insects), a quiet city hum by a river.
+ * Recorded city beds per district (`public/audio/`): a distant downtown rumble from a rooftop, a quieter
+ * street at night (far road, a closed station, insects), a quiet city hum by a river.
  */
-const BEDS: Record<DistrictType, { busy: number; tokyo: number; harbor: number }> = {
-  downtown: { busy: 1, tokyo: 0.25, harbor: 0 },
-  shotengai: { busy: 0.6, tokyo: 0.55, harbor: 0 },
-  harbor: { busy: 0.2, tokyo: 0, harbor: 1 },
-  residential: { busy: 0, tokyo: 1, harbor: 0 },
-  depot: { busy: 0.55, tokyo: 0, harbor: 0.45 },
+const BEDS: Record<DistrictType, { busy: number; quiet: number; harbor: number }> = {
+  downtown: { busy: 1, quiet: 0.25, harbor: 0 },
+  oldtown: { busy: 0.6, quiet: 0.55, harbor: 0 },
+  harbor: { busy: 0.2, quiet: 0, harbor: 1 },
+  residential: { busy: 0, quiet: 1, harbor: 0 },
+  depot: { busy: 0.55, quiet: 0, harbor: 0.45 },
 };
 /** Bed loops are normalized to about -24 dBFS RMS. */
 const BED_LEVEL = 0.42;
-/** Neon / transformer hum (50 Hz mains: Tokyo). */
-const HUM: Record<DistrictType, number> = { downtown: 0.8, shotengai: 1, harbor: 0.3, residential: 0.15, depot: 0.4 };
+/** Mains hum. */
+const HUM: Record<DistrictType, number> = { downtown: 0.8, oldtown: 1, harbor: 0.3, residential: 0.15, depot: 0.4 };
 /** Insects in the grass and gardens. */
-const CRICKETS: Record<DistrictType, number> = { downtown: 0, shotengai: 0.1, harbor: 0.15, residential: 0.8, depot: 0.2 };
+const CRICKETS: Record<DistrictType, number> = { downtown: 0, oldtown: 0.1, harbor: 0.15, residential: 0.8, depot: 0.2 };
 
 const smooth = (g: GainNode, v: number, t: number, tc = 0.6) => g.gain.setTargetAtTime(v, t, tc);
 
@@ -54,7 +54,7 @@ interface Spot {
  * sound for now: the synthesized one was removed, to be replaced by recordings.
  */
 export class Ambience {
-  private readonly beds: { busy: LoopLayer; tokyo: LoopLayer; harbor: LoopLayer };
+  private readonly beds: { busy: LoopLayer; quiet: LoopLayer; harbor: LoopLayer };
   private readonly hum: GainNode;
   private readonly wind: GainNode;
   private readonly windBp: BiquadFilterNode;
@@ -63,7 +63,7 @@ export class Ambience {
   private readonly vent: Spot;
   private readonly crickets: GainNode;
   private plopAt = 0;
-  private level = { busy: 0, tokyo: 0, harbor: 0, hum: 0, crickets: 0 };
+  private level = { busy: 0, quiet: 0, harbor: 0, hum: 0, crickets: 0 };
   private readonly calls: AmbientCalls;
 
   constructor(
@@ -75,7 +75,7 @@ export class Ambience {
     const city = mx.catGain('city', amb);
     this.beds = {
       busy: new LoopLayer(bank, 'cityBusy', city),
-      tokyo: new LoopLayer(bank, 'cityTokyo', city),
+      quiet: new LoopLayer(bank, 'cityQuiet', city),
       harbor: new LoopLayer(bank, 'cityHarbor', city),
     };
     // Mains hum: 50 Hz saw, its 100 / 150 / 200 Hz partials through a narrow band
@@ -157,7 +157,7 @@ export class Ambience {
     const lv = this.level;
     const bed = BEDS[d];
     lv.busy += (bed.busy - lv.busy) * k;
-    lv.tokyo += (bed.tokyo - lv.tokyo) * k;
+    lv.quiet += (bed.quiet - lv.quiet) * k;
     lv.harbor += (bed.harbor - lv.harbor) * k;
     lv.hum += (HUM[d] - lv.hum) * k;
     lv.crickets += (CRICKETS[d] * (1 - clamp(s.rain * 3, 0, 1)) - lv.crickets) * k;
@@ -165,7 +165,7 @@ export class Ambience {
     // Indoors (garages, passages) the city outside drops a little; the title camera floats high above it
     const bedLevel = BED_LEVEL * shelter * (s.covered ? 0.7 : 1);
     this.beds.busy.set(lv.busy * bedLevel, t);
-    this.beds.tokyo.set(lv.tokyo * bedLevel, t);
+    this.beds.quiet.set(lv.quiet * bedLevel, t);
     this.beds.harbor.set(lv.harbor * bedLevel, t);
     smooth(this.hum, 0.012 * lv.hum * (s.covered ? 1.4 : 1), t);
     const high = clamp(s.pos.y / 25, 0, 1);

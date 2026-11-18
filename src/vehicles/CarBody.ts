@@ -309,7 +309,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   const trim = look(TRIM, MATTE);
   const chrome = look(CHROME_C, CHROME);
   const glass = look(police ? rgb(0.012, 0.015, 0.02) : GLASS_C, GLASS);
-  const brightTrim = style === 'coupe' || style === 'sedan' || style === 'city' ? chrome : trim;
+  const brightTrim = style === 'coupe' || style === 'sedan' ? chrome : trim;
   const heads: THREE.BufferGeometry[] = [];
   const tails: THREE.BufferGeometry[] = [];
   const headPos: [number, number, number][] = [];
@@ -318,7 +318,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
 
   // The player's own bodies are split across the width, so the end round and the hood crown become a
   // curve instead of a flat face sliding back. Traffic keeps a single span: same outline, far fewer triangles.
-  const shaped = style === 'sports' || detail === 'driver' || detail === 'taxi' || detail === 'patrol';
+  const shaped = detail === 'driver' || detail === 'taxi' || detail === 'patrol';
   // --- Lower body: side profile with wheel arches, extruded across the width ---
   const [archGap, archLift] = st.arch ?? [0.055, 0.015];
   const R = st.r + archGap;
@@ -383,7 +383,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
     cabDecal(strip([lerp2(a, b, t0 / len), lerp2(a, b, 1 - t1 / len)], -hwG, hwG, 0.006), glass);
   };
   panel(st.ws[0], st.ws[1], 0.04, 0.035, st.pillar);
-  panel(st.bl[0], st.bl[1], 0.04, style === 'coupe' ? 0.16 : style === 'sports' ? 0.07 : 0.05, st.cPillar);
+  panel(st.bl[0], st.bl[1], 0.04, style === 'coupe' ? 0.16 : 0.05, st.cPillar);
   // Wipers parked at the windshield base
   {
     const [a, b] = st.ws;
@@ -422,13 +422,10 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
   if (style === 'coupe') {
     const y = st.sill + 0.1;
     kit.both(rbox(archStart, archEnd, y - 0.009, y + 0.009, hw - 0.01, hw + 0.009, 0.008, 0.004), chrome);
-  } else if (style === 'sedan' || style === 'wagon' || style === 'kei') {
-    const y = style === 'kei' ? 0.5 : 0.56;
+  } else if (style === 'sedan' || style === 'wagon') {
+    const y = 0.56;
     kit.both(rbox(archStart, archEnd, y - 0.025, y + 0.025, hw - 0.01, hw + 0.014, 0.012, 0.006), trim);
-    if (style !== 'kei') kit.both(rbox(archStart + 0.02, archEnd - 0.02, y + 0.006, y + 0.014, hw + 0.01, hw + 0.018, 0.003, 0.002), chrome);
-  } else if (style === 'city') {
-    const y = st.belt - 0.045;
-    kit.both(rbox(archStart, archEnd, y - 0.007, y + 0.007, hw - 0.008, hw + 0.01, 0.006, 0.003), chrome);
+    kit.both(rbox(archStart + 0.02, archEnd - 0.02, y + 0.006, y + 0.014, hw + 0.01, hw + 0.018, 0.003, 0.002), chrome);
   }
 
   // --- Top seams: hood and trunk / hatch shut lines ---
@@ -440,7 +437,7 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
     kit.add(strip(slice([st.nose[st.nose.length - 1], ...top], hl - 0.08, hoodZ0), lineXs[0], lineXs[1], 0.003), seam);
   }
   kit.add(strip(slice(top, hoodZ0 + 0.006, hoodZ0 - 0.006), -seamX, seamX, 0.003), seam);
-  if (style === 'coupe' || style === 'sports' || style === 'sedan' || style === 'police' || style === 'city') {
+  if (style === 'coupe' || style === 'sedan' || style === 'police') {
     const z0 = st.bl[1][0] - 0.05;
     const deck = [...st.deck];
     for (const s of [-1, 1]) {
@@ -450,37 +447,14 @@ export function buildBase(style: CarStyle, taxi: boolean, detail?: CarDetail): B
     kit.add(strip(slice(deck, z0 + 0.006, z0 - 0.006), -seamX, seamX, 0.003), seam);
   }
 
-  // --- Mirrors ---
-  if (style === 'sports') {
-    // Small body-color door mirrors on black stalks, at the front corner of the door glass
-    const z = st.ws[0][0] - 0.2;
-    const y = st.belt + 0.09;
-    kit.both(rbox(z - 0.045, z + 0.06, y - 0.04, y + 0.035, hw + 0.03, hw + 0.13, 0.03, 0.012), body);
-    kit.both(rbox(z - 0.05, z + 0.055, y - 0.035, y + 0.0, hw - 0.06, hw + 0.04, 0.012, 0.006), dark);
-    // The glass, facing back at the driver
-    kit.both(rbox(z - 0.052, z - 0.04, y - 0.032, y + 0.027, hw + 0.04, hw + 0.12, 0.004, 0.002), glass);
-  } else if (style === 'coupe' || style === 'wagon' || style === 'police') {
+  // --- Mirrors: on the doors, ahead of the glass ---
+  {
     const z = st.ws[0][0] - 0.16;
     const y = st.belt + 0.07;
     const m = style === 'coupe' ? chrome : style === 'police' ? body : trim;
     kit.both(rbox(z - 0.05, z + 0.05, y - 0.035, y + 0.035, hw + 0.02, hw + 0.13, 0.025, 0.01), m);
     kit.both(prep(new THREE.BoxGeometry(0.05, 0.03, 0.03).translate(hw + 0.0, y - 0.02, z)), m);
     kit.both(rbox(z - 0.057, z - 0.045, y - 0.027, y + 0.027, hw + 0.03, hw + 0.12, 0.004, 0.002), glass);
-  } else if (style === 'city') {
-    // Small chrome mirrors on the front fenders, just ahead of the cowl
-    const z = 1.12;
-    const y = yAt([st.nose[st.nose.length - 1], ...st.hood], z);
-    const x = hw - 0.08;
-    kit.both(prep(new THREE.BoxGeometry(0.014, 0.09, 0.014).translate(x, y + 0.04, z)), trim);
-    kit.both(rbox(z - 0.022, z + 0.028, y + 0.075, y + 0.12, x - 0.028, x + 0.028, 0.014, 0.006), chrome);
-  } else {
-    // Fender mirrors, as on Japanese cars of the era
-    const z = hl - (style === 'kei' ? 0.42 : 0.62);
-    const y = yAt([st.nose[st.nose.length - 1], ...st.hood], z);
-    const x = hw - 0.13;
-    const m = style === 'kei' ? chrome : trim;
-    kit.both(prep(new THREE.BoxGeometry(0.016, 0.12, 0.016).translate(x, y + 0.05, z)), trim);
-    kit.both(rbox(z - 0.03, z + 0.035, y + 0.09, y + 0.15, x - 0.035, x + 0.035, 0.02, 0.008), m);
   }
 
   addSkinDetails(kit, st, style, hw, ghw, R, seam, dark, trim);

@@ -13,7 +13,7 @@ const GATE = 10;
 
 /**
  * Turn each full-block lawn into a garden: a smaller road-level square, a plowed road in one side and out
- * the other, trees, lamps, stone lanterns and benches. The street wall stays; buildings that fall in the
+ * the other, trees, lamps and benches. The street wall stays; buildings that fall in the
  * garden are pulled back to its edge. Own random stream.
  */
 export function layParks(city: CityModel, seed: number): void {
@@ -28,7 +28,7 @@ export function layParks(city: CityModel, seed: number): void {
     city.features.driveways.push(...mouths);
     for (const g of mouths) {
       const ns = g.maxZ - g.minZ >= g.maxX - g.minX;
-      city.features.alleys.push({ block: block.id, axis: ns ? 'z' : 'x', box: g, lit: 'lamps' });
+      city.features.alleys.push({ block: block.id, axis: ns ? 'z' : 'x', box: g });
     }
   }
   city.features.parks = parks;
@@ -64,7 +64,6 @@ function layoutPark(block: Block, rng: Rng): CityPark | null {
   const path = pathBox(lawn, side);
   const trees = plant(lawn, path, rng);
   const lamps = corners(lawn, 3.2).filter((p) => !hits(p, path, 1.5));
-  const lanterns = placeLanterns(lawn, side, span).filter((p) => trees.every((t) => Math.hypot(t.pos.x - p.x, t.pos.z - p.z) > 2.6));
   const benches = placeBenches(lawn, side, span);
   const post = (p: Vec2, r: number): AABB => ({ minX: p.x - r, maxX: p.x + r, minZ: p.z - r, maxZ: p.z + r });
   return {
@@ -76,12 +75,10 @@ function layoutPark(block: Block, rng: Rng): CityPark | null {
     enclosed: true,
     trees,
     lamps,
-    lanterns,
     benches,
     colliders: [
       ...trees.map((t) => post(t.pos, 0.35)),
       ...lamps.map((p) => post(p, 0.16)),
-      ...lanterns.map((p) => post(p, 0.4)),
       ...benches.map((b) => benchBox(b)),
     ],
   };
@@ -122,13 +119,12 @@ function plant(lawn: AABB, path: AABB, rng: Rng): CityPark['trees'] {
   for (let x = lawn.minX + 4; x < lawn.maxX - 3; x += 8) {
     for (let z = lawn.minZ + 4; z < lawn.maxZ - 3; z += 8) {
       const p = { x: x + rng.range(-1.5, 1.5), z: z + rng.range(-1.5, 1.5) };
-      const pink = rng.chance(0.62);
       const skip = rng.chance(0.14);
       const r = rng.range(2.3, 3.5);
       if (skip) continue;
       if (p.x < lawn.minX + 2.4 || p.x > lawn.maxX - 2.4 || p.z < lawn.minZ + 2.4 || p.z > lawn.maxZ - 2.4) continue;
       if (hits(p, path, 3.1)) continue;
-      trees.push({ pos: p, r, pink });
+      trees.push({ pos: p, r });
     }
   }
   return trees;
@@ -141,27 +137,6 @@ function corners(lawn: AABB, inset: number): Vec2[] {
     { x: lawn.minX + inset, z: lawn.maxZ - inset },
     { x: lawn.maxX - inset, z: lawn.maxZ - inset },
   ];
-}
-
-function placeLanterns(lawn: AABB, side: Facing, span: number): Vec2[] {
-  const mx = (lawn.minX + lawn.maxX) / 2;
-  const mz = (lawn.minZ + lawn.maxZ) / 2;
-  const along = span * 0.32;
-  const off = 4.4;
-  if (side === 'N' || side === 'S') {
-    return [
-      { x: mx - off, z: mz - along },
-      { x: mx + off, z: mz - along },
-      { x: mx - off, z: mz + along },
-      { x: mx + off, z: mz + along },
-    ].filter((p) => p.x > lawn.minX + 1.5 && p.x < lawn.maxX - 1.5 && p.z > lawn.minZ + 1.5 && p.z < lawn.maxZ - 1.5);
-  }
-  return [
-    { x: mx - along, z: mz - off },
-    { x: mx - along, z: mz + off },
-    { x: mx + along, z: mz - off },
-    { x: mx + along, z: mz + off },
-  ].filter((p) => p.x > lawn.minX + 1.5 && p.x < lawn.maxX - 1.5 && p.z > lawn.minZ + 1.5 && p.z < lawn.maxZ - 1.5);
 }
 
 function placeBenches(lawn: AABB, side: Facing, span: number): CityPark['benches'] {

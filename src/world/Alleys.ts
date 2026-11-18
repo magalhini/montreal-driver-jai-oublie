@@ -54,7 +54,7 @@ export function planAlleys(city: CityModel, seed: number): void {
   const eligible = (bl: Block) =>
     f.kinds[bl.id] === 'normal' &&
     bl.gj !== f.canal?.row &&
-    (bl.district === 'residential' || bl.district === 'shotengai' || bl.district === 'downtown');
+    (bl.district === 'residential' || bl.district === 'oldtown' || bl.district === 'downtown');
   for (const bl of city.blocks) {
     if (!eligible(bl) || isCourt(city, bl)) continue;
     const r = inner(bl);
@@ -147,7 +147,7 @@ function cutAlley(city: CityModel, bl: Block, axis: Axis, rng: Rng): void {
     if (b1 - cut1 >= ALLEY.minPiece) added.push(piece(b, axis, cut1, b1, farFace, rng.int(0, 1e6), Math.max(5, b.height * rng.range(0.8, 1.2))));
   }
   city.buildings = city.buildings.filter((b) => !removed.has(b)).concat(added);
-  f.alleys.push({ block: bl.id, axis, box, lit: bl.district === 'residential' ? 'lamps' : 'lanterns' });
+  f.alleys.push({ block: bl.id, axis, box });
 }
 
 /** Part of `b` between p0 and p1 across the alley, with a facade onto the alley (if it had street faces). */

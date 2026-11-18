@@ -2,7 +2,7 @@ import { cloneSpec, type CarSpec } from "./CarSpec";
 import type { FleetId } from "./Fleet";
 
 /**
- * What the NEO OIL pit garage sells (`ui/PitShop.ts`): performance parts in stages, tailored to each car,
+ * What the pit garage sells (`ui/PitShop.ts`): performance parts in stages, tailored to each car,
  * a clutch-dump burnout kit, plus free rims and paint and the little charms that hang from the rearview mirror.
  */
 export type PartKind = "engine" | "weight" | "handling" | "brakes";
@@ -50,17 +50,17 @@ export const STOCK_BUILD: Readonly<CarBuild> = {
 
 export const PART_INFO: Record<
   PartKind,
-  { label: string; jp: string; unit: string; stages: string[] }
+  { label: string; sub: string; unit: string; stages: string[] }
 > = {
   engine: {
     label: "ENGINE",
-    jp: "エンジン",
+    sub: "moteur",
     unit: "Nm",
     stages: ["Street tune", "Sport cams & headers", "Full race build"],
   },
   weight: {
     label: "WEIGHT",
-    jp: "軽量化",
+    sub: "allègement",
     unit: "kg",
     stages: [
       "Strip the trim",
@@ -70,7 +70,7 @@ export const PART_INFO: Record<
   },
   handling: {
     label: "HANDLING",
-    jp: "足回り",
+    sub: "tenue",
     unit: "grip",
     stages: [
       "Sport tires",
@@ -80,7 +80,7 @@ export const PART_INFO: Record<
   },
   brakes: {
     label: "BRAKES",
-    jp: "ブレーキ",
+    sub: "freins",
     unit: "kN",
     stages: ["Performance pads", "Vented discs", "Four-pot calipers"],
   },
@@ -89,7 +89,7 @@ export const PART_INFO: Record<
 /** Share of a stage's price the garage pays to take it back off. */
 export const RESALE = 0.8;
 
-/** What removing a fitted stage pays, rounded to 100 yen. */
+/** What removing a fitted stage pays, rounded to 100 dollars. */
 export function resale(price: number): number {
   return Math.round((price * RESALE) / 100) * 100;
 }
@@ -122,7 +122,7 @@ interface CarParts {
 
 /** Stage values for the player's car. */
 const PARTS: Record<FleetId, CarParts> = {
-  karola: {
+  coupe: {
     engine: [205, 222, 240],
     weight: [1065, 1035, 1000],
     handling: [0.04, 0.08, 0.12],
@@ -192,28 +192,28 @@ export const WHEELS: { id: WheelId; name: string }[] = [
 /** null is the car's factory color. */
 export const PAINTS: { name: string; color: number | null }[] = [
   { name: "Factory color", color: null },
-  { name: "Championship white", color: 0xeeeeea },
+  { name: "White", color: 0xeeeeea },
   { name: "Jet black", color: 0x0e0e12 },
   { name: "Gunmetal", color: 0x4a4e56 },
   { name: "Candy red", color: 0xb8101e },
   { name: "Sunset orange", color: 0xe8601c },
   { name: "Lemon yellow", color: 0xe8cc1c },
   { name: "Racing green", color: 0x1d5a38 },
-  { name: "Neon cyan", color: 0x1fc4d6 },
-  { name: "Bayside blue", color: 0x1e4fb8 },
+  { name: "Bright cyan", color: 0x1fc4d6 },
+  { name: "Deep blue", color: 0x1e4fb8 },
   { name: "Midnight purple", color: 0x3a1a5a },
-  { name: "Sakura pink", color: 0xf08cb4 },
+  { name: "Rose", color: 0xf08cb4 },
   { name: "Hot pink", color: 0xff2e96 },
 ];
 
 export const CHARMS: {
   id: CharmId;
   name: string;
-  jp: string;
+  sub: string;
   price: number;
 }[] = [
-  { id: "cone", name: "Traffic cone", jp: "cône orange", price: 0 },
-  { id: "bagel", name: "Bagel", jp: "sésame", price: 200 },
-  { id: "croissant", name: "Chocolatine", jp: "pur beurre", price: 200 },
-  { id: "timmies", name: "Tim Hortons cup", jp: "double-double", price: 200 },
+  { id: "cone", name: "Traffic cone", sub: "cône orange", price: 0 },
+  { id: "bagel", name: "Bagel", sub: "sésame", price: 200 },
+  { id: "croissant", name: "Chocolatine", sub: "pur beurre", price: 200 },
+  { id: "timmies", name: "Tim Hortons cup", sub: "double-double", price: 200 },
 ];

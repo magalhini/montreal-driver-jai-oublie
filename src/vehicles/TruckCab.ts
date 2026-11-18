@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { extrude, inset, lerp2, mirrorX, onX, onZ, prep, rrect, shade, strip, taper, warpArrays, warpGeo, type V2, type Warp3, type XY } from './CarGeometry';
 import { look, type Kit, type Look } from './CarKit';
-import { GLOW, MATTE, PLATE_INK, PLATE_KEI, PLATE_WHITE, rgb } from './CarMaterial';
+import { GLOW, MATTE, PLATE_INK, PLATE_WHITE } from './CarMaterial';
 
 // ---------------------------------------------------------------------------
 // Shared pieces of the cab-over trucks: build context, small solids and the
@@ -101,10 +101,10 @@ export function flap(kit: Kit, x0: number, x1: number, y0: number, y1: number, z
   for (const d of [1, -1] as const) kit.both(onZ(poly, z + d * 0.004, d), l);
 }
 
-/** Japanese number plate (white, or yellow for kei) with stamped characters. */
-export function plate(kit: Kit, y: number, z: number, dir: 1 | -1, lit: boolean, kei: boolean): void {
-  kit.add(onZ(rrect(0, y, 0.33, 0.165, 0.012), z, dir), look(kei ? PLATE_KEI : PLATE_WHITE, lit ? GLOW : MATTE));
-  const ink = look(kei ? rgb(0.02, 0.02, 0.02) : PLATE_INK, MATTE);
+/** Number plate (white) with stamped characters. */
+export function plate(kit: Kit, y: number, z: number, dir: 1 | -1, lit: boolean): void {
+  kit.add(onZ(rrect(0, y, 0.33, 0.165, 0.012), z, dir), look(PLATE_WHITE, lit ? GLOW : MATTE));
+  const ink = look(PLATE_INK, MATTE);
   kit.add(onZ(rrect(0.02, y + 0.048, 0.14, 0.022, 0.004), z + dir * 0.004, dir), ink);
   kit.add(onZ(rrect(0.035, y - 0.022, 0.2, 0.06, 0.006), z + dir * 0.004, dir), ink);
   kit.add(onZ(rrect(-0.12, y - 0.022, 0.03, 0.04, 0.006), z + dir * 0.004, dir), ink);

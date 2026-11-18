@@ -564,7 +564,7 @@ game.onFrame((dt) => {
   ferris?.update(game.time);
 });
 game.addView(lightView);
-// Phase 1 pass: manhole covers, and steam from some of them downtown / in the shotengai
+// Phase 1 pass: manhole covers, and steam from some of them downtown / in the oldtown
 const steam = new SteamVents(city, r.scene, r.camera);
 game.addView(steam);
 game.addView(carView);

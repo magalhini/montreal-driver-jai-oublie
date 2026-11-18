@@ -9,7 +9,7 @@ import type { Wreck, WreckShot } from './Wreck';
 /**
  * Slow-motion breakup of the player's car (IMPROVEMENTS #24). The body is cut into the real panels and
  * each one is thrown from the hit: a wall throws them back, a pole lets the nose spear through, a truck
- * stops harder than a kei. Panels tumble, then burn out.
+ * stops harder than a light car. Panels tumble, then burn out.
  *
  * Velocities are in sim-seconds. `Wreck` runs the sim at ~1/3 speed, which is what makes this slow motion.
  */

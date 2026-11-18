@@ -1,4 +1,4 @@
-/* NEO OIL pit garage menu (ui/PitShop.ts). The workshop and the car are the 3D scene behind this chrome. */
+/* Pit garage menu (ui/PitShop.ts). The workshop and the car are the 3D scene behind this chrome. */
 
 #ui.in-pitshop > :not(.pit-shop):not(.hud-fade) {
   display: none !important;

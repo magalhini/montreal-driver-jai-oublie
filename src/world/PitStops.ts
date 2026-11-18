@@ -61,7 +61,7 @@ export const DESTINATION_GARAGE = 'Jacques-Cartier Pneus Garage';
 const NAMES = ['Pneus Métro', 'Garage du Canal', 'Mécanique Berri'];
 
 /**
- * Pick the pit stop blocks among the plain residential / shotengai blocks on level ground (`level(bl)`), and
+ * Pick the pit stop blocks among the plain residential / oldtown blocks on level ground (`level(bl)`), and
  * lay each one out at the block corner on the widest streets. Marks the blocks `pitStop`; their buildings
  * are generated as usual and then cleared off the forecourt (`clearForecourt`).
  */
@@ -73,7 +73,7 @@ export function planPitStops(city: CityModel, kinds: string[], level: (bl: Block
     const ti = fx * (gx - 1);
     const tj = fz * (gz - 1);
     const bl = city.blocks
-      .filter((b) => kinds[b.id] === 'normal' && (b.district === 'residential' || b.district === 'shotengai') && b.gj !== avoidRow && level(b))
+      .filter((b) => kinds[b.id] === 'normal' && (b.district === 'residential' || b.district === 'oldtown') && b.gj !== avoidRow && level(b))
       .filter((b) => out.every((p) => Math.abs(city.blocks[p.block].gi - b.gi) + Math.abs(city.blocks[p.block].gj - b.gj) > 2))
       .sort((a, b) => Math.hypot(a.gi - ti, a.gj - tj) - Math.hypot(b.gi - ti, b.gj - tj))[0];
     if (!bl) continue;
@@ -115,7 +115,7 @@ function layout(city: CityModel, bl: Block, name: string, rng: Rng): PitStop {
     minZ: kz0,
     maxZ: kz0 + 7,
     height: 4.6,
-    district: 'shotengai',
+    district: 'oldtown',
     faces: [sx < 0 ? 'W' : 'E', sz < 0 ? 'N' : 'S'],
     seed: rng.int(0, 1e6),
   };

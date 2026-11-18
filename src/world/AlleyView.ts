@@ -10,8 +10,8 @@ import { sharedGlow } from './textures';
 /**
  * Alleys, passages and nooks (IMPROVEMENTS #19). Underpasses get a ceiling slab, tiled wall linings with a
  * colored stripe, fluorescent tubes with light pools on the floor and hazard-striped lintels over the
- * openings; nooks the same with one dim, greenish tube. Open alleys get lantern strings across them
- * (shotengai / downtown) or wall lamps (residential), plus air-conditioner units on the walls. All
+ * openings; nooks the same with one dim, greenish tube. Open alleys get wall lamps, plus
+ * air-conditioner units on the walls. All
  * instanced: ~10 draw calls for the whole city.
  */
 
@@ -21,7 +21,6 @@ const FLAT = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0),
 
 /** Underpass stripe colors (tile band at waist height). */
 const STRIPES = [0x2a7fc4, 0xc43a2a, 0x2a9c6a, 0xd9a21e, 0x8a4ac4].map((c) => new THREE.Color(c));
-const LANTERN = [new THREE.Color(2.1, 0.24, 0.12), new THREE.Color(1.9, 1.55, 1.0)];
 const TUBE = new THREE.Color(1.7, 1.8, 1.9);
 const NOOK_TUBE = new THREE.Color(0.8, 1.25, 0.95);
 const LAMP = new THREE.Color(2.0, 1.35, 0.7);
@@ -41,9 +40,6 @@ export function buildAlleys(city: CityModel, scene: THREE.Scene): void {
   const poolCol: THREE.Color[] = [];
   const lintels: M[] = [];
   const brackets: M[] = [];
-  const lanterns: M[] = [];
-  const lanternCol: THREE.Color[] = [];
-  const wires: number[] = [];
 
   const pool = (x: number, z: number, size: number, c: THREE.Color) => {
     pools.push(new THREE.Matrix4().compose(new THREE.Vector3(x, t.heightAt(x, z) + 0.05, z), FLAT, new THREE.Vector3(size, size, 1)));
@@ -103,7 +99,7 @@ export function buildAlleys(city: CityModel, scene: THREE.Scene): void {
     }
   }
 
-  // Open alleys: lanterns or wall lamps where there are walls to hang them from, AC units on the walls
+  // Open alleys: wall lamps where there are walls to hang them from, AC units on the walls
   for (const a of f.alleys) {
     const solids = blockSolids(city, a);
     const z = a.axis === 'z';
@@ -126,44 +122,20 @@ export function buildAlleys(city: CityModel, scene: THREE.Scene): void {
     };
     const start = l0 + 9;
     const end = l1 - 9;
-    if (a.lit === 'lanterns') {
-      for (let s = start; s <= end; s += 5) {
-        const wa = wall(s, -1);
-        const wb = wall(s, 1);
-        if (covered(s) || wa === null || wb === null) continue;
-        const pa = P(s, wa);
-        const pb = P(s, wb);
-        const y = t.heightAt(pa.x, pa.z) + 4.6;
-        const yb = t.heightAt(pb.x, pb.z) + 4.6;
-        const yy = (u: number) => y + (yb - y) * u - 0.5 * 4 * u * (1 - u);
-        const segs = 6;
-        for (let k = 0; k < segs; k++) {
-          const u0 = k / segs;
-          const u1 = (k + 1) / segs;
-          wires.push(pa.x + (pb.x - pa.x) * u0, yy(u0), pa.z + (pb.z - pa.z) * u0, pa.x + (pb.x - pa.x) * u1, yy(u1), pa.z + (pb.z - pa.z) * u1);
-        }
-        const red = rng.chance(0.65);
-        for (const u of [0.22, 0.5, 0.78]) {
-          lanterns.push(box(0.36, 0.52, 0.36, pa.x + (pb.x - pa.x) * u, yy(u) - 0.62, pa.z + (pb.z - pa.z) * u));
-          lanternCol.push(red ? LANTERN[0] : LANTERN[1]);
-        }
-      }
-    } else {
-      let side = rng.sign();
-      for (let s = start + rng.range(0, 4); s <= end; s += rng.range(10, 14)) {
-        const sd = side;
-        side = -side;
-        const w = wall(s, sd);
-        if (covered(s) || w === null) continue;
-        const out = -sd;
-        const p = P(s, w + out * 0.22);
-        const y = t.heightAt(p.x, p.z) + 3.4;
-        brackets.push(z ? box(0.44, 0.1, 0.14, p.x, y + 0.2, p.z) : box(0.14, 0.1, 0.44, p.x, y + 0.2, p.z));
-        tubes.push(box(0.2, 0.2, 0.2, p.x + (z ? out * 0.12 : 0), y, p.z + (z ? 0 : out * 0.12)));
-        tubeCol.push(LAMP);
-        const g = P(s, w + out * 1.8);
-        pool(g.x, g.z, 6, new THREE.Color(0.32, 0.2, 0.09));
-      }
+    let side = rng.sign();
+    for (let s = start + rng.range(0, 4); s <= end; s += rng.range(10, 14)) {
+      const sd = side;
+      side = -side;
+      const w = wall(s, sd);
+      if (covered(s) || w === null) continue;
+      const out = -sd;
+      const p = P(s, w + out * 0.22);
+      const y = t.heightAt(p.x, p.z) + 3.4;
+      brackets.push(z ? box(0.44, 0.1, 0.14, p.x, y + 0.2, p.z) : box(0.14, 0.1, 0.44, p.x, y + 0.2, p.z));
+      tubes.push(box(0.2, 0.2, 0.2, p.x + (z ? out * 0.12 : 0), y, p.z + (z ? 0 : out * 0.12)));
+      tubeCol.push(LAMP);
+      const g = P(s, w + out * 1.8);
+      pool(g.x, g.z, 6, new THREE.Color(0.32, 0.2, 0.09));
     }
     // Air-conditioner units and their pipes up on the walls (above the car: no colliders)
     for (let s = start; s <= end; s += rng.range(4, 9)) {
@@ -188,7 +160,6 @@ export function buildAlleys(city: CityModel, scene: THREE.Scene): void {
   add(scene, unit, new THREE.MeshStandardMaterial({ color: 0xffffff, map: hazard(), roughness: 0.6 }), lintels);
   add(scene, center, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), tubes, tubeCol);
   add(scene, center, new THREE.MeshStandardMaterial({ color: 0x55575c, roughness: 0.6, metalness: 0.5 }), brackets);
-  add(scene, new THREE.CylinderGeometry(0.5, 0.5, 1, 10), new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }), lanterns, lanternCol);
   const poolMesh = add(
     scene,
     new THREE.PlaneGeometry(1, 1),
@@ -197,11 +168,6 @@ export function buildAlleys(city: CityModel, scene: THREE.Scene): void {
     poolCol,
   );
   poolMesh.renderOrder = 1;
-  if (wires.length) {
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(wires, 3));
-    scene.add(new THREE.LineSegments(geo, new THREE.LineBasicMaterial({ color: 0x15151a })));
-  }
 }
 
 function add(scene: THREE.Scene, geo: THREE.BufferGeometry, mat: THREE.Material, mats: M[], colors?: THREE.Color[]): THREE.InstancedMesh {

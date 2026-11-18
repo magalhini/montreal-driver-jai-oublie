@@ -11,7 +11,7 @@ export interface Ground {
 export const FLAT_GROUND: Ground = { heightAt: () => 0, waterAt: () => null };
 
 /**
- * A city's height field (T38): what generic code may ask of `city.terrain`, whatever the map. Tokyo's grid
+ * A city's height field (T38): what generic code may ask of `city.terrain`, whatever the map. The grid
  * `Terrain` implements it.
  */
 export interface CityGround extends Ground {

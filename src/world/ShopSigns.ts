@@ -149,7 +149,7 @@ function hash(n: number): number {
 }
 
 const RATE: Partial<Record<Building["district"], number>> = {
-  shotengai: 0.55,
+  oldtown: 0.55,
   downtown: 0.32,
   residential: 0.14,
 };

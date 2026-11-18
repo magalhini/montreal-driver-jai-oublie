@@ -115,7 +115,7 @@ export function buildBoxTruck(c: TruckCtx): void {
   kit.add(rbox(ZF - 0.06, ZF + 0.065, 0.36, 0.62, -0.955, 0.955, 0.05, 0.03), grey);
   kit.add(rb(ZF - 0.04, ZF + 0.04, 0.3, 0.37, -0.9, 0.9, 0.02, 0.015), steel);
   for (const s of [-1, 1]) kit.add(box(s * 0.75 - 0.08, s * 0.75 + 0.08, 0.44, 0.54, ZF + 0.06, ZF + 0.075), steel);
-  plate(kit, 0.49, ZF + 0.068, 1, false, false);
+  plate(kit, 0.49, ZF + 0.068, 1, false);
   // Door handles, grab handles, steps behind the front wheels, mudflaps under them
   kit.both(box(hwc - 0.01, hwc + 0.018, 1.17, 1.21, 1.3, 1.42), dark);
   kit.both(rod([hwc + 0.025, 1.0, 1.15], [hwc + 0.025, 1.7, 1.15], 0.012, 5), dark);
@@ -233,7 +233,7 @@ export function buildBoxTruck(c: TruckCtx): void {
     rect(kit, s * 0.6, 0.465, 0.16, 0.05, 0.008, -2.853, -1, redRefl);
   }
   kit.add(rb(-2.85, -2.79, 0.42, 0.51, -0.86, 0.86, 0.02, 0.012), grey);
-  plate(kit, 0.688, -2.825, -1, true, false);
+  plate(kit, 0.688, -2.825, -1, true);
   kit.add(box(-0.08, 0.08, 0.775, 0.8, -2.85, -2.79), dark);
   roundCabFront(c, ZF, 2.42, hwc, 0.028, 0.02);
 }

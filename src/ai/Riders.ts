@@ -11,7 +11,7 @@ const SPAWN_MAX = 170;
 const DESPAWN = 200;
 /** Stopped this long behind a car that is stopped too: go around it (up onto the sidewalk or out into the lane). */
 const GO_AROUND_AFTER = 2.5;
-const DISTRICT_WEIGHT: Record<DistrictType, number> = { residential: 1, shotengai: 1, downtown: 0.75, depot: 0.6, harbor: 0.45 };
+const DISTRICT_WEIGHT: Record<DistrictType, number> = { residential: 1, oldtown: 1, downtown: 0.75, depot: 0.6, harbor: 0.45 };
 
 /** Live-tunable riding knobs (debug panel). */
 export const RIDER_TUNING = {

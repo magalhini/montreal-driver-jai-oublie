@@ -41,7 +41,7 @@ export interface AudioHooks {
 }
 
 /** Reverb of the open street by district: tall downtown canyons ring, the harbor is open. */
-const STREET: Record<DistrictType, number> = { downtown: 0.6, shotengai: 0.5, harbor: 0.35, residential: 0.35, depot: 0.4 };
+const STREET: Record<DistrictType, number> = { downtown: 0.6, oldtown: 0.5, harbor: 0.35, residential: 0.35, depot: 0.4 };
 const ROOM: Record<Interior['kind'], number> = { passage: 0.8, nook: 0.85 };
 
 const inBox = (b: AABB, x: number, z: number, m = 0) => x >= b.minX - m && x <= b.maxX + m && z >= b.minZ - m && z <= b.maxZ + m;

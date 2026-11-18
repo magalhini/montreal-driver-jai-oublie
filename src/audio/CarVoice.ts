@@ -106,7 +106,7 @@ export class CarVoice {
       this.engineGain.gain.setTargetAtTime(0, this.mx.now, 0.05);
       return;
     }
-    const id = engineFor(car.phys.spec.name, car.look.style);
+    const id = engineFor(car.phys.spec.name);
     if (id !== this.engineId) this.setEngine(id, car.id);
     this.prevGear = car.phys.state.gear;
   }
@@ -118,7 +118,7 @@ export class CarVoice {
       this.engine.port.postMessage({ profile: ENGINES[id] });
       return;
     }
-    this.engine = new AudioWorkletNode(this.mx.ctx, 'neon-engine', {
+    this.engine = new AudioWorkletNode(this.mx.ctx, 'car-engine', {
       numberOfInputs: 0,
       outputChannelCount: [1],
       processorOptions: { profile: ENGINES[id], seed },
@@ -138,7 +138,7 @@ export class CarVoice {
     const mx = this.mx;
     const t = mx.now;
     // The worklet may load after the voice was assigned; the player's car can be swapped (debug fleet)
-    const id = engineFor(car.phys.spec.name, car.look.style);
+    const id = engineFor(car.phys.spec.name);
     if (id !== this.engineId || (!this.engine && mx.ready)) this.setEngine(id, car.id);
     this.setPosition(f.x, f.y, f.z);
     const phys = car.phys;

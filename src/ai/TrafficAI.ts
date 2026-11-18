@@ -8,13 +8,13 @@ import { BOX_TRUCK, PICKUP, TRAFFIC_SEDAN } from '../vehicles/CarSpec';
 import { LaneDriver } from './LaneDriver';
 
 const COLORS = [0xe8e8e8, 0x9aa0a8, 0x18181d, 0xa01818, 0x1c2a5a, 0xc8b48a, 0x2a7a7a, 0x2f5a3a, 0xd8d0c0, 0x5a2a4a];
-/** Full-size cars only (PRD 11B): no kei, no bubble car. Sedans are the majority, and the modern shape. */
+/** Full-size cars only. Sedans are the majority, and the modern shape. */
 const STYLES: BodyStyle[] = ['sedan', 'sedan', 'sedan', 'sedan', 'wagon', 'wagon', 'coupe'];
 /** Mostly white cabs, a few pale blue / green / navy ones. */
 const TRUCK_COLORS = [0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0x8fb0c8, 0x5f8a6a, 0x26406e];
 /** Pickup paints: white, silver, black, red, blue, dark green. */
 const PICKUP_COLORS = [0xf2f2f0, 0xb7bcc2, 0x1a1a1c, 0x8e1c1c, 0x1c355c, 0x1e3d28];
-/** Share of spawns that are trucks, and at most this many box trucks around. Pickups take the old kei-truck share. */
+/** Share of spawns that are trucks, and at most this many box trucks around. The rest of that share is pickups. */
 export const TRUCK_TUNING = { boxTruck: 0.06, pickup: 0.1, maxBoxTrucks: 3 };
 
 /** Spawns, drives and despawns civilian traffic in a ring around the player. */

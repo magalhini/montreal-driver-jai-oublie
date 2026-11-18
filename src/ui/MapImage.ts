@@ -35,7 +35,7 @@ const C = {
 
 const GROUND: Record<DistrictType, string> = {
   downtown: '#211538',
-  shotengai: '#2a1230',
+  oldtown: '#2a1230',
   harbor: '#0e2129',
   residential: '#131629',
   depot: '#2c210d',
@@ -43,7 +43,7 @@ const GROUND: Record<DistrictType, string> = {
 /** Building footprint color at low / high rise. */
 const BUILDING: Record<DistrictType, [number, number, number]> = {
   downtown: [70, 46, 120],
-  shotengai: [92, 38, 88],
+  oldtown: [92, 38, 88],
   harbor: [34, 72, 82],
   residential: [42, 50, 84],
   depot: [96, 74, 30],
@@ -168,7 +168,7 @@ export function buildMapImage(city: CityModel): MapImage {
   }
   for (const park of f.parks ?? []) {
     for (const t of park.trees) {
-      ctx.fillStyle = t.pink ? 'rgba(242, 166, 200, 0.7)' : 'rgba(36, 78, 48, 0.85)';
+      ctx.fillStyle = 'rgba(36, 78, 48, 0.85)';
       rect(t.pos.x - 1.5, t.pos.z - 1.5, t.pos.x + 1.5, t.pos.z + 1.5);
     }
   }
@@ -305,7 +305,7 @@ function districtName(d: DistrictType, gi: number, gj: number, gx: number): stri
   switch (d) {
     case 'downtown':
       return 'CENTRE-VILLE';
-    case 'shotengai':
+    case 'oldtown':
       return southOfNotreDame ? 'VIEUX-MONTRÉAL' : 'QUARTIER LATIN';
     case 'residential':
       return southOfNotreDame ? 'GRIFFINTOWN' : gi < gx / 2 ? 'SHAUGHNESSY' : 'QUARTIER DES SPECTACLES';
@@ -387,7 +387,7 @@ export function mapLabels(city: CityModel): MapLabel[] {
         ? [0, 1, 2, 3].map((q) => group.filter((b) => (b.gi < gx / 2 ? 0 : 1) + (b.gj < gz / 2 ? 0 : 2) === q))
         : [group];
     for (const part of parts) {
-      if (part.length < (start.district === 'shotengai' || start.district === 'residential' ? 2 : 1)) continue;
+      if (part.length < (start.district === 'oldtown' || start.district === 'residential' ? 2 : 1)) continue;
       // Anchor at the block nearest the area's centroid (stays inside L / ring shapes)
       const cs = part.map(center);
       const cx = cs.reduce((s, c) => s + c.x, 0) / cs.length;

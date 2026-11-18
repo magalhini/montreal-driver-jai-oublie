@@ -34,7 +34,7 @@ function signTexture(lines: { text: string; size: number }[], color: string, w: 
 }
 
 /**
- * The precinct's dressing: a roof sign, a 警 blade, a red/blue roof bar, a canopy, floodlight masts and the
+ * The precinct's dressing: a roof sign, a blade, a red/blue roof bar, a canopy, floodlight masts and the
  * bay lines. Empty bays (the future dispatch spots) get a blue stall line. The building is a city building.
  */
 export function buildPoliceStation(city: CityModel, scene: THREE.Scene): void {
@@ -52,7 +52,7 @@ export function buildPoliceStation(city: CityModel, scene: THREE.Scene): void {
 
   const board = new THREE.Mesh(
     new THREE.PlaneGeometry(16, 3.6),
-    new THREE.MeshBasicMaterial({ map: signTexture([{ text: s.jp, size: 150 }, { text: s.name, size: 78 }], s.color, 1024, 280), color: new THREE.Color(1.8, 1.8, 1.8) }),
+    new THREE.MeshBasicMaterial({ map: signTexture([{ text: s.mark, size: 150 }, { text: s.name, size: 78 }], s.color, 1024, 280), color: new THREE.Color(1.8, 1.8, 1.8) }),
   );
   board.position.copy(at(0, 0.3, top + 2.1));
   board.rotation.y = yaw;

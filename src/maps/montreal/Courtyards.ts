@@ -22,10 +22,10 @@ const MAX_LAWN = 72;
 const GATE = 8;
 const PATH = 5.4;
 /** Share of large blocks that become a garden. Downtown stays mostly built, so the tower cluster holds. */
-const RATE: Record<'downtown' | 'residential' | 'shotengai', number> = {
+const RATE: Record<'downtown' | 'residential' | 'oldtown', number> = {
   downtown: 0.16,
   residential: 0.38,
-  shotengai: 0.34,
+  oldtown: 0.34,
 };
 
 const overlaps = (a: AABB, b: AABB, m = 0) => a.minX < b.maxX + m && a.maxX > b.minX - m && a.minZ < b.maxZ + m && a.maxZ > b.minZ - m;
@@ -35,7 +35,7 @@ export function layCourtyards(city: CityModel, seed: number): void {
   const parks = city.features.parks ?? [];
   for (const bl of city.blocks) {
     if (!eligible(city, bl)) continue;
-    const rate = RATE[bl.district as 'downtown' | 'residential' | 'shotengai'];
+    const rate = RATE[bl.district as 'downtown' | 'residential' | 'oldtown'];
     if (rate === undefined || hash01(bl.id, 23) >= rate) continue;
     const park = layout(city, bl, new Rng((seed + 53 + bl.id * 17) >>> 0));
     if (!park) continue;
@@ -49,7 +49,7 @@ function eligible(city: CityModel, bl: Block): boolean {
   const f = city.features;
   if (f.kinds[bl.id] !== 'normal') return false;
   if (bl.gj === f.canal?.row) return false;
-  return bl.district === 'residential' || bl.district === 'shotengai' || bl.district === 'downtown';
+  return bl.district === 'residential' || bl.district === 'oldtown' || bl.district === 'downtown';
 }
 
 function buildingsIn(city: CityModel, bl: Block): Building[] {
@@ -116,7 +116,6 @@ function layout(city: CityModel, bl: Block, rng: Rng): CityPark | null {
       block: bl.id,
       axis: side === 'N' || side === 'S' ? 'z' : 'x',
       box: g,
-      lit: bl.district === 'residential' ? 'lamps' : 'lanterns',
     });
   }
 
@@ -137,7 +136,6 @@ function layout(city: CityModel, bl: Block, rng: Rng): CityPark | null {
     monument: monument ?? undefined,
     trees,
     lamps,
-    lanterns: [],
     benches,
     colliders: [...trees.map((t) => post(t.pos, 0.35)), ...lamps.map((p) => post(p, 0.16)), ...benches.map(benchBox), ...(markBox ? [markBox] : [])],
   };
@@ -275,7 +273,7 @@ function plant(lawn: AABB, paths: AABB[], monument: CityPark['monument'] | null,
         const need = monument.kind === 'kiosk' ? 6.2 : 3.4;
         if (Math.hypot(p.x - monument.pos.x, p.z - monument.pos.z) < need) continue;
       }
-      trees.push({ pos: p, r: rng.range(2.2, 3.4), pink: rng.chance(0.42) });
+      trees.push({ pos: p, r: rng.range(2.2, 3.4) });
     }
   }
   return trees;

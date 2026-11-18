@@ -62,7 +62,7 @@ function rayExit(poly: Vec2[], o: Vec2, d: Vec2): number {
 }
 
 /**
- * Signal heads, one per approach (T43), facing its traffic along the lanes' `endDir`. `overhead` (Tokyo):
+ * Signal heads, one per approach (T43), facing its traffic along the lanes' `endDir`. `overhead`:
  * horizontal heads hung from an arm on a pole beyond the junction, on the far side of the approach. `mast`
  * (North America, Montreal): the same far-side pole and arm, with a vertical head hanging under the arm.
  * `pole` (European): vertical heads on a pole at the stop line, on the drive-side curb.
@@ -82,7 +82,7 @@ export class TrafficLightView implements ViewSystem {
     private lights: TrafficLights,
     scene: THREE.Scene,
     private camera: THREE.Camera,
-    style: SignalStyle = 'overhead',
+    style: SignalStyle = 'mast',
   ) {
     const housings: THREE.Matrix4[] = [];
     const poles: THREE.Matrix4[] = [];
@@ -140,8 +140,7 @@ export class TrafficLightView implements ViewSystem {
         const thick = style === 'pole' ? 0.16 : style === 'mast' ? 0.26 : 0.24;
         poles.push(new THREE.Matrix4().makeScale(thick, top + 0.4 - poleY, thick).setPosition(pole.x, poleY, pole.z));
         const front = 0.17;
-        // Lamp positions: across the head with red nearest the road's center (overhead: red on the right in Tokyo,
-        // on the left in Montreal) or stacked (pole: red on top)
+        // Lamp positions: across the head with red nearest the road's center, or stacked (pole: red on top)
         const at = (k: number, ahead: number) =>
           vertical
             ? new THREE.Vector3(head.x - d.x * ahead, top - 0.34 * k, head.z - d.z * ahead)
@@ -161,7 +160,7 @@ export class TrafficLightView implements ViewSystem {
     }
 
     const boxGeo = new THREE.BoxGeometry(1, 1, 1);
-    // Montreal (stop-line poles or mast arms): dark round posts and black housings; Tokyo's arms keep the grey box kit
+    // Stop-line poles and mast arms: dark round posts and black housings. Horizontal arms keep the grey box kit.
     const dark = style !== 'overhead';
     const baseBox = (dark ? new THREE.CylinderGeometry(0.5, 0.5, 1, 10) : boxGeo.clone()).translate(0, 0.5, 0);
     const metal = new THREE.MeshStandardMaterial({ color: dark ? 0x2a2c30 : 0x55565e, metalness: 0.6, roughness: 0.4 });

@@ -15,7 +15,7 @@ const DESPAWN_RADIUS = CONFIG.PED_RADIUS + 15;
 const SPAWN_MIN = 55;
 /** Player moved farther than this in one step: a respawn/teleport, so refill instantly. */
 const TELEPORT_DIST = 40;
-const DISTRICT_WEIGHT: Record<DistrictType, number> = { shotengai: 1, downtown: 0.8, depot: 0.6, residential: 0.4, harbor: 0.15 };
+const DISTRICT_WEIGHT: Record<DistrictType, number> = { oldtown: 1, downtown: 0.8, depot: 0.6, residential: 0.4, harbor: 0.15 };
 
 /**
  * Where the crowd gathers (PRD Phase 5): a sidewalk beside a cobble street, a fountain loop or the Old Port's

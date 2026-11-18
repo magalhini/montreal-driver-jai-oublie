@@ -47,8 +47,6 @@ export interface Alley {
   axis: 'x' | 'z';
   /** Lane footprint, from road edge to road edge (it crosses the sidewalk ring at both mouths). */
   box: AABB;
-  /** Hanging lanterns or wall lamps. */
-  lit: 'lanterns' | 'lamps';
 }
 
 export interface CityFeatures {
@@ -224,9 +222,8 @@ export interface CityPark {
   enclosed?: boolean;
   /** A pavilion or a column standing off the paths. */
   monument?: { kind: 'kiosk' | 'column'; pos: Vec2 };
-  trees: { pos: Vec2; r: number; pink: boolean }[];
+  trees: { pos: Vec2; r: number }[];
   lamps: Vec2[];
-  lanterns: Vec2[];
   benches: { pos: Vec2; yaw: number }[];
   colliders: AABB[];
 }

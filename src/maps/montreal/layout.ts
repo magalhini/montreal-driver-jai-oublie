@@ -203,9 +203,9 @@ export const isPark = (i: number, j: number): boolean => PARKS.has(`${i},${j}`);
 
 export function districtAt(i: number, j: number): DistrictType {
   if (j >= CANAL_ROW) return 'harbor';
-  if (j >= 8 && i >= 9) return 'shotengai'; // Vieux-Montréal
+  if (j >= 8 && i >= 9) return 'oldtown'; // Vieux-Montréal
   if (j >= 8) return 'residential'; // Griffintown, Cité du Multimédia
-  if (i >= 13 && j >= 2 && j <= 7) return 'shotengai'; // Chinatown and the latin quarter
+  if (i >= 13 && j >= 2 && j <= 7) return 'oldtown'; // Chinatown and the latin quarter
   if (i <= 1) return 'residential'; // west of the arena: Shaughnessy, the station
   if (i >= 2 && i <= 10 && j >= 1 && j <= 7) return 'downtown';
   if (j === 0 && i >= 6 && i <= 10) return 'downtown';

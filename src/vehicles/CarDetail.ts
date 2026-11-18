@@ -61,7 +61,7 @@ function addPatrol(kit: Kit, st: BodyProfile): void {
   kit.add(prep(new THREE.CylinderGeometry(0.003, 0.005, 0.5, 4).translate(0.4, ay + 0.26, az)), dark);
 }
 
-/** Hood slots on the Karola, a rub strip and badge on the Mame. Traffic of the same shape leaves these off. */
+/** Hood slots on the player's coupe. Traffic of the same shape leaves these off. */
 function addDriver(kit: Kit, st: BodyProfile, style: CarStyle): void {
   const hw = st.W / 2;
   const dark = look(BLACK, MATTE);
@@ -73,26 +73,6 @@ function addDriver(kit: Kit, st: BodyProfile, style: CarStyle): void {
     const by = st.belt - 0.18;
     kit.both(onX(circle(bz, by, 0.04, 10), hw + 0.009), chrome);
     kit.both(onX(circle(bz, by, 0.024, 8), hw + 0.012), dark);
-  } else if (style === 'city') {
-    const R = st.r + (st.arch?.[0] ?? 0.055);
-    const z0 = st.wr + R + 0.06;
-    const z1 = st.wf - R - 0.06;
-    const y = st.sill + 0.09;
-    kit.both(
-      onX(
-        [
-          [z0, y - 0.006],
-          [z1, y - 0.006],
-          [z1, y + 0.006],
-          [z0, y + 0.006],
-        ],
-        hw + 0.009,
-      ),
-      chrome,
-    );
-    const bz = (z0 + z1) / 2;
-    kit.both(onX(circle(bz, y + 0.16, 0.034, 10), hw + 0.009), chrome);
-    kit.both(onX(circle(bz, y + 0.16, 0.02, 8), hw + 0.012), look(rgb(0.72, 0.14, 0.12)));
   }
 }
 

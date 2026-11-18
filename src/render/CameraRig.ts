@@ -177,23 +177,19 @@ export class CameraRig {
       return;
     }
 
-    // The close chase is framed for a full-size car. On the small city car it sits 25% nearer, and the
-    // speed pull-back is only a short extra, so the car does not shrink away down the road.
-    const cityNear = car.look.style === 'city' && this.mode === 'near';
     let dist = 9.5;
     let height = 3.6;
     let lookAhead = 4;
     if (this.mode === 'near') {
-      dist = cityNear ? 6.2 * 0.75 : 6.2;
-      height = cityNear ? 2.05 : 2.3;
+      dist = 6.2;
+      height = 2.3;
     } else if (this.mode === 'top') {
       dist = 14;
       height = 34;
       lookAhead = 8;
     }
-    const pull = cityNear ? 0.4 : 1;
-    dist += clamp(speed * SPEED_PULL * pull, 0, SPEED_PULL_MAX * pull);
-    lookAhead += speed * 0.25 * pull;
+    dist += clamp(speed * SPEED_PULL, 0, SPEED_PULL_MAX);
+    lookAhead += speed * 0.25;
     if (this.mode !== 'top') {
       height += this.air * 1.6;
       dist += this.air * 1.5;
@@ -226,20 +222,8 @@ export class CameraRig {
       const zf = Math.cos(yaw);
       const pitch = s.pitch + s.susPitch;
       const ride = s.heave;
-      if (car.look.style === 'keitruck') {
-        // Cab-over: the shared mount (0.6 m forward, 1.15 m up) is inside the shell, so the
-        // lens sees the back of the body. Sit ahead of the face (z ≈ 1.72) and aim down the
-        // road, in the truck's frame, so the view stays on the outside.
-        _e.set(-pitch, yaw, s.roll, 'YXZ');
-        _q.setFromEuler(_e);
-        _p.set(0, 1.2, 2.05).applyQuaternion(_q);
-        desired.set(p.x + _p.x, carY + _p.y + ride, p.z + _p.z);
-        _p.set(0, 0.55, 18).applyQuaternion(_q);
-        look.set(p.x + _p.x, carY + _p.y + ride, p.z + _p.z);
-      } else {
-        desired.set(p.x + yf * 0.6, carY + 1.15 + ride, p.z + zf * 0.6);
-        look.set(p.x + yf * 20, carY + 1.0 + ride + Math.tan(pitch) * 20, p.z + zf * 20);
-      }
+      desired.set(p.x + yf * 0.6, carY + 1.15 + ride, p.z + zf * 0.6);
+      look.set(p.x + yf * 20, carY + 1.0 + ride + Math.tan(pitch) * 20, p.z + zf * 20);
       this.pos.copy(desired);
       this.look.copy(look);
     } else {
@@ -274,9 +258,7 @@ export class CameraRig {
       cam.position.x += buzz * 0.5 * Math.sin(t * 43 + 0.7);
     }
     cam.lookAt(this.look);
-    // The wide-open lens at speed shrinks a small car the same way a long pull-back does.
-    const widen = cityNear ? 0.4 : 1;
-    this.lens(this.mode === 'bumper' ? 75 : 62 + clamp(speed * 0.35 * widen, 0, 20 * widen), 0.3, dt);
+    this.lens(this.mode === 'bumper' ? 75 : 62 + clamp(speed * 0.35, 0, 20), 0.3, dt);
   }
 
   /** Driver's seat can show: a chase view, or the cockpit the player already picked. Not bumper, top, look-back, or the bust framing. */

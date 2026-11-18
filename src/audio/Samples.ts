@@ -19,7 +19,7 @@ export type SampleId =
   | 'rainCar'
   | 'thunder'
   | 'cityBusy'
-  | 'cityTokyo'
+  | 'cityQuiet'
   | 'cityHarbor'
   | 'crowd'
   // Pit garage (`GarageSamples.ts` has the cues inside the one-shot files)
@@ -48,7 +48,7 @@ export const SAMPLES: Record<SampleId, SampleFile> = {
   rainCar: { file: 'rain-car.m4a', loop: 33, pad: 0.1 },
   thunder: { file: 'thunder.m4a', loop: 0, pad: 0 },
   cityBusy: { file: 'city-busy.m4a', loop: 60, pad: 0.1 },
-  cityTokyo: { file: 'city-tokyo.m4a', loop: 60, pad: 0.1 },
+  cityQuiet: { file: 'city-quiet.m4a', loop: 60, pad: 0.1 },
   cityHarbor: { file: 'city-harbor.m4a', loop: 60, pad: 0.1 },
   crowd: { file: 'crowd.m4a', loop: 45, pad: 0.1 },
   garageRoom: { file: 'garage-room.m4a', loop: 60, pad: 0.1 },

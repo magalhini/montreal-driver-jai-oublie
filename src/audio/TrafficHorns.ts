@@ -12,8 +12,6 @@ const SEDAN_HORNS = [
   [415, 523],
   [370, 466],
 ];
-const KEI_HORN = [620];
-const CITY_HORN = [523, 659];
 const TRUCK_HORN = [262, 330];
 
 /**
@@ -131,7 +129,7 @@ export class TrafficHorns {
 
   private honk(car: Car, pattern: [number, number][]): void {
     const style = car.look.style;
-    const freqs = style === 'kei' || style === 'keitruck' ? KEI_HORN : style === 'city' ? CITY_HORN : style === 'truck' ? TRUCK_HORN : SEDAN_HORNS[car.id % SEDAN_HORNS.length];
+    const freqs = style === 'truck' ? TRUCK_HORN : SEDAN_HORNS[car.id % SEDAN_HORNS.length];
     this.sfx.horn({ pos: { x: car.pos.x, y: car.y + 0.7, z: car.pos.z }, bus: this.mx.effects, cat: 'horns', ref: 9, wet: 0.5 }, freqs, pattern, 0.32);
   }
 }

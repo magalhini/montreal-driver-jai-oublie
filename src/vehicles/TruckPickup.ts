@@ -4,7 +4,7 @@ import { AMBER, GLOW, MATTE, rgb } from './CarMaterial';
 import { box, flap, plate, rect, rod, sheet, type TruckCtx } from './TruckCab';
 
 /**
- * Half-ton pickup (PRD 11B): hood, separate cab, open bed. Replaces the kei flatbed in traffic.
+ * Half-ton pickup: hood, separate cab, open bed.
  * Dimensions match `TRUCK_DIMS.pickup` (length 5.4, the nose at z = +2.7).
  */
 
@@ -53,7 +53,7 @@ export function buildPickup(c: TruckCtx): void {
     headPos.push([s * 0.62, 0.64, ZF + 0.06]);
     rect(kit, s * 0.78, 0.4, 0.16, 0.06, 0.012, zf, 1, amber);
   }
-  plate(kit, 0.36, ZF + 0.05, 1, false, false);
+  plate(kit, 0.36, ZF + 0.05, 1, false);
 
   // Cab
   kit.add(box(-(hw - 0.03), hw - 0.03, 0.7, 1.64, CAB_BACK, 1.02), body);
@@ -84,7 +84,7 @@ export function buildPickup(c: TruckCtx): void {
     tailPos.push([s * 0.72, 1.08, ZR - 0.05]);
     rect(kit, s * 0.72, 0.94, 0.16, 0.045, 0.01, zr, -1, amber);
   }
-  plate(kit, 0.98, ZR - 0.01, -1, true, false);
+  plate(kit, 0.98, ZR - 0.01, -1, true);
   kit.add(box(-hw, hw, 0.32, 0.46, ZR - 0.02, ZR + 0.06), trim);
 
   // Frame rails under the cab and bed, clear of the axles

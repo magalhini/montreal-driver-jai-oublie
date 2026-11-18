@@ -10,7 +10,7 @@ const SOURCE = `
 const EngineDSP = ${EngineDSP.toString()};
 const SirenDSP = ${SirenDSP.toString()};
 
-class NeonEngine extends AudioWorkletProcessor {
+class CarEngine extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     const k = (name, def, min, max) => ({ name, defaultValue: def, minValue: min, maxValue: max, automationRate: 'k-rate' });
     return [k('rpm', 0, 0, 14000), k('rev', 0, 0, 1.2), k('throttle', 0, 0, 1), k('load', 0, 0, 1), k('pitch', 1, 0.1, 4),
@@ -38,7 +38,7 @@ class NeonEngine extends AudioWorkletProcessor {
   }
 }
 
-class NeonSiren extends AudioWorkletProcessor {
+class CarSiren extends AudioWorkletProcessor {
   static get parameterDescriptors() {
     return [
       { name: 'pitch', defaultValue: 1, minValue: 0.1, maxValue: 4, automationRate: 'k-rate' },
@@ -63,8 +63,8 @@ class NeonSiren extends AudioWorkletProcessor {
   }
 }
 
-registerProcessor('neon-engine', NeonEngine);
-registerProcessor('neon-siren', NeonSiren);
+registerProcessor('car-engine', CarEngine);
+registerProcessor('car-siren', CarSiren);
 `;
 
 /** Register the processors on `ctx` (resolves once they can be instantiated). */
