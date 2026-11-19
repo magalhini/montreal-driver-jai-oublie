@@ -59,6 +59,8 @@ export class World {
    * parked cars, speed, the lot's sidewalk) or start a chase. Set by `gameplay/Gymkhana.ts`.
    */
   onCourse = false;
+  /** Free roam: the SPVM still patrols but charges no offenses and never chases or answers a call. Set by main. */
+  noChase = false;
   /** Rue barrée and cone lines (PRD Phase 7); null: an open city (headless tools). */
   roadworks: Roadworks | null = null;
 

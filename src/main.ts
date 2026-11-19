@@ -891,11 +891,12 @@ game.start();
 setTimeout(() => shop.prepare(), 2500);
 
 /**
- * Title -> driving. Winter tires is the drive across town; free roam is the same city with winter tires and
- * no pin. Cash and the pit garage upgrades carry over between sessions.
+ * Title -> driving. Winter tires is the drive across town; free roam is the same city with winter tires,
+ * no pin and no police chases (patrols still drive around). Cash and the pit garage upgrades carry over between sessions.
  */
 function startSession(mode: PlayMode): void {
   session = mode;
+  world.noChase = mode === "free";
   briefing.hide();
   resetSession();
   world.mode = "free";
@@ -957,7 +958,7 @@ function resetSession(): void {
 let patrolWarned = false;
 /** The first patrol car on the radar while driving, once per page load: what the SPVM pulls you over for. */
 function warnFirstPatrol(): void {
-  if (patrolWarned || !minimap.visible || world.controlLocked || police.pursuers > 0) return;
+  if (patrolWarned || world.noChase || !minimap.visible || world.controlLocked || police.pursuers > 0) return;
   if (minimap.patrolsOnRadar === 0) return;
   patrolWarned = true;
   events.message("The SPVM is nearby! Don't run red lights or speed until they're gone.", "warn", 6);
@@ -1030,10 +1031,11 @@ function greet(): void {
       s * 1000,
     );
   hint(3, "Press M for the city map: the GPS routes you.");
-  hint(
-    9,
-    "Don't let the SPVM see you drive too fast. Hit 'L' for the speed limiter",
-  );
+  if (!world.noChase)
+    hint(
+      9,
+      "Don't let the SPVM see you drive too fast. Hit 'L' for the speed limiter",
+    );
   if (city.features.pitStops.length)
     hint(16, "Garages are marked on the map: you can repair your car there");
 }

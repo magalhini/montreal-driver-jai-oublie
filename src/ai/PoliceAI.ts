@@ -155,7 +155,7 @@ export class PoliceSystem implements SimSystem {
         if (this.canSee(car, pp, cop.state === 'pursuit')) {
           this.sawPlayer();
           const wanted = this.heat.value >= WANTED_HEAT || cop.call !== null;
-          if (cop.state === 'patrol' && wanted && this.pursuers < CONFIG.MAX_PURSUERS && !w.onCourse) this.startPursuit(cop);
+          if (cop.state === 'patrol' && wanted && this.pursuers < CONFIG.MAX_PURSUERS && !w.onCourse && !w.noChase) this.startPursuit(cop);
         }
       }
     }
@@ -210,7 +210,7 @@ export class PoliceSystem implements SimSystem {
    * its lights on. Returns false if no car could be sent.
    */
   respond(pos: Vec2): boolean {
-    if (this.pursuers > 0 || this.world.immune) return false;
+    if (this.pursuers > 0 || this.world.immune || this.world.noChase) return false;
     this.callPos.x = pos.x;
     this.callPos.z = pos.z;
     this.callPing = CALL_TUNING.ping;
