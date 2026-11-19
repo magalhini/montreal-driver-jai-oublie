@@ -2,8 +2,9 @@ import "./ui/mobilegate.css";
 
 /**
  * Montreal Driver is desktop only (keyboard or gamepad, and a GPU that can carry the city). Phones and tablets get
- * this page instead: a short note and the published promo shots (`public/screens`, made from `promo/screenshots`
- * by `scripts/mobile-screens.sh`). `boot.ts` decides; the game bundle never loads on a phone.
+ * this page instead: a short note, the 720p promo video (`public/video`, made from the clips in `promo/video` by
+ * `scripts/promo-video.sh`) and the published promo shots (`public/screens`, made from `promo/screenshots` by
+ * `scripts/mobile-screens.sh`). `boot.ts` decides; the game bundle never loads on a phone.
  */
 
 /** Each shot carries the next beat of the drive, in order: what you're up against, not what's in the frame. */
@@ -59,6 +60,9 @@ export function showMobileGate(): void {
         <p>The game isn't available on phones or tablets. Come back on a computer with a keyboard or a gamepad.</p>
       </div>
     </header>
+    <video class="mg-video" src="${base}video/montreal-driver-720p.mp4" poster="${base}screens/05-rue-barree-detour.jpg"
+      width="1280" height="716" controls playsinline preload="none"
+      aria-label="Gameplay trailer: driving across a snowy Montreal"></video>
     <section class="mg-shots">
       ${SHOTS.map(
         ([file, caption], i) => `

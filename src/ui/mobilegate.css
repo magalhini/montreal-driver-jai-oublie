@@ -60,6 +60,16 @@ body.mg-body {
   line-height: 1.45;
   color: #f4f6f8;
 }
+/* Promo video (scripts/promo-video.sh), above the shots */
+.mg-video {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0 0 18px;
+  border-radius: 6px;
+  background: #140a26;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+}
 .mg-shots {
   display: grid;
   gap: 18px;

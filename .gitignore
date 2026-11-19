@@ -4,3 +4,6 @@ dist/
 *.log
 .env.deploy
 dist-deploy/
+# Promo video sources and the full-size render (scripts/promo-video.sh); the 720p and poster are tracked
+promo/video/*.mov
+promo/video/montreal-driver.mp4

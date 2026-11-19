@@ -23,7 +23,7 @@ class DebugPanel {
   private keys = new Set<string>();
   private dragging = false;
   private euler = new THREE.Euler(0, 0, 0, 'YXZ');
-  readonly settings = { freeCam: false, flySpeed: 40 };
+  readonly settings = { freeCam: false, flySpeed: 40, hideUi: false };
 
   constructor() {
     this.gui.hide();
@@ -63,6 +63,14 @@ class DebugPanel {
       .name('free camera (F)')
       .onChange((v: boolean) => this.setFreeCam(v));
     g.add(this.settings, 'flySpeed', 5, 200, 1);
+    // For recording footage: hides everything in #ui (HUD, minimap, messages, menus).
+    // Stays hidden after closing the debug panel, which also hides the stats overlay.
+    g.add(this.settings, 'hideUi')
+      .name('hide UI (recording)')
+      .onChange((v: boolean) => {
+        const ui = document.getElementById('ui');
+        if (ui) ui.style.visibility = v ? 'hidden' : '';
+      });
 
     const canvas = t.renderer.domElement;
     canvas.addEventListener('mousedown', () => (this.dragging = this.settings.freeCam));
