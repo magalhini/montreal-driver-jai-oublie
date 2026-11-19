@@ -11,12 +11,12 @@ export const PURSUIT_TUNING = {
   /** ...out to at most this far ahead of the player (m), and only while further than `flankUntil` from them. */
   flankMax: 75,
   flankUntil: 35,
-  /** Pursuer top speed in m/s (each cop gets 0.88..1x). */
-  topSpeed: 38,
+  /** Pursuer top speed in m/s (each cop gets 0.88..1x). Playtest: 25% slower than the first pass (38). */
+  topSpeed: 28.5,
   /** Closing speed (m/s) when making contact with the target: a bump or PIT, not a full-speed ram. */
   ramSpeed: 5,
-  /** Speed through a 90 degree route corner. */
-  cornerSpeed: 11,
+  /** Speed through a 90 degree route corner. 25% slower with `topSpeed` (was 11). */
+  cornerSpeed: 8.25,
   /** Seconds without any cop seeing the player before the pursuit ends. */
   loseTime: 12,
   /** During a pursuit, dispatch reports the player's real position this often (seen or not). */

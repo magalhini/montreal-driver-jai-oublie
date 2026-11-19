@@ -43,6 +43,7 @@ import { Breakdown } from "./gameplay/Breakdown";
 import { BreakdownView } from "./gameplay/BreakdownView";
 import { PitStopSystem } from "./gameplay/PitStop";
 import { PotholeHits } from "./gameplay/PotholeHits";
+import { PotholeCam } from "./gameplay/PotholeCam";
 import { Closures, closureSalt, defaultAnchors } from "./gameplay/Closures";
 import { Cones } from "./gameplay/Cones";
 import { Chantier } from "./gameplay/Chantier";
@@ -490,6 +491,23 @@ const shop = new PitShop(uiRoot, r.renderer, post, builds, {
   installWinterTires: () => mission.install(),
   tireCue: (step) => audio.garage.tire(step),
 });
+// The first pothole that does damage: slow motion on the wheel, and a tip about them
+const potholeCam = new PotholeCam(
+  world,
+  game,
+  uiRoot,
+  r.camera,
+  (x, z) => city.terrain.surfaceY(x, z),
+  (from, dir, max) => camRig.walls?.rayDistance(from, dir, max) ?? Infinity,
+);
+potholeCam.blocked = () =>
+  sceneBusy() ||
+  pickup.cinematic ||
+  picnic.cinematic ||
+  intro.playing ||
+  shop.active ||
+  briefing.open;
+potholeHits.cutscene = (p, wheel) => potholeCam.trigger(p, wheel);
 const orbitCenter = new THREE.Vector3();
 uiRoot.classList.add("on-title");
 menu.showTitle();
@@ -501,6 +519,13 @@ game.onFrame((dt) => {
   // Escape skips the storage scene instead of pausing
   if (pickup.playing && input.pressed("escape") && !menu.open) pickup.skip();
   if (picnic.playing && input.pressed("escape") && !menu.open) picnic.skip();
+  // Escape skips the pothole shot (and doesn't pause on the same press); F or the × also drops its tip
+  const potholeShot = potholeCam.playing;
+  if (potholeShot && input.pressed("escape") && !menu.open) potholeCam.skip();
+  if (potholeCam.tipOpen && input.pressed("interact") && !menu.open)
+    potholeCam.dismiss();
+  potholeCam.frame(dt, game.paused);
+  carView.simRate = game.timeScale;
   intro.update(dt);
   if (
     intro.playing &&
@@ -543,7 +568,13 @@ game.onFrame((dt) => {
     game.setPaused("map", fullMap.open);
   } else if (intro.playing) {
     // The intro owns the keys until it hands over to the briefing or the car
-  } else if (back && !fullMap.open && !pickup.playing && !picnic.playing) {
+  } else if (
+    back &&
+    !fullMap.open &&
+    !pickup.playing &&
+    !picnic.playing &&
+    !potholeShot
+  ) {
     game.setPaused("menu", true);
     menu.showPause();
   }
@@ -611,6 +642,7 @@ game.addView(picnicView);
 // The coda's own agent, for the Ville-Marie Bagel permit
 game.addView(new TicketAgentView(picnic, r.scene, city.terrain));
 let picnicCam = false;
+let potholeWas = false;
 const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
   city.terrain.heightAt(x, z),
 );
@@ -641,7 +673,7 @@ game.addView({
     effects.update(
       world.cars,
       player.pos,
-      wreck.playing ? dt * game.timeScale : dt,
+      wreck.playing || potholeCam.playing ? dt * game.timeScale : dt,
     );
     camRig.focus = bust.officer?.pos ?? parkingTickets.cameraFocus;
     cockpit.fit(player);
@@ -655,22 +687,25 @@ game.addView({
       !breakdown.playing &&
       !pickup.cinematic &&
       !picnic.cinematic &&
+      !potholeCam.playing &&
       (intro.inside ||
         (camRig.cabinAt(player.interpPos(alpha)) && !intro.playing));
     cockpit.update(player, dt, inCabin);
     carView.setCutaway(inCabin ? player.id : null, ...cockpit.cabin);
     if (wreck.playing) wreckView.aim(r.camera);
     else if (breakdown.playing) breakdownView.aim(r.camera);
+    else if (potholeCam.playing) potholeCam.aim(r.camera);
     else if (intro.playing) intro.aim(r.camera);
     else if (pickup.cinematic) pickupView.aim(r.camera, dt);
     else if (picnic.cinematic) picnicView.aim(r.camera, dt);
     else {
-      if (pickupCam || introCam || picnicCam) camRig.snap();
+      if (pickupCam || introCam || picnicCam || potholeWas) camRig.snap();
       camRig.update(player, alpha, Math.max(dt, 1 / 240), orbitCenter);
     }
     pickupCam = pickup.cinematic;
     picnicCam = picnic.cinematic;
     introCam = intro.playing;
+    potholeWas = potholeCam.playing;
     // Post FX on top of the tuned settings: the wreck's punch
     post.boost.bloom = 0.55 * wreck.fx;
     post.boost.aberration = 0.0035 * wreck.fx;
@@ -738,6 +773,7 @@ adoptSpec = addDebugPanels({
   tires,
   potholes,
   potholeHits,
+  potholeCam,
   closures,
   cones,
   chantier,
@@ -902,6 +938,7 @@ function resetSession(): void {
   police.standDown();
   heat.reset();
   potholeHits.reset();
+  potholeCam.cancel();
   chantier.reset();
   mission.clear();
   pickup.reset();
@@ -1061,6 +1098,7 @@ function viewHeading(cam: THREE.Camera): number {
   parked,
   potholes,
   potholeHits,
+  potholeCam,
   closures,
   cones,
   chantier,

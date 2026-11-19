@@ -21,6 +21,7 @@ import type { Gps } from './gameplay/Gps';
 import { TIRE_TUNING, type Tires } from './gameplay/Tires';
 import { PIT_TUNING, type PitStopSystem } from './gameplay/PitStop';
 import { POTHOLE_TUNING, type PotholeHits } from './gameplay/PotholeHits';
+import type { PotholeCam } from './gameplay/PotholeCam';
 import type { Potholes } from './world/Potholes';
 import type { Closures } from './gameplay/Closures';
 import { CONE_TUNING, type Cones } from './gameplay/Cones';
@@ -68,6 +69,7 @@ export interface DebugSystems {
   tires: Tires;
   potholes: Potholes;
   potholeHits: PotholeHits;
+  potholeCam: PotholeCam;
   closures: Closures;
   cones: Cones;
   chantier: Chantier;
@@ -480,6 +482,7 @@ function addPotholePanel(sys: DebugSystems): void {
     },
     'go',
   ).name('line up on a big pothole');
+  f.add({ arm: () => (sys.potholeCam.armed = true) }, 'arm').name('replay the first-pothole shot');
   const big = potholes.pits.filter((p) => p.depth === 'big').length;
   const edges = new Set(potholes.pits.map((p) => p.edge)).size;
   Debug.watch('potholes', () => {

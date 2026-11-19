@@ -328,6 +328,9 @@ export class CarView implements ViewSystem {
     return v;
   }
 
+  /** Sim speed (slow motion): wheels turn with the sim, not the render clock. */
+  simRate = 1;
+
   sync(alpha: number, dt: number): void {
     this.time += dt;
     const cars = this.getCars();
@@ -385,8 +388,8 @@ export class CarView implements ViewSystem {
       const sag = clamp((s.load - 1) * 0.05, -0.03, 0.06);
       v.body.position.y = Math.abs(roll) * 0.4 - bounce + s.heave - (s.airborne ? -0.04 : sag);
       v.droop += ((s.airborne ? 0.13 : 0) - v.droop) * Math.min(1, dt * 10);
-      v.wheelAngle += (s.speed / v.r) * dt;
-      v.rearAngle += drivenWheelRate(car, v.r) * dt;
+      v.wheelAngle += (s.speed / v.r) * dt * this.simRate;
+      v.rearAngle += drivenWheelRate(car, v.r) * dt * this.simRate;
       v.root.updateMatrixWorld(true);
 
       // Wheels

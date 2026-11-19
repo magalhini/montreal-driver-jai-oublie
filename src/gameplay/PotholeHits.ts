@@ -26,8 +26,8 @@ export const POTHOLE_TUNING = {
   bigHard: 0.05,
   bigPerKmh: 0.002,
   wheelCap: 0.14,
-  /** Everything above, scaled (playtest: 0.85 = 15% gentler than the first pass). */
-  damageScale: 0.85,
+  /** Everything above, scaled (playtest: 0.85 was 15% gentler than the first pass; 0.5 since, still too much). */
+  damageScale: 0.5,
   /** Kicks for a big pit at 60 km/h (small pits and slower cars get less): nose pitch (rad). */
   pitch: 0.05,
   /** Sideways shove as a share of speed, and a steering yank (rad), toward the pit when a tire clips its edge. */
@@ -82,6 +82,8 @@ export interface PotholeHitInfo {
 export class PotholeHits implements SimSystem {
   last: PotholeHitInfo | null = null;
   hits = 0;
+  /** The player's car took damage from a pit: true if the slow-motion shot played (it brings its own tip). */
+  cutscene: ((p: Pothole, wheel: number) => boolean) | null = null;
   private readonly tracks = new Map<number, Track>();
   private cooldown = 0;
   private told = 0;
@@ -240,6 +242,12 @@ export class PotholeHits implements SimSystem {
     if (!tell) return;
     this.hits++;
     this.last = { kmh, damage: dmg, depth: p.depth };
+    // The shot's tip stands in for the first line
+    if (dmg > 0 && this.cutscene?.(p, i)) {
+      this.told++;
+      this.cooldown = T.messageCooldown;
+      return;
+    }
     if (dmg > 0 && p.depth === "big" && this.cooldown <= 0) {
       const line =
         this.told === 0
