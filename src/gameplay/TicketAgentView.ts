@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import type { CityGround } from '../world/Ground';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import type { ViewSystem } from '../types';
-import type { ParkingTicket } from './ParkingTicket';
+import type { TicketAgent } from './ParkingTicket';
 
 const NAVY = 0x1a2433;
 const SKIN = 0xe8c8b0;
@@ -32,8 +32,8 @@ function limb(parent: THREE.Object3D, geo: THREE.BufferGeometry, mat: THREE.Mate
 }
 
 /**
- * Parking agent for the curb-stall gag: fluorescent jacket, dark trousers, cap, and the ticket block.
- * Walks out from behind the car and scribbles. Only in the scene while a ticket is being written.
+ * Parking agent: fluorescent jacket, dark trousers, cap, and the ticket block. Walks up to the car and
+ * scribbles. Only in the scene while its source has an agent out (the curb-stall gag, the Vieux-Port coda).
  */
 export class TicketAgentView implements ViewSystem {
   private root = new THREE.Group();
@@ -48,7 +48,7 @@ export class TicketAgentView implements ViewSystem {
   private y = 0;
 
   constructor(
-    private tickets: ParkingTicket,
+    private tickets: { readonly agent: TicketAgent | null },
     scene: THREE.Scene,
     private terrain: CityGround,
   ) {

@@ -1,9 +1,10 @@
 import * as THREE from 'three';
-import { damp, fwd, lerpAngle } from '../core/math';
+import { damp, fwd, leftOf, lerpAngle } from '../core/math';
 import type { ViewSystem } from '../types';
+import type { Car } from '../vehicles/Car';
 import type { CityGround } from '../world/Ground';
 import { HIP, lerpPose, Person, POSE, type ArmPose } from '../world/People';
-import { PICNIC_TUNING, type PortPicnic } from './PortPicnic';
+import { PICNIC_TUNING, type PicnicShot, type PortPicnic } from './PortPicnic';
 
 const LAP: ArmPose = { raise: 0.42, spread: 0.16, bend: 1.2 };
 /** Bench seat (the promenade benches are 0.45 m). `Person` adds a little so the hips land on it. */
@@ -51,6 +52,8 @@ export class PortPicnicView implements ViewSystem {
   private yaw = 0;
   private yawReady = false;
   private captioned = false;
+  private ticketCaptioned = false;
+  private shot: PicnicShot = 'bench';
   private barsUp = false;
   private camPos = new THREE.Vector3();
   private camLook = new THREE.Vector3();
@@ -63,6 +66,7 @@ export class PortPicnicView implements ViewSystem {
     ui: HTMLElement,
     scene: THREE.Scene,
     private readonly terrain: CityGround,
+    private readonly player: Car,
   ) {
     this.hero = new Person({
       skin: 0xe3c2a6,
@@ -91,6 +95,13 @@ export class PortPicnicView implements ViewSystem {
     const pk = this.picnic;
     const d = pk.driver;
     this.bars(pk.cinematic);
+    if (pk.shot !== this.shot) {
+      this.shot = pk.shot;
+      // A cut, not a pan: the lens jumps with the shot, and the bagel line is gone with the bench
+      this.shotReady = false;
+      this.caption.classList.remove('show');
+    }
+    if (pk.shot === 'ticket' && pk.agent?.pose === 'write' && pk.cinematic && !this.ticketCaptioned) this.ticketCaption();
     this.hero.root.visible = pk.playing && d.visible;
     if (!this.hero.root.visible) {
       if (!pk.cinematic) this.shotReady = false;
@@ -124,6 +135,10 @@ export class PortPicnicView implements ViewSystem {
    * The river stays in frame in front of him.
    */
   aim(camera: THREE.PerspectiveCamera, dt: number): void {
+    if (this.picnic.shot === 'ticket') {
+      this.aimTicket(camera, dt);
+      return;
+    }
     const bench = this.picnic.bench;
     if (!bench) return;
     const ground = this.terrain.surfaceY(bench.pos.x, bench.pos.z);
@@ -139,6 +154,39 @@ export class PortPicnicView implements ViewSystem {
       this.camLook.copy(this.look);
       this.shotReady = true;
     }
+    this.place(camera, dt);
+  }
+
+  /**
+   * Back in the lot, off the car's front corner on the agent's side: the agent comes up the flank toward
+   * the lens, writes by the windshield, and walks back off into the lot. A slow push in on the car.
+   */
+  private aimTicket(camera: THREE.PerspectiveCamera, dt: number): void {
+    const p = this.player;
+    const side = this.picnic.ticketSide;
+    const u = smooth(Math.min(1, (this.picnic.agent?.t ?? 0) / 10));
+    const along = p.halfL + 4.3 - u * 0.5;
+    const lat = side * (p.halfW + 2.7 - u * 0.3);
+    this.carFrame(along, lat, 1.6, this.at);
+    this.carFrame(-0.5, side * p.halfW * 0.55, 0.95, this.look);
+    if (!this.shotReady) {
+      this.camPos.copy(this.at);
+      this.camLook.copy(this.look);
+      this.shotReady = true;
+    }
+    this.place(camera, dt);
+  }
+
+  private carFrame(along: number, lat: number, up: number, out: THREE.Vector3): void {
+    const p = this.player;
+    const f = fwd(p.yaw);
+    const l = leftOf(p.yaw);
+    const x = p.pos.x + f.x * along + l.x * lat;
+    const z = p.pos.z + f.z * along + l.z * lat;
+    out.set(x, this.terrain.surfaceY(x, z) + up, z);
+  }
+
+  private place(camera: THREE.PerspectiveCamera, dt: number): void {
     const k = 1 - Math.exp(-dt * 2.2);
     this.camPos.lerp(this.at, k);
     this.camLook.lerp(this.look, k);
@@ -221,12 +269,25 @@ export class PortPicnicView implements ViewSystem {
     this.cine.parentElement?.classList.toggle('cinematic', up);
     if (!up) {
       this.captioned = false;
-      this.caption.classList.remove('show');
+      this.ticketCaptioned = false;
+      this.caption.classList.remove('show', 'ticket');
     }
+  }
+
+  private ticketCaption(): void {
+    this.ticketCaptioned = true;
+    this.caption.innerHTML =
+      '<div class="name">Contravention</div><div class="jp">You can\'t park here without a Ville-Marie Bagel permit.</div>';
+    this.caption.style.animationDuration = '7s';
+    this.caption.classList.remove('show');
+    this.caption.classList.add('ticket');
+    void this.caption.offsetWidth;
+    this.caption.classList.add('show');
   }
 
   private captionOn(): void {
     this.captioned = true;
+    this.caption.classList.remove('ticket');
     this.caption.innerHTML = '<div class="name">Lox bagel</div><div class="jp">Tour de l\'Horloge</div>';
     this.caption.style.animationDuration = '9s';
     this.caption.classList.remove('show');

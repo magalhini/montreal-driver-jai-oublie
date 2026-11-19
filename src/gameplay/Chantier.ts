@@ -122,7 +122,7 @@ export class Chantier implements SimSystem {
     this.toldFence.add(h.id);
     this.fenceCooldown = T.fenceCooldown;
     this.world.events.message(
-      "Rue barrée, again! Ugh, find an alternative route.",
+      "Rue barrée, again! Ugh, find another route.",
       "warn",
     );
   }

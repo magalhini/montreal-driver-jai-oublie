@@ -489,6 +489,12 @@ body {
   78% { opacity: 1; }
   100% { opacity: 0; }
 }
+/* The Vieux-Port ticket: a sentence, not a place name */
+.picnic-cine .cine-caption.ticket .jp {
+  letter-spacing: 1px;
+  font-size: 20px;
+  max-width: 80vw;
+}
 /* The game's intro: a sign-shop caption, white on the métro's blue */
 .intro-cine .cine-caption .name {
   font-family: 'Press Start 2P', monospace;

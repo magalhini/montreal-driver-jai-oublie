@@ -115,12 +115,12 @@ const TUTORIAL: [string, string[]][] = [
     "CONTROLS",
     [
       "<kbd>W A S D</kbd> drive &nbsp; <kbd>SPACE</kbd> handbrake",
-      "<kbd>M</kbd> city map: click a destination on it and the GPS routes you there",
+      "<kbd>M</kbd> city map: click a destination on it and the GPS routes you",
       "<kbd>L</kbd> speed limiter &nbsp; <kbd>C</kbd> change camera",
       "<kbd>Q</kbd> <kbd>E</kbd> blinkers",
     ],
   ],
-  ["GARAGES", ["Stop under a garage (GARAGE on the map) to repair your car."]],
+  ["GARAGES", ["Stop under a garage (on the map) to repair your car."]],
 ];
 const TUTORIAL_HTML = `<div class="menu-tutorial">${TUTORIAL.map(
   ([title, lines]) =>

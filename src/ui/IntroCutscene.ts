@@ -405,7 +405,7 @@ export class IntroCutscene {
     const look = this.ground(sign, 2.1);
     return {
       title: "Arrêt",
-      sub: "all-way · full stop",
+      sub: "optional for all Montrealers",
       from: at(11, 0.6, 1.6),
       to: at(6.5, 0.2, 1.8),
       look: () => look,
@@ -464,7 +464,7 @@ export class IntroCutscene {
     const look = this.ground(pit.pos, -0.2);
     return {
       title: "Nid-de-poule",
-      sub: "deep enough to keep a tire",
+      sub: "deep enough to keep a small child",
       from: at(pit.r + 8, 1.4, 2.3),
       to: at(pit.r + 5, -0.4, 1.6),
       look: () => look,

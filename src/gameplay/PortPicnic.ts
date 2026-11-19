@@ -1,6 +1,8 @@
 import { dist, fwd, leftOf, yawOf } from '../core/math';
 import type { World } from '../core/World';
 import { inBox } from '../world/Features';
+import { formatCash, type Economy } from './Economy';
+import { PARKING_TICKET_TUNING, type TicketAgent } from './ParkingTicket';
 import type { CityModel } from '../world/RoadGraph';
 import type { AABB, SimSystem, Vec2 } from '../types';
 
@@ -16,9 +18,18 @@ export const PICNIC_TUNING = {
   /** Turn and sit, then the bagel (s). */
   sit: 1.15,
   eat: 6.6,
-  /** Fade to black and back (s, each way). */
+  /** Fade to black and back (s, each way). Also the dip between the bench and the ticket. */
   fade: 0.4,
+  /** The agent's pace up to the car (m/s), the scribble (s), and how long they walk off before the fade (s). */
+  agentWalk: 1.75,
+  write: 3.4,
+  walkOff: 1.7,
+  /** Dollars: the bagel permit nobody has. */
+  fine: PARKING_TICKET_TUNING.fine,
 };
+
+/** Which shot the cutscene camera is on: him on the bench, then the car in the lot. */
+export type PicnicShot = 'bench' | 'ticket';
 
 export type PicnicPose = 'walk' | 'sit' | 'eat';
 
@@ -35,9 +46,19 @@ export interface PicnicDriver {
   visible: boolean;
 }
 
+type Who = 'driver' | 'agent';
+
 type Beat =
-  | { kind: 'walk'; pts: Vec2[]; speed: number; start?: () => void }
-  | { kind: 'hold'; dur: number; pose: PicnicPose; face?: number; start?: () => void };
+  | { kind: 'walk'; who?: Who; pts: Vec2[]; speed: number; start?: () => void; endAt?: number }
+  | { kind: 'hold'; who?: Who; dur: number; pose: PicnicPose | 'write'; face?: number; start?: () => void }
+  /** Dip to black; `mid` runs on the black frame. */
+  | { kind: 'cut'; mid: () => void; cut?: boolean };
+
+interface Walker {
+  pos: Vec2;
+  yaw: number;
+  walked: number;
+}
 
 /** Where the coda points, and which bench the cutscene uses. */
 export interface PortPicnicSpot {
@@ -74,8 +95,10 @@ export function portPicnic(city: CityModel): PortPicnicSpot | null {
 
 /**
  * After the winter tires are on: stop in the Vieux-Port lot by the clock tower and the scene takes the car.
- * The driver walks to the nearest bench, sits facing the water and eats a lox bagel. Escape skips it.
- * A bust, a wreck or a tow mid-scene calls it off; the lot takes the car again the next time it stops.
+ * The driver walks to the nearest bench, sits facing the water and eats a lox bagel. Then the cut back to
+ * the lot: an agent walks up to the car and writes it up (no Ville-Marie Bagel permit). Escape skips it,
+ * and the fine still sticks. A bust, a wreck or a tow mid-scene calls it off; the lot takes the car again
+ * the next time it stops.
  */
 export class PortPicnic implements SimSystem {
   /** The lot wants the car (the tires are on, the bagel is not eaten). */
@@ -97,6 +120,11 @@ export class PortPicnic implements SimSystem {
   sceneT = 0;
   /** The bench the shot is built on. Null until the scene starts. */
   bench: { pos: Vec2; yaw: number } | null = null;
+  shot: PicnicShot = 'bench';
+  /** Side of the car the agent works (+1 = the car's left). */
+  ticketSide: 1 | -1 = 1;
+  /** The parking agent, only on the ticket shot. Drawn by a `TicketAgentView`. */
+  agent: TicketAgent | null = null;
   readonly driver: PicnicDriver = {
     pos: { x: 0, z: 0 },
     prev: { x: 0, z: 0 },
@@ -114,8 +142,14 @@ export class PortPicnic implements SimSystem {
   /** The stop counted once: drive out of the lot before it takes the car again. */
   private served = false;
   private progress = 0;
+  /** The fine has been charged this scene. */
+  private fined = false;
+  private paid = 0;
 
-  constructor(private readonly world: World) {}
+  constructor(
+    private readonly world: World,
+    private readonly economy: Economy,
+  ) {}
 
   /** Quit, free roam, a fresh session. */
   reset(): void {
@@ -127,11 +161,13 @@ export class PortPicnic implements SimSystem {
     this.hinted = false;
     this.served = false;
     this.bench = null;
+    this.shot = 'bench';
+    this.agent = null;
     this.driver.visible = false;
     this.beats = [];
   }
 
-  /** Escape during the scene: straight to the end. He still got the bagel. */
+  /** Escape during the scene: straight to the end. He still got the bagel, and the ticket. */
   skip(): void {
     if (!this.playing || this.ending > 0) return;
     this.beats = [];
@@ -189,6 +225,10 @@ export class PortPicnic implements SimSystem {
     this.ending = 0;
     this.beatT = 0;
     this.bench = bench;
+    this.shot = 'bench';
+    this.agent = null;
+    this.fined = false;
+    this.paid = 0;
     w.controlLocked = true;
 
     const face = fwd(bench.yaw);
@@ -211,8 +251,82 @@ export class PortPicnic implements SimSystem {
       { kind: 'walk', pts: [stand], speed: T.walk, start: () => (d.visible = true) },
       { kind: 'hold', dur: T.sit, pose: 'sit', face: bench.yaw },
       { kind: 'hold', dur: T.eat, pose: 'eat', face: bench.yaw },
+      ...this.ticketBeats(),
     ];
     this.startBeat();
+  }
+
+  /**
+   * Back to the lot: the agent comes up the car's flank from behind, stops by the windshield, writes it up,
+   * and walks back off the way they came. Every point is in the car's frame, read on the black frame.
+   */
+  private ticketBeats(): Beat[] {
+    const T = PICNIC_TUNING;
+    const p = this.world.player;
+    const lat = (k: number) => this.ticketSide * (p.halfW + k);
+    let door: Vec2 = { x: 0, z: 0 };
+    const walkUp: Vec2[] = [];
+    const walkOff: Vec2[] = [];
+    return [
+      {
+        kind: 'cut',
+        mid: () => {
+          this.shot = 'ticket';
+          this.driver.visible = false;
+          this.ticketSide = this.clearSide();
+          const start = this.carPoint(-(p.halfL + 5.5), lat(1.15));
+          walkUp.push(this.carPoint(-(p.halfL + 0.45), lat(0.9)), (door = this.carPoint(0.55, lat(0.62))));
+          walkOff.push(this.carPoint(-(p.halfL + 0.6), lat(1.4)), this.carPoint(-(p.halfL + 9), lat(2.4)));
+          this.agent = {
+            pos: { ...start },
+            prev: { ...start },
+            yaw: yawOf({ x: walkUp[0].x - start.x, z: walkUp[0].z - start.z }),
+            pose: 'walk',
+            t: 0,
+            walked: 0,
+          };
+        },
+      },
+      { kind: 'walk', who: 'agent', pts: walkUp, speed: T.agentWalk },
+      {
+        kind: 'hold',
+        who: 'agent',
+        dur: T.write,
+        pose: 'write',
+        start: () => {
+          const o = this.agent;
+          if (o) o.yaw = yawOf({ x: p.pos.x - door.x, z: p.pos.z - door.z });
+          this.fine();
+        },
+      },
+      { kind: 'walk', who: 'agent', pts: walkOff, speed: T.agentWalk, endAt: T.walkOff },
+    ];
+  }
+
+  /** The flank with fewer cars beside it (the lot is full of them); the driver's side on a tie. */
+  private clearSide(): 1 | -1 {
+    const p = this.world.player;
+    const crowd = (side: 1 | -1) => {
+      const at = this.carPoint(0, side * (p.halfW + 1));
+      let n = 0;
+      for (const c of this.world.cars) if (c !== p && !c.removed && dist(c.pos, at) < 2.6) n++;
+      return n;
+    };
+    return crowd(-1) < crowd(1) ? -1 : 1;
+  }
+
+  private carPoint(along: number, lat: number): Vec2 {
+    const p = this.world.player;
+    const f = fwd(p.yaw);
+    const l = leftOf(p.yaw);
+    return { x: p.pos.x + f.x * along + l.x * lat, z: p.pos.z + f.z * along + l.z * lat };
+  }
+
+  /** The pen hits the book: charged once per scene, on the write or on a skip. */
+  private fine(): void {
+    if (this.fined) return;
+    this.fined = true;
+    this.paid = this.economy.charge(PICNIC_TUNING.fine);
   }
 
   private play(dt: number): void {
@@ -227,11 +341,14 @@ export class PortPicnic implements SimSystem {
     d.prev.x = d.pos.x;
     d.prev.z = d.pos.z;
     d.t += dt;
-    if (this.sceneT < T.fade) this.fade = this.sceneT / T.fade;
-    else {
-      if (!this.cinematic && this.ending === 0) this.cinematic = true;
-      if (this.ending === 0) this.fade = Math.max(0, 1 - (this.sceneT - T.fade) / T.fade);
+    const o = this.agent;
+    if (o) {
+      o.prev.x = o.pos.x;
+      o.prev.z = o.pos.z;
+      o.t += dt;
     }
+    // The beats keep running under the closing fade, so the agent walks into the black
+    this.step(dt);
     if (this.ending > 0) {
       this.ending += dt;
       this.fade = Math.min(1, this.ending / T.fade);
@@ -239,19 +356,38 @@ export class PortPicnic implements SimSystem {
       return;
     }
     const beat = this.beats[0];
+    if (this.sceneT < T.fade) this.fade = this.sceneT / T.fade;
+    else if (beat?.kind === 'cut') this.fade = Math.max(0, 1 - Math.abs(this.beatT - T.fade) / T.fade);
+    else {
+      this.cinematic = true;
+      this.fade = Math.max(0, this.fade - dt / T.fade);
+    }
+  }
+
+  private step(dt: number): void {
+    const T = PICNIC_TUNING;
+    const beat = this.beats[0];
     if (!beat) {
-      this.ending = 1e-6;
+      if (this.ending === 0) this.ending = 1e-6;
       return;
     }
     this.beatT += dt;
     if (beat.kind === 'walk') {
-      if (this.walk(beat, dt)) this.nextBeat();
+      const who = beat.who === 'agent' ? this.agent : this.driver;
+      if (!who || this.walk(beat, dt, who)) this.nextBeat();
+      else if (beat.endAt !== undefined && this.beatT >= beat.endAt && this.ending === 0) this.ending = 1e-6;
+    } else if (beat.kind === 'cut') {
+      if (!beat.cut && this.beatT >= T.fade) {
+        beat.cut = true;
+        beat.mid();
+      }
+      if (this.beatT >= T.fade * 2) this.nextBeat();
     } else if (this.beatT >= beat.dur) this.nextBeat();
-    if (this.beats.length === 1 && this.beats[0].kind === 'hold' && this.beatT >= this.beats[0].dur - T.fade) this.ending = 1e-6;
+    const last = this.beats[0];
+    if (this.ending === 0 && this.beats.length === 1 && last.kind === 'hold' && this.beatT >= last.dur - T.fade) this.ending = 1e-6;
   }
 
-  private walk(beat: Extract<Beat, { kind: 'walk' }>, dt: number): boolean {
-    const d = this.driver;
+  private walk(beat: Extract<Beat, { kind: 'walk' }>, dt: number, d: Walker): boolean {
     let move = beat.speed * dt;
     while (move > 0 && beat.pts.length) {
       const target = beat.pts[0];
@@ -283,17 +419,28 @@ export class PortPicnic implements SimSystem {
     this.beatT = 0;
     const b = this.beats[0];
     if (!b) return;
+    if (b.kind === 'cut') return;
+    if (b.who === 'agent') {
+      const o = this.agent;
+      if (o) {
+        o.t = 0;
+        o.pose = b.kind === 'walk' ? 'walk' : b.pose === 'write' ? 'write' : 'walk';
+        if (b.kind === 'hold' && b.face !== undefined) o.yaw = b.face;
+      }
+      b.start?.();
+      return;
+    }
     const d = this.driver;
     d.t = 0;
     b.start?.();
     if (b.kind === 'walk') d.pose = 'walk';
     else {
-      d.pose = b.pose;
+      d.pose = b.pose === 'write' ? 'sit' : b.pose;
       if (b.face !== undefined) d.yaw = b.face;
     }
   }
 
-  /** End of the scene. `ate`: he got the bagel; the car goes back to the player. */
+  /** End of the scene. `ate`: he got the bagel (and the ticket); the car goes back to the player. */
   private release(ate: boolean): void {
     const w = this.world;
     this.playing = false;
@@ -301,11 +448,18 @@ export class PortPicnic implements SimSystem {
     this.beats = [];
     this.ending = 0;
     this.driver.visible = false;
+    this.agent = null;
+    this.shot = 'bench';
     if (!ate) {
       this.fade = 0;
       return;
     }
+    this.fine();
     if (w.mode === 'free' && !this.blocked()) w.controlLocked = false;
     this.onDone?.();
+    const fine = PICNIC_TUNING.fine;
+    const short = this.paid < fine ? ` (all you had: ${formatCash(this.paid)})` : '';
+    w.events.message('Agence de mobilité durable de Montréal issued you a fine.', 'bad', 8);
+    w.events.message(`You can't park here without a Ville-Marie Bagel permit. ${formatCash(fine)}${short}.`, 'bad', 8);
   }
 }

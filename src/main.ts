@@ -398,7 +398,7 @@ pickup.chased = () => police.pursuers > 0;
 pickup.onLoaded = () => mission.loadTires();
 game.addSim(pickup);
 // After the tires: stop in the Vieux-Port lot and he sits down with the lox bagel
-const picnic = new PortPicnic(world);
+const picnic = new PortPicnic(world, economy);
 picnic.armed = () => mission.wantsPicnic;
 picnic.blocked = sceneBusy;
 picnic.chased = () => police.pursuers > 0;
@@ -600,8 +600,10 @@ const pickupView = new TirePickupView(
 );
 game.addView(pickupView);
 let pickupCam = false;
-const picnicView = new PortPicnicView(picnic, uiRoot, r.scene, city.terrain);
+const picnicView = new PortPicnicView(picnic, uiRoot, r.scene, city.terrain, player);
 game.addView(picnicView);
+// The coda's own agent, for the Ville-Marie Bagel permit
+game.addView(new TicketAgentView(picnic, r.scene, city.terrain));
 let picnicCam = false;
 const wreckView = new WreckView(wreck, r.scene, r.camera, effects, (x, z) =>
   city.terrain.heightAt(x, z),
