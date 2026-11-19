@@ -63,6 +63,11 @@ export class OffenseDetector implements SimSystem {
   private crashCooldown = new Map<number, number>();
   private last: Vec2 = { x: 0, z: 0 };
 
+  /** The junction the player is driving toward and the distance to its stop line (null when stopped or off a lane). */
+  get approaching(): Readonly<Approach> | null {
+    return this.approach;
+  }
+
   constructor(private world: World) {
     world.events.on('collision', (e) => {
       const p = world.player;

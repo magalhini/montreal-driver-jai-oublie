@@ -3,6 +3,8 @@ import { CONFIG, KMH } from "./config";
 import { Debug } from "./core/Debug";
 import { addDebugPanels } from "./debugPanels";
 import { Events } from "./core/Events";
+import { fwd } from "./core/math";
+import { pointAt, project, tangentAt } from "./world/Polyline";
 import { Game } from "./core/Game";
 import { Input } from "./core/Input";
 import { Rng } from "./core/Rng";
@@ -353,7 +355,8 @@ breakdown.blocked = () =>
   bust.phase !== "free" || wreck.active || recovery.active;
 breakdown.onRespawn = () => camRig.snap();
 game.addSim(breakdown);
-game.addSim(new OffenseDetector(world));
+const offenses = new OffenseDetector(world);
+game.addSim(offenses);
 // Cone lines breached, the call-ins and the "rue barrée" line
 const chantier = new Chantier(world, closures, cones, heat, police);
 game.addSim(chantier);
@@ -551,6 +554,8 @@ game.onFrame((dt) => {
     !intro.playing &&
     !picnic.cinematic;
   warnFirstPatrol();
+  tipFirstStop();
+  sendFirstVan(dt);
   fullMap.update(dt);
   camRig.lookBack =
     input.isHeld("lookBack") &&
@@ -919,6 +924,61 @@ function warnFirstPatrol(): void {
   if (minimap.patrolsOnRadar === 0) return;
   patrolWarned = true;
   events.message("The SPVM is nearby! Don't run red lights or speed until they're gone.", "warn", 6);
+}
+
+/** How long to keep looking for a clear spot for the first Canada Post van (s of driving). */
+const FIRST_VAN_TRIES = 6;
+let firstVanT = 0;
+let firstVanDone = false;
+/**
+ * Once per page load, a Canada Post van is on the player's street as the picture fades up from the intro:
+ * coming the other way in the oncoming lane, or (one-way street) just ahead, going the same way.
+ */
+function sendFirstVan(dt: number): void {
+  if (firstVanDone || world.controlLocked || world.mode === "menu" || game.paused) return;
+  firstVanT += dt;
+  if (firstVanT > FIRST_VAN_TRIES) {
+    firstVanDone = true;
+    return;
+  }
+  const f = fwd(player.yaw);
+  for (const oncoming of [true, false]) {
+    for (const d of oncoming ? [70, 55, 85, 45] : [38, 30, 46]) {
+      const at = { x: player.pos.x + f.x * d, z: player.pos.z + f.z * d };
+      let best: { lane: (typeof city.lanes)[number]; pos: { x: number; z: number } } | null = null;
+      // The player starts at the curb: the oncoming lanes are across the street, the near lanes right beside
+      let bestD = oncoming ? 14 : 6;
+      for (const lane of city.lanes) {
+        const pr = project(lane.pts, lane.cum, at);
+        if (pr.dist >= bestD || pr.s < 2 || pr.s > lane.length - 2) continue;
+        const t = tangentAt(lane.pts, lane.cum, pr.s);
+        const along = t.x * f.x + t.z * f.z;
+        if (oncoming ? along > -0.8 : along < 0.8) continue;
+        bestD = pr.dist;
+        best = { lane, pos: pointAt(lane.pts, lane.cum, pr.s) };
+      }
+      if (best && traffic.clearAt(best.pos, 9)) {
+        traffic.spawnCar(best.lane, best.pos, { style: "postvan" });
+        firstVanDone = true;
+        return;
+      }
+    }
+  }
+}
+
+let stopTipped = false;
+/** Rolling up to the first ARRÊT sign, once per page load: the horn hurries the pedestrians along. */
+function tipFirstStop(): void {
+  if (stopTipped || world.controlLocked || world.mode === "menu") return;
+  const a = offenses.approaching;
+  if (!a || a.dStop <= 0 || a.dStop > 18) return;
+  if (city.nodes[a.node].control !== "stop") return;
+  stopTipped = true;
+  events.message(
+    'You didn\'t hear this from me but... hit "H" to honk at the pedestrians and make them walk faster',
+    "info",
+    8,
+  );
 }
 
 let greeted = false;

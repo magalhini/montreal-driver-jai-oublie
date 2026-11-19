@@ -8,7 +8,7 @@ import type { Building, Facing } from "../types";
 import { SCRIPT, scriptFontReady } from "./ScriptFont";
 
 /**
- * Storefront boards (PRD 11B): IGA, Provigo, Starbucks, Tim Hortons, the corner dépanneur, and a poutine counter.
+ * Storefront boards (PRD 11B): IGA, Provigo, Starbucks, Pharmaprix, Tim Hortons, the corner dépanneur, and a poutine counter.
  * Words and flat colors, not traced logos. One board on some street faces in the old city,
  * downtown, and the side streets.
  */
@@ -127,13 +127,37 @@ const BRANDS: Brand[] = [
     },
   },
   {
-    id: "quebecor",
+    id: "pharmaprix",
     draw: (g, w, h) => {
-      fill(g, "#4169E1", w, h);
-      g.strokeStyle = "#fff";
-      g.lineWidth = 8;
-      g.strokeRect(16, 16, w - 32, h - 32);
-      label(g, "QUEBECOR", "#ffffff", w, h * 0.52, h * 0.42);
+      fill(g, "#d4202a", w, h);
+      // Pale blue badge on the right with a white zigzag
+      const r = h * 0.36;
+      const cx = w - r - 36;
+      const cy = h / 2;
+      g.fillStyle = "#5aa9de";
+      g.beginPath();
+      g.arc(cx, cy, r, 0, Math.PI * 2);
+      g.fill();
+      g.strokeStyle = "#ffffff";
+      g.lineWidth = h * 0.055;
+      g.lineJoin = "round";
+      g.lineCap = "round";
+      g.beginPath();
+      g.moveTo(cx - r * 0.42, cy - r * 0.42);
+      g.lineTo(cx + r * 0.42, cy - r * 0.42);
+      g.lineTo(cx - r * 0.42, cy + r * 0.42);
+      g.lineTo(cx + r * 0.42, cy + r * 0.42);
+      g.stroke();
+      // The name fills the board to the left of the badge
+      const room = cx - r - 60;
+      g.fillStyle = "#ffffff";
+      g.textAlign = "center";
+      g.textBaseline = "middle";
+      let size = h * 0.42;
+      g.font = `700 ${size}px ${FONT}`;
+      while (g.measureText("PHARMAPRIX").width > room && size > 18)
+        g.font = `700 ${(size -= 4)}px ${FONT}`;
+      g.fillText("PHARMAPRIX", 30 + room / 2, h * 0.53);
     },
   },
   {

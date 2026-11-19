@@ -17,7 +17,7 @@ const PICKUP_COLORS = [0xf2f2f0, 0xb7bcc2, 0x1a1a1c, 0x8e1c1c, 0x1c355c, 0x1e3d2
 /** Canada Post red. */
 export const POST_RED = 0xd8121c;
 /** Share of spawns that are box trucks, Canada Post vans and pickups, and caps on the first two. */
-export const TRUCK_TUNING = { boxTruck: 0.06, postVan: 0.04, pickup: 0.1, maxBoxTrucks: 3, maxPostVans: 2 };
+export const TRUCK_TUNING = { boxTruck: 0.06, postVan: 0.08, pickup: 0.1, maxBoxTrucks: 3, maxPostVans: 4 };
 
 /** Spawns, drives and despawns civilian traffic in a ring around the player. */
 export class TrafficSystem implements SimSystem {
