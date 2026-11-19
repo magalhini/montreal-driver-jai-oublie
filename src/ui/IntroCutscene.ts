@@ -11,20 +11,20 @@ import { metroSites } from "../world/MetroEntrances";
 import type { Potholes } from "../world/Potholes";
 import { laneOffset } from "../world/RoadGraph";
 
-/** Shot lengths and fades (s). The city shots are two seconds; the car scene at the end is its own length. */
+/** Shot lengths and fades (s). The city shots are four seconds; the car scene at the end is its own length. */
 export const INTRO_TUNING = {
-  shot: 2,
+  shot: 4,
   /** Black at the start (out of the title) and at the end (into the drive). */
   fadeIn: 0.45,
   fadeOut: 0.4,
   /** Close on the mirror charm, then back out through the driver's window. */
-  charm: 2.5,
+  charm: 4.5,
   /** How fast the screen goes black as the lens reaches the window. */
   charmFade: 0.24,
   /** Black between the window and the car. */
   gap: 0.16,
   /** The car, from outside. */
-  reveal: 2.6,
+  reveal: 4.6,
   /** Fade up onto the car. */
   revealFade: 0.35,
 };
@@ -370,7 +370,7 @@ export class IntroCutscene {
     const look = this.ground(mid, 1.1);
     return {
       title: "Rue barrée",
-      sub: "DÉTOUR · the GPS has no idea",
+      sub: "DÉTOUR · the GPS has no idea, neither do you",
       from: at(14, 2.5, 2.2),
       to: at(8.5, 1, 1.7),
       look: () => look,
@@ -404,7 +404,7 @@ export class IntroCutscene {
       );
     const look = this.ground(sign, 2.1);
     return {
-      title: "Arrêt",
+      title: "Arrêt (STOP)",
       sub: "optional for all Montrealers",
       from: at(11, 0.6, 1.6),
       to: at(6.5, 0.2, 1.8),
@@ -437,7 +437,7 @@ export class IntroCutscene {
     const to = this.ground({ x: p.x + f.x * 1.5, z: p.z + f.z * 1.5 }, 1.35);
     return {
       title: "SPVM",
-      sub: "Service de police de la Ville de Montréal",
+      sub: "Service de police Ville de Montréal, I think.",
       from,
       to,
       look: () => this.v.set(car.pos.x, from.y - 0.35, car.pos.z),

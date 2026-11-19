@@ -270,6 +270,16 @@
 }
 .menu-credit {
   left: 24px;
+  text-align: left;
+}
+.menu-link {
+  display: block;
+  margin-top: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+.menu-link:hover {
+  color: rgba(255, 255, 255, 0.8);
 }
 .menu-version {
   right: 24px;

@@ -8,7 +8,7 @@ import type { Building, Facing } from "../types";
 import { SCRIPT, scriptFontReady } from "./ScriptFont";
 
 /**
- * Storefront boards (PRD 11B): IGA, Provigo, Starbucks, Tim Hortons, and a poutine counter.
+ * Storefront boards (PRD 11B): IGA, Provigo, Starbucks, Tim Hortons, the corner dépanneur, and a poutine counter.
  * Words and flat colors, not traced logos. One board on some street faces in the old city,
  * downtown, and the side streets.
  */
@@ -16,7 +16,10 @@ import { SCRIPT, scriptFontReady } from "./ScriptFont";
 const FONT = '"Arial Black", "Arial Bold", Arial, sans-serif';
 interface Brand {
   id: string;
-  draw: (g: CanvasRenderingContext2D, w: number, h: number) => void;
+  /** `v` picks the color scheme when the brand has `variants`. */
+  draw: (g: CanvasRenderingContext2D, w: number, h: number, v: number) => void;
+  /** Number of color schemes (one board per building picks one). Default 1. */
+  variants?: number;
   /** Written in the script font: redrawn once it has loaded. */
   script?: boolean;
 }
@@ -72,6 +75,16 @@ const script = (
   g.lineWidth = s * 0.045;
   g.strokeText(text, w / 2, y);
 };
+
+/** Corner-store boards come in whatever the owner had: [board, letters]. */
+const DEP_COLORS: [string, string][] = [
+  ["#ffffff", "#d0202a"],
+  ["#1f7a3a", "#ffffff"],
+  ["#1d3f8f", "#ffd23f"],
+  ["#d0202a", "#ffffff"],
+  ["#ffd23f", "#141414"],
+  ["#e8681e", "#ffffff"],
+];
 
 const BRANDS: Brand[] = [
   {
@@ -132,14 +145,13 @@ const BRANDS: Brand[] = [
     script: true,
   },
   {
-    id: "aircanada",
-    draw: (g, w, h) => {
-      fill(g, "#c8102e", w, h);
-      g.fillStyle = "#fff";
-      g.fillRect(0, h * 0.62, w, h * 0.38);
-      label(g, "AIR", "#ffffff", w, h * 0.34, h * 0.4);
-      label(g, "CANADA", "#c8102e", w, h * 0.8, h * 0.28);
+    id: "depanneur",
+    draw: (g, w, h, v) => {
+      const [bg, ink] = DEP_COLORS[v];
+      fill(g, bg, w, h);
+      label(g, "Dépanneur", ink, w, h * 0.53, h * 0.5);
     },
+    variants: DEP_COLORS.length,
   },
   {
     id: "poutine",
@@ -154,14 +166,14 @@ const BRANDS: Brand[] = [
   },
 ];
 
-function texture(brand: Brand): THREE.CanvasTexture {
+function texture(brand: Brand, v: number): THREE.CanvasTexture {
   const w = 1024;
   const h = 256;
   const c = document.createElement("canvas");
   c.width = w;
   c.height = h;
   const g = c.getContext("2d")!;
-  brand.draw(g, w, h);
+  brand.draw(g, w, h, v);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 8;
@@ -170,7 +182,7 @@ function texture(brand: Brand): THREE.CanvasTexture {
     void scriptFontReady().then((ok) => {
       if (!ok) return; // the fallback script stays up
       g.clearRect(0, 0, w, h);
-      brand.draw(g, w, h);
+      brand.draw(g, w, h, v);
       t.needsUpdate = true;
     });
   return t;
@@ -190,18 +202,19 @@ const RATE: Partial<Record<Building["district"], number>> = {
 /** Hang the boards. Static meshes; the city tiler picks them up with the rest of the block. */
 export function buildShopSigns(city: CityModel, scene: THREE.Scene): void {
   const geo = new THREE.PlaneGeometry(1, 1);
-  const maps = BRANDS.map(texture);
   // A little self-light so a red board still reads under the flat winter sky, without glowing like neon.
-  const mats = maps.map(
-    (map) =>
-      new THREE.MeshStandardMaterial({
+  const mats = BRANDS.map((brand) =>
+    Array.from({ length: brand.variants ?? 1 }, (_, v) => {
+      const map = texture(brand, v);
+      return new THREE.MeshStandardMaterial({
         map,
         roughness: 0.62,
         metalness: 0.02,
         emissive: new THREE.Color(0xffffff),
         emissiveMap: map,
         emissiveIntensity: 0.18,
-      }),
+      });
+    }),
   );
   const group = new THREE.Group();
   group.name = "shop-signs";
@@ -229,7 +242,12 @@ export function buildShopSigns(city: CityModel, scene: THREE.Scene): void {
       const span = f === "N" || f === "S";
       const s0 = (span ? x : z) - width / 2;
       if (openingTop(b, f as Facing, s0, s0 + width) !== null) continue;
-      const mesh = new THREE.Mesh(geo, mats[brand]);
+      const looks = mats[brand];
+      const look =
+        looks[
+          Math.floor(hash(b.seed * 5.3 + f.charCodeAt(0) * 2.9) * looks.length)
+        ];
+      const mesh = new THREE.Mesh(geo, look);
       mesh.scale.set(width, height, 1);
       mesh.position.set(x, floor + 2.72, z);
       mesh.rotation.y = Math.atan2(face.normal.x, face.normal.z);

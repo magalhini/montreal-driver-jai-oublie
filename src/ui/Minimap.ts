@@ -106,13 +106,13 @@ export class Minimap implements ViewSystem {
     }
     // Precinct (always shown), then patrol cops (only inside the radar), pursuers (pinned to the rim)
     const station = this.city.features.station;
-    if (station) drawDispatch(ctx, q.x, q.y, (this.place(station.dispatch, rim) ? 13 : 9) * dpr, station.color, station.glyph);
+    if (station) drawDispatch(ctx, q.x, q.y, (this.place(station.dispatch, rim) ? 15.6 : 10.8) * dpr, station.color, station.glyph);
     for (const cop of this.police.cops.values()) {
       const pursuit = cop.state === 'pursuit';
       const inside = this.place(cop.car.interpPos(alpha), rim);
       if (!inside && !pursuit) continue;
       if (inside && !pursuit) this.patrolsOnRadar++;
-      drawBlip(ctx, q.x, q.y, (pursuit ? (inside ? 4.8 : 3.8) : 3.2) * dpr, copColor(pursuit, now), pursuit);
+      drawBlip(ctx, q.x, q.y, (pursuit ? (inside ? 5.8 : 4.6) : 3.8) * dpr, copColor(pursuit, now), pursuit);
     }
     const target = this.gps.target;
     if (this.gps.waypoint && this.gps.waypoint !== target && this.place(this.gps.waypoint, rim)) drawPin(ctx, q.x, q.y, 5 * dpr, MAP_INK.waypoint);

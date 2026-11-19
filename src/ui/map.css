@@ -1,9 +1,9 @@
 :root {
-  --minimap-size: 200px;
+  --minimap-size: 240px;
 }
 @media (max-height: 760px) {
   :root {
-    --minimap-size: 160px;
+    --minimap-size: 192px;
   }
 }
 
