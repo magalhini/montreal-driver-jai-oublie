@@ -4,7 +4,7 @@ import type { World } from '../core/World';
 import type { Lane, SimSystem, Vec2 } from '../types';
 import { Car, type BodyStyle } from '../vehicles/Car';
 import { TAXI_COLOR } from '../vehicles/CarModel';
-import { BOX_TRUCK, PICKUP, TRAFFIC_SEDAN } from '../vehicles/CarSpec';
+import { BOX_TRUCK, PICKUP, POST_VAN, TRAFFIC_SEDAN } from '../vehicles/CarSpec';
 import { LaneDriver } from './LaneDriver';
 
 const COLORS = [0xe8e8e8, 0x9aa0a8, 0x18181d, 0xa01818, 0x1c2a5a, 0xc8b48a, 0x2a7a7a, 0x2f5a3a, 0xd8d0c0, 0x5a2a4a];
@@ -14,8 +14,10 @@ const STYLES: BodyStyle[] = ['sedan', 'sedan', 'sedan', 'sedan', 'wagon', 'wagon
 const TRUCK_COLORS = [0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0xe4e4e0, 0x8fb0c8, 0x5f8a6a, 0x26406e];
 /** Pickup paints: white, silver, black, red, blue, dark green. */
 const PICKUP_COLORS = [0xf2f2f0, 0xb7bcc2, 0x1a1a1c, 0x8e1c1c, 0x1c355c, 0x1e3d28];
-/** Share of spawns that are trucks, and at most this many box trucks around. The rest of that share is pickups. */
-export const TRUCK_TUNING = { boxTruck: 0.06, pickup: 0.1, maxBoxTrucks: 3 };
+/** Canada Post red. */
+export const POST_RED = 0xd8121c;
+/** Share of spawns that are box trucks, Canada Post vans and pickups, and caps on the first two. */
+export const TRUCK_TUNING = { boxTruck: 0.06, postVan: 0.04, pickup: 0.1, maxBoxTrucks: 3, maxPostVans: 2 };
 
 /** Spawns, drives and despawns civilian traffic in a ring around the player. */
 export class TrafficSystem implements SimSystem {
@@ -49,15 +51,21 @@ export class TrafficSystem implements SimSystem {
 
   /** Box trucks currently driving. */
   get boxTrucks(): number {
+    return this.driving('truck');
+  }
+
+  private driving(style: BodyStyle): number {
     let n = 0;
-    for (const d of this.drivers.values()) if (d.car.look.style === 'truck') n++;
+    for (const d of this.drivers.values()) if (d.car.look.style === style) n++;
     return n;
   }
 
   private pickStyle(): BodyStyle {
     const rng = this.world.rng;
     const r = rng.next();
-    if (r < TRUCK_TUNING.boxTruck && this.boxTrucks < TRUCK_TUNING.maxBoxTrucks) return 'truck';
+    const T = TRUCK_TUNING;
+    if (r < T.boxTruck && this.boxTrucks < T.maxBoxTrucks) return 'truck';
+    if (r >= T.boxTruck && r < T.boxTruck + T.postVan && this.driving('postvan') < T.maxPostVans) return 'postvan';
     if (r > 1 - TRUCK_TUNING.pickup) return 'pickup';
     return rng.pick(STYLES);
   }
@@ -67,9 +75,9 @@ export class TrafficSystem implements SimSystem {
     const style = opts?.style ?? this.pickStyle();
     const palette = style === 'truck' ? TRUCK_COLORS : style === 'pickup' ? PICKUP_COLORS : COLORS;
     const taxi = style === 'sedan' && rng.chance(0.14);
-    const color = opts?.color ?? (taxi ? TAXI_COLOR : rng.pick(palette));
+    const color = style === 'postvan' ? POST_RED : (opts?.color ?? (taxi ? TAXI_COLOR : rng.pick(palette)));
     const yaw = Math.atan2(lane.dir.x, lane.dir.z);
-    const spec = style === 'truck' ? BOX_TRUCK : style === 'pickup' ? PICKUP : TRAFFIC_SEDAN;
+    const spec = style === 'truck' ? BOX_TRUCK : style === 'postvan' ? POST_VAN : style === 'pickup' ? PICKUP : TRAFFIC_SEDAN;
     const car = new Car('traffic', spec, { style, color }, pos, yaw);
     const sp = car.phys.state;
     const v0 = this.world.city.edges[lane.edgeId].speedLimit * 0.7;
@@ -82,6 +90,11 @@ export class TrafficSystem implements SimSystem {
       drv.speedMul = rng.range(0.75, 0.9);
       drv.turnSpeed = 4.8;
       drv.aMax = 1.3;
+    } else if (style === 'postvan') {
+      // On a route: a bit under the limit, careful round the corners
+      drv.speedMul = rng.range(0.8, 0.95);
+      drv.turnSpeed = 5.2;
+      drv.aMax = 1.6;
     }
     this.drivers.set(car.id, drv);
     return car;

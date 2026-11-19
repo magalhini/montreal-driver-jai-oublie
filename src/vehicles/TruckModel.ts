@@ -5,6 +5,7 @@ import { bake, Kit, lensGeo, look, paintBase, type Base } from './CarKit';
 import { BLACK, CHROME, CHROME_C, GLASS, GLASS_C, MATTE, TRIM } from './CarMaterial';
 import { buildBoxTruck } from './TruckBox';
 import { buildPickup } from './TruckPickup';
+import { buildPostVan, postLivery } from './PostVan';
 import type { P3, TruckCtx } from './TruckCab';
 
 /**
@@ -14,6 +15,7 @@ import type { P3, TruckCtx } from './TruckCab';
 export const TRUCK_DIMS: Record<TruckStyle, { L: number; W: number; r: number; wf: number; wr: number; duals: boolean; tf: number; tr: number; ti: number }> = {
   truck: { L: 5.7, W: 1.94, r: 0.38, wf: 1.75, wr: -1.3, duals: true, tf: 0.8, tr: 0.835, ti: 0.59 },
   pickup: { L: 5.4, W: 1.94, r: 0.36, wf: 1.68, wr: -1.42, duals: false, tf: 0.82, tr: 0.82, ti: 0 },
+  postvan: { L: 5.72, W: 2.0, r: 0.38, wf: 1.75, wr: -1.3, duals: false, tf: 0.85, tr: 0.85, ti: 0 },
 };
 
 interface TruckBase {
@@ -47,6 +49,7 @@ function buildBase(style: TruckStyle): TruckBase {
     tailPos: [],
   };
   if (style === 'truck') buildBoxTruck(c);
+  else if (style === 'postvan') buildPostVan(c);
   else buildPickup(c);
   return { base: bake(c.kit), front: lensGeo(c.heads), rear: lensGeo(c.tails), headPos: c.headPos, tailPos: c.tailPos };
 }
@@ -77,5 +80,6 @@ export function buildTruckParts(style: TruckStyle, color: number): CarParts {
     wheelRadius: d.r,
     length: d.L,
     width: d.W,
+    livery: style === 'postvan' ? postLivery() : undefined,
   };
 }

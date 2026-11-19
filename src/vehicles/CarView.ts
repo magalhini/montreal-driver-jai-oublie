@@ -317,6 +317,7 @@ export class CarView implements ViewSystem {
         body.add(m);
       }
     }
+    if (p.livery) body.add(new THREE.Mesh(p.livery.geo, p.livery.mat));
     if (p.sign) {
       v.sign = new THREE.Mesh(p.sign, MAT.taxiFree);
       body.add(v.sign);

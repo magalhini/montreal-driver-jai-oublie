@@ -1,8 +1,9 @@
 import * as THREE from "three";
 import { CONFIG } from "../config";
-import { fwd, leftOf } from "../core/math";
+import { dot, fwd, leftOf, yawOf } from "../core/math";
 import type { World } from "../core/World";
 import type { Closures } from "../gameplay/Closures";
+import type { TicketAgent } from "../gameplay/ParkingTicket";
 import type { Vec2 } from "../types";
 import type { Car } from "../vehicles/Car";
 import type { Cockpit } from "../vehicles/Cockpit";
@@ -45,6 +46,8 @@ interface Shot {
   look: () => THREE.Vector3;
   /** Re-frame when the shot comes up (a moving subject: where it is now, not at the start of the intro). */
   restage?: () => Shot | null;
+  /** Someone the intro puts in the scene for this shot only (drawn by a `TicketAgentView`). */
+  agent?: TicketAgent;
 }
 
 const CURB_SIDE = CONFIG.DRIVE_SIDE === "left" ? 1 : -1;
@@ -52,15 +55,18 @@ const ease = (u: number) => u * u * (3 - 2 * u);
 
 /**
  * Montreal, then the car, before the drive (both modes): a rue barrée fence, an ARRÊT sign at an all-way stop,
- * an SPVM cruiser going by, the deepest pothole in town and a métro entrance, then the charm on the rearview
+ * an SPVM cruiser going by, the deepest pothole in town, a métro entrance and a parking agent ticketing a car
+ * at the curb, then the charm on the rearview
  * mirror and a pull back out of the driver's window onto the car. The city keeps running underneath (the
  * cruiser is really driving). ESC, F or Space skips it. Shots that the city can't stage this session (no
- * cruiser on the road, no fence rolled) are left out; the car scene still plays.
+ * cruiser on the road, no fence rolled, no car parked at the curb) are left out; the car scene still plays.
  */
 export class IntroCutscene {
   /** Black over the screen (0..1), shared with the HUD fade. */
   fade = 0;
   private shots: Shot[] = [];
+  /** The parking agent in the ticket shot; null the rest of the time. Read by a `TicketAgentView`. */
+  readonly ticketing: { agent: TicketAgent | null } = { agent: null };
   private t = 0;
   private index = -1;
   private ending = -1;
@@ -141,10 +147,14 @@ export class IntroCutscene {
         const fresh = this.shots[i].restage?.();
         if (fresh) this.shots[i] = fresh;
         this.showCaption(this.shots[i], T.shot);
+        this.ticketing.agent = this.shots[i].agent ?? null;
       }
+      const agent = this.ticketing.agent;
+      if (agent) agent.t += dt;
       this.fade = Math.max(0, 1 - this.t / T.fadeIn);
       return;
     }
+    this.ticketing.agent = null;
     // No body yet (the view hasn't built the car): skip the car scene rather than hold a black screen.
     if (!this.ride.body()) {
       this.ending = 0;
@@ -202,6 +212,7 @@ export class IntroCutscene {
 
   private finish(): void {
     this.beat = "";
+    this.ticketing.agent = null;
     if (this.cam) this.lens(this.cam, 62, 0.3, 1600);
     const then = this.done;
     this.done = null;
@@ -318,6 +329,7 @@ export class IntroCutscene {
       this.policeShot(),
       this.potholeShot(),
       this.metroShot(),
+      this.ticketShot(),
     ].filter((s): s is Shot => s !== null);
   }
 
@@ -498,6 +510,69 @@ export class IntroCutscene {
       from: at(9, -6, 1.7),
       to: at(7, -2.5, 2.1),
       look: () => sign,
+    };
+  }
+
+  private ticketShot(): Shot | null {
+    const shot = this.frameTicket();
+    return shot && { ...shot, restage: () => this.frameTicket() };
+  }
+
+  /**
+   * A car parked at the curb near the start (only the curb runs around the player are filled in), with an
+   * agent from the Agence de mobilité durable at its sidewalk-side door, writing. The lens comes down the
+   * sidewalk toward them from in front of the car.
+   */
+  private frameTicket(): Shot | null {
+    const w = this.world;
+    const home = w.player.pos;
+    const curb = w.city.features.curb;
+    let car: Car | null = null;
+    let bay: (typeof curb)[number] | null = null;
+    let best = Infinity;
+    for (const c of w.cars) {
+      if (c.kind !== "parked" || c.removed || c.doubleParked) continue;
+      const d = Math.hypot(c.pos.x - home.x, c.pos.z - home.z);
+      // Not the player's own street corner, not so far the run is about to be put away
+      if (d < 18 || d > 110) continue;
+      const b = curb.find(
+        (k) => Math.hypot(k.pos.x - c.pos.x, k.pos.z - c.pos.z) < 0.5,
+      );
+      if (!b) continue; // a parking lot, not the curb
+      const score = Math.abs(d - 40);
+      if (score < best) {
+        best = score;
+        car = c;
+        bay = b;
+      }
+    }
+    if (!car || !bay) return null;
+    const f = fwd(car.yaw);
+    const l = leftOf(car.yaw);
+    // The sidewalk side, as ParkingTicket works it out for the player's car
+    const curbDir = { x: -Math.cos(bay.yaw), z: Math.sin(bay.yaw) };
+    const side = dot(curbDir, l) >= 0 ? 1 : -1;
+    const at = (along: number, lat: number) => ({
+      x: car.pos.x + f.x * along + l.x * side * lat,
+      z: car.pos.z + f.z * along + l.z * side * lat,
+    });
+    const pos = at(-0.15, car.halfW + 0.62);
+    const agent: TicketAgent = {
+      pos,
+      prev: { ...pos },
+      yaw: yawOf({ x: car.pos.x - pos.x, z: car.pos.z - pos.z }),
+      pose: "write",
+      t: 0,
+      walked: 0,
+    };
+    const look = this.ground(at(-0.4, car.halfW + 0.3), 1.05);
+    return {
+      title: "Agence de mobilité durable",
+      sub: "good luck trying to find a valid parking spot",
+      from: this.ground(at(car.halfL + 5.5, car.halfW + 1.5), 1.75),
+      to: this.ground(at(car.halfL + 2.6, car.halfW + 1.25), 1.5),
+      look: () => look,
+      agent,
     };
   }
 }

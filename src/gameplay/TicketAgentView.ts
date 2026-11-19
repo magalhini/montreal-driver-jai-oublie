@@ -119,10 +119,12 @@ export class TicketAgentView implements ViewSystem {
 
   sync(alpha: number, frameDt: number): void {
     const o = this.tickets.agent;
+    const appeared = !this.root.visible;
     this.root.visible = o !== null;
     if (!o) return;
     const yTarget = this.terrain.surfaceY(o.pos.x, o.pos.z);
-    this.y += (yTarget - this.y) * Math.min(1, frameDt * 12);
+    // Smooth over the curb while walking, but start on the ground (not rising out of it)
+    this.y = appeared ? yTarget : this.y + (yTarget - this.y) * Math.min(1, frameDt * 12);
     if (o.pose === 'walk' && o.walked === 0) this.y = yTarget;
 
     const [legL, legR] = this.legs;

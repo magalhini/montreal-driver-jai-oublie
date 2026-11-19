@@ -136,6 +136,15 @@ export const BOX_TRUCK: CarSpec = {
   steerSpeed: 2.6,
 };
 
+/** Canada Post step van: the box truck's running gear under a lighter, wider body. */
+export const POST_VAN: CarSpec = {
+  ...BOX_TRUCK,
+  name: "Canada Post Van",
+  mass: 3000,
+  halfWidth: 1.0,
+  halfLength: 2.86,
+};
+
 /** Half-ton pickup: hood, separate cab, open bed. */
 export const PICKUP: CarSpec = {
   ...TRAFFIC_SEDAN,

@@ -36,6 +36,8 @@ export interface CarParts {
   wheelRadius: number;
   length: number;
   width: number;
+  /** Printed side panels (lettering the vertex-colored body can't carry): shared geometry and material. */
+  livery?: { geo: THREE.BufferGeometry; mat: THREE.Material };
 }
 
 const baseCache = new Map<string, BaseParts>();

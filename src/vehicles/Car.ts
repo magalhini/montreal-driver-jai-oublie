@@ -12,8 +12,8 @@ const BLINK_PERIOD = 0.75;
 const BLINK_ON = 0.42;
 /** Cars built from side profiles. Trucks are separate (`TruckStyle`). */
 export type CarStyle = 'coupe' | 'sedan' | 'wagon' | 'police';
-/** Trucks built by `TruckModel`, not from side profiles: a box van and a conventional pickup. */
-export type TruckStyle = 'truck' | 'pickup';
+/** Trucks built by `TruckModel`, not from side profiles: a box van, a conventional pickup and a Canada Post step van. */
+export type TruckStyle = 'truck' | 'pickup' | 'postvan';
 export type BodyStyle = CarStyle | TruckStyle;
 /**
  * Extra bodywork for a car the player drives. Traffic leaves this off, so a shared silhouette stays cheaper.
@@ -21,7 +21,7 @@ export type BodyStyle = CarStyle | TruckStyle;
  */
 export type CarDetail = 'taxi' | 'patrol' | 'work' | 'driver';
 
-export const isTruck = (s: BodyStyle): s is TruckStyle => s === 'truck' || s === 'pickup';
+export const isTruck = (s: BodyStyle): s is TruckStyle => s === 'truck' || s === 'pickup' || s === 'postvan';
 
 export interface CarLook {
   style: BodyStyle;

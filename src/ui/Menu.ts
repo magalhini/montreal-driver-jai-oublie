@@ -78,7 +78,6 @@ const KEYBOARD: [string, string][] = [
   ["M", "map"],
   ["F", "skip the garage intro"],
   ["P / ESC", "pause"],
-  ["~", "debug panel"],
 ];
 const GAMEPAD: [string, string][] = [
   ["RT / LT", "throttle / brake"],

@@ -31,7 +31,7 @@ import type { CameraRig } from './render/CameraRig';
 import { GRAPHICS, GRAPHICS_OPTIONS, POSTFX, setGraphic, type GraphicsKey } from './render/PostFX';
 import type { StaticTiles } from './render/StaticTiles';
 import type { Interior, OffenseKind, Vec2 } from './types';
-import type { Car } from './vehicles/Car';
+import { isTruck, type Car } from './vehicles/Car';
 import { addDamage, repair } from './vehicles/Damage';
 import { equipCar, PLAYER_CAR } from './vehicles/Fleet';
 import { addSpecPanel } from './vehicles/SpecPanel';
@@ -103,7 +103,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   addPotholePanel(sys);
   addClosurePanel(sys);
   Debug.watch('cars', () => {
-    const trucks = [...traffic.drivers.values()].filter((d) => d.car.look.style === 'truck' || d.car.look.style === 'pickup').length;
+    const trucks = [...traffic.drivers.values()].filter((d) => isTruck(d.car.look.style)).length;
     const moods = { yield: 0, evade: 0, ped: 0 };
     for (const d of traffic.drivers.values()) if (d.mood !== 'cruise') moods[d.mood]++;
     return `${world.cars.length} (traffic ${traffic.drivers.size}, trucks ${trucks}) yield ${moods.yield} evade ${moods.evade} ped ${moods.ped}`;
@@ -131,6 +131,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   streetFolder.add(DOG_TUNING, 'share', 0, 5, 0.1).name('dog walkers x');
   streetFolder.add(TRUCK_TUNING, 'boxTruck', 0, 1, 0.01).name('box truck share');
   streetFolder.add(TRUCK_TUNING, 'pickup', 0, 1, 0.01).name('pickup share');
+  streetFolder.add(TRUCK_TUNING, 'postVan', 0, 1, 0.01).name('post van share');
   streetFolder.add(TRUCK_TUNING, 'maxBoxTrucks', 0, 10, 1).name('max box trucks');
   const laneAhead = (d: number) => {
     const f = fwd(player.yaw);
@@ -140,6 +141,7 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   streetFolder.add({ scooter: () => { const h = laneAhead(30); riders.spawn(h.lane, h.t, 'scooter'); } }, 'scooter').name('spawn scooter ahead');
   streetFolder.add({ truck: () => { const h = laneAhead(40); traffic.spawnCar(h.lane, h.pos, { style: 'truck' }); } }, 'truck').name('spawn truck ahead');
   streetFolder.add({ pickup: () => { const h = laneAhead(40); traffic.spawnCar(h.lane, h.pos, { style: 'pickup' }); } }, 'pickup').name('spawn pickup ahead');
+  streetFolder.add({ postvan: () => { const h = laneAhead(40); traffic.spawnCar(h.lane, h.pos, { style: 'postvan' }); } }, 'postvan').name('spawn Canada Post van ahead');
   Debug.watch('heat', () => {
     const short: Record<OffenseKind, string> = {
       redLight: 'red',
@@ -251,7 +253,6 @@ export function addDebugPanels(sys: DebugSystems): { adoptSpec: () => void } {
   fxFolder.add(POSTFX, 'grain', 0, 0.2, 0.005);
   fxFolder.add(POSTFX, 'aberration', 0, 0.01, 0.0001);
   fxFolder.add(POSTFX, 'saturation', 0, 2, 0.01);
-  fxFolder.add(POSTFX, 'curve', 0, 0.25, 0.005).name('screen bend');
   for (const opt of GRAPHICS_OPTIONS) {
     fxFolder
       .add(GRAPHICS, opt.key)

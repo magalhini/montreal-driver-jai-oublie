@@ -590,6 +590,7 @@ const riderView = new RiderView(world, r.scene, city.terrain, r.camera);
 game.addView(riderView);
 game.addView(new OfficerView(bust, r.scene, city.terrain));
 game.addView(new TicketAgentView(parkingTickets, r.scene, city.terrain));
+game.addView(new TicketAgentView(intro.ticketing, r.scene, city.terrain));
 const pickupView = new TirePickupView(
   pickup,
   player,

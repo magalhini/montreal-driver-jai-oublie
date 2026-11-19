@@ -16,8 +16,6 @@ export const POSTFX = {
   grain: 0.035,
   aberration: 0.0006,
   saturation: 1.08,
-  /** Barrel bend when SCREEN BEND is on. */
-  curve: 0.085,
 };
 
 /** Picture options on the GRAPHICS page. Saved to `localStorage`. */
@@ -26,7 +24,6 @@ export const GRAPHICS_OPTIONS = [
   { key: 'vignette', label: 'VIGNETTE', hint: 'Darkened corners' },
   { key: 'grain', label: 'FILM GRAIN', hint: 'Fine noise, like old footage' },
   { key: 'aberration', label: 'RGB SHIFT', hint: 'Color fringing toward the edges of the screen' },
-  { key: 'curve', label: 'SCREEN BEND', hint: 'Curve the picture like a glass tube' },
 ] as const;
 
 export type GraphicsKey = (typeof GRAPHICS_OPTIONS)[number]['key'];
@@ -36,7 +33,6 @@ const GRAPHICS_DEFAULTS: Record<GraphicsKey, boolean> = {
   vignette: true,
   grain: true,
   aberration: true,
-  curve: false,
 };
 
 export const GRAPHICS_KEY = 'montrealDriver.graphics';
@@ -77,7 +73,7 @@ function lookAmount(key: GraphicsKey, amount: number): number {
   return GRAPHICS[key] ? amount : 0;
 }
 
-/** Final pass: linear -> sRGB, then the retro glass (bend, fringe, vignette, grain). */
+/** Final pass: linear -> sRGB, then the retro glass (fringe, vignette, grain). */
 const FinishShader = {
   uniforms: {
     tDiffuse: { value: null as THREE.Texture | null },
@@ -88,32 +84,21 @@ const FinishShader = {
     uSaturation: { value: POSTFX.saturation },
     uTired: { value: 0 },
     uBlink: { value: 0 },
-    uCurve: { value: 0 },
   },
   vertexShader: /* glsl */ `
     varying vec2 vUv;
     void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
   fragmentShader: /* glsl */ `
     uniform sampler2D tDiffuse;
-    uniform float uTime, uVignette, uGrain, uAberration, uSaturation, uTired, uBlink, uCurve;
+    uniform float uTime, uVignette, uGrain, uAberration, uSaturation, uTired, uBlink;
     varying vec2 vUv;
     vec3 toSRGB(vec3 c) {
       c = max(c, 0.0);
       return mix(c * 12.92, 1.055 * pow(c, vec3(1.0 / 2.4)) - 0.055, step(0.0031308, c));
     }
     float hash(vec2 p) { return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
-    // Glass tube: the picture bows out toward the corners. uCurve 0 leaves uv alone.
-    vec2 bend(vec2 uv) {
-      vec2 p = uv * 2.0 - 1.0;
-      p *= 1.0 + dot(p, p) * uCurve;
-      return p * 0.5 + 0.5;
-    }
     void main() {
-      vec2 uv = bend(vUv);
-      if (uv.x < 0.0 || uv.y < 0.0 || uv.x > 1.0 || uv.y > 1.0) {
-        gl_FragColor = vec4(0.0, 0.0, 0.0, 1.0);
-        return;
-      }
+      vec2 uv = vUv;
       vec2 d = uv - 0.5;
       float r2 = dot(d, d);
       vec2 off = d * uAberration * (1.0 + r2 * 6.0);
@@ -235,7 +220,6 @@ export class PostFX {
     u.uTired.value = this.tired;
     u.uBlink.value = this.blink;
     u.uSaturation.value = POSTFX.saturation;
-    u.uCurve.value = lookAmount('curve', POSTFX.curve);
     this.composer.render();
   }
 }

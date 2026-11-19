@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { CONFIG } from '../config';
-import type { BodyStyle } from './Car';
+import { isTruck, type BodyStyle } from './Car';
 import { PROFILES } from './BodyProfiles';
 import type { V2 } from './CarGeometry';
 import { Kit, bake, look, paintBase } from './CarKit';
@@ -104,7 +104,7 @@ interface CabFit {
 
 /** Driver's-eye interior fitted to a body style's greenhouse (car frame: +z forward, y up from the ground). */
 export function buildCockpit(style: BodyStyle): CockpitParts {
-  const st: CabFit = PROFILES[style === 'truck' || style === 'pickup' ? 'sedan' : style];
+  const st: CabFit = PROFILES[isTruck(style) ? 'sedan' : style];
   const [[bz, by], [tz, ty]] = st.ws; // windshield base and top (z, y)
   const wsZ = (y: number) => bz + ((y - by) / (ty - by)) * (tz - bz);
   const roofY = Math.max(...st.roof.map((p) => p[1]));
@@ -200,7 +200,7 @@ export function buildCockpit(style: BodyStyle): CockpitParts {
   }
 
   // Door mirrors (they are on the body, outside): the black sail at the front of each window that holds them
-  const sailZ = style === 'truck' || style === 'pickup' ? null : bz - 0.16;
+  const sailZ = isTruck(style) ? null : bz - 0.16;
   if (sailZ !== null) {
     const xIn = hwD + 0.01;
     const xOut = st.W / 2 + 0.04;
